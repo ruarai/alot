@@ -113,3 +113,6 @@ Work happens on local branches; there is no GitHub PR step.
   ```
 
 - When a task is done, update its status in TASKS.md in the same commit.
+- Commit as Claude Code, not as the machine's default git user (`Ubuntu`):
+  run `git -c user.name="Claude Code" -c user.email=noreply@anthropic.com
+  commit ...`, which sets both author and committer.
