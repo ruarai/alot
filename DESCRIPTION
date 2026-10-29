@@ -12,6 +12,7 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 Depends: R (>= 4.4)
 Imports:
+    cli,
     ggplot2 (>= 4.0.0),
     ggplot2 (< 4.1.0),
     rlang,

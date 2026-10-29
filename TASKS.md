@@ -68,7 +68,7 @@ not repeated below:
   `mapped_discrete`, `Date`, `POSIXct`, and list columns passed through
   untouched). Benchmarks show no copy for numeric columns.
 
-### T0.4 Grouped-kernel driver
+### T0.4 Grouped-kernel driver — done
 - **Depends:** T0.3
 - **Touches:** `alot-core/src/group.rs` (new), `alot-r/src/lib.rs`,
   `R/grouped.R` (new)

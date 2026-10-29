@@ -24,4 +24,21 @@ rs_convert_roundtrip <- function(df, copy) .Call(wrap__convert_roundtrip, df, co
 #' @noRd
 rs_convert_inspect <- function(df) .Call(wrap__convert_inspect, df)
 
+#' The group index of layer data `df` over `PANEL` x `group` (`PANEL`
+#' only unless `by_group`), for tests: `list(order, offsets, panel)`, all
+#' 1-based, or `NULL` where the driver would decline.
+#' @noRd
+rs_group_index <- function(df, by_group) .Call(wrap__group_index, df, by_group)
+
+#' Identity-style stat kernel for testing the driver: per group, the double
+#' columns `cols` unchanged plus `n`, the group size. `NULL` (decline) if a
+#' column is missing or not double.
+#' @noRd
+rs_grouped_test_stat <- function(df, cols) .Call(wrap__grouped_test_stat, df, cols)
+
+#' Position kernel for testing the driver: adds the panel's row count to
+#' the double column `col`. `NULL` (decline) if `col` is not double.
+#' @noRd
+rs_grouped_test_position <- function(df, col) .Call(wrap__grouped_test_position, df, col)
+
 # nolint end

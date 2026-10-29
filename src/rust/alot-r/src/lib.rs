@@ -1,5 +1,7 @@
 pub mod convert;
+pub mod grouped;
 
+use alot_core::group::{Columns, Values};
 use alot_core::scale::range;
 use convert::{ColumnData, ColumnsBuilder, Frame};
 use extendr_api::prelude::*;
@@ -94,9 +96,66 @@ fn convert_inspect(df: List) -> extendr_api::Result<List> {
     out.finish()
 }
 
+/// The group index of layer data `df` over `PANEL` x `group` (`PANEL`
+/// only unless `by_group`), for tests: `list(order, offsets, panel)`, all
+/// 1-based, or `NULL` where the driver would decline.
+/// @noRd
+#[extendr(r_name = "rs_group_index")]
+fn group_index(df: List, by_group: bool) -> extendr_api::Result<Robj> {
+    let Some(ix) = grouped::group_index(&Frame::new(&df), by_group) else { return Ok(().into()) };
+    let one_based = |v: &[usize]| convert::integers(v.iter().map(|&i| Some(i as i32 + 1)));
+    let mut out = ColumnsBuilder::new();
+    out.push("order", one_based(&ix.order));
+    out.push("offsets", convert::integers(ix.offsets.iter().map(|&i| Some(i as i32))));
+    out.push("panel", one_based(&ix.panel));
+    Ok(out.finish()?.into())
+}
+
+/// Identity-style stat kernel for testing the driver: per group, the double
+/// columns `cols` unchanged plus `n`, the group size. `NULL` (decline) if a
+/// column is missing or not double.
+/// @noRd
+#[extendr(r_name = "rs_grouped_test_stat")]
+fn grouped_test_stat(df: List, cols: Strings) -> extendr_api::Result<Robj> {
+    let frame = Frame::new(&df);
+    let mut xs = Vec::new();
+    for name in convert::str_iter(&cols) {
+        match frame.get(name.as_ref()).map(|c| c.data) {
+            Some(ColumnData::Double(v)) => xs.push((name.to_string(), v)),
+            _ => return Ok(().into()),
+        }
+    }
+    grouped::run_stat(&frame, |g| {
+        let mut out = Columns::new();
+        for (name, v) in &xs {
+            out.push(name, Values::Double(g.rows.iter().map(|&r| Some(v[r])).collect()));
+        }
+        out.push("n", Values::Integer(vec![Some(g.rows.len() as i32); g.rows.len()]));
+        out
+    })
+}
+
+/// Position kernel for testing the driver: adds the panel's row count to
+/// the double column `col`. `NULL` (decline) if `col` is not double.
+/// @noRd
+#[extendr(r_name = "rs_grouped_test_position")]
+fn grouped_test_position(df: List, col: &str) -> extendr_api::Result<Robj> {
+    let frame = Frame::new(&df);
+    let Some(ColumnData::Double(v)) = frame.get(col).map(|c| c.data) else { return Ok(().into()) };
+    grouped::run_position(&frame, |g| {
+        let n = g.rows.len() as f64;
+        let mut out = Columns::new();
+        out.push(col, Values::Double(g.rows.iter().map(|&r| Some(v[r] + n)).collect()));
+        out
+    })
+}
+
 extendr_module! {
     mod alot;
     fn train_continuous_grouped;
     fn convert_roundtrip;
     fn convert_inspect;
+    fn group_index;
+    fn grouped_test_stat;
+    fn grouped_test_position;
 }
