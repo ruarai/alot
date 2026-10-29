@@ -51,7 +51,7 @@ not repeated below:
 - **Done when:** `R CMD build` followed by `R CMD check --as-cran` with
   networking disabled passes, with no NOTE about crate licences.
 
-### T0.3 Data interchange layer
+### T0.3 Data interchange layer — done
 - **Depends:** T0.1
 - **Touches:** `alot-r/src/convert.rs` (new), `R/convert.R` (new),
   `tests/testthat/test-convert.R`

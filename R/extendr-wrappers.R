@@ -12,4 +12,16 @@ NULL
 #' @noRd
 rs_train_continuous_grouped <- function(x, scale_id, existing) .Call(wrap__train_continuous_grouped, x, scale_id, existing)
 
+#' Round-trips the columns of `df` through the interchange layer, for
+#' tests and benchmarks. With `copy = FALSE` every column passes through;
+#' with `copy = TRUE` each atomic column is rebuilt from its view and given
+#' the original's attributes. Returns a named list for `rebuild_frame()`.
+#' @noRd
+rs_convert_roundtrip <- function(df, copy) .Call(wrap__convert_roundtrip, df, copy)
+
+#' Describes how the interchange layer reads each column of `df`: its kind
+#' and the number of values its view reports as missing.
+#' @noRd
+rs_convert_inspect <- function(df) .Call(wrap__convert_inspect, df)
+
 # nolint end
