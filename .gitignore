@@ -1,0 +1,21 @@
+# R session and IDE files
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+.Renviron
+.vscode/
+
+# R CMD build / check output
+*.tar.gz
+*.Rcheck/
+
+# Generated docs and site
+docs/
+inst/doc/
+
+# Stray graphics output from tests and benchmarks
+Rplots.pdf
+
+# OS files
+.DS_Store

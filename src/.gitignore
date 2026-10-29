@@ -1,0 +1,11 @@
+# Compiled objects
+*.o
+*.so
+*.dll
+
+# Cargo build output and per-build cargo home
+rust/target/
+.cargo/
+
+# Crates unpacked from rust/vendor.tar.xz during offline builds
+vendor/
