@@ -1,8 +1,8 @@
 # alot — Phase 2 scope: rendering to SVG and PNG
 
 Phase 2 takes a built plot (a `ggplot_built` from `alot_build()` or
-`ggplot2::ggplot_build()`) and draws it in Rust: first to SVG, then to PNG
-with resvg. It replaces `ggplot2::ggplot_gtable()`, the grid drawing step and
+`ggplot2::ggplot_build()`) and draws it in Rust, to SVG and to PNG, through
+one shared display list. It replaces `ggplot2::ggplot_gtable()`, the grid drawing step and
 the graphics device. Phase 2 begins once Phase 1 ([PLAN.md](PLAN.md)) is
 finished.
 
@@ -49,14 +49,34 @@ Both accept a `ggplot` (built with `alot_build()` first) or a `ggplot_built`.
 3. **Text measurement.** `fontdb` loads the same files R resolved, and
    `rustybuzz` shapes the text for widths, ascent and descent. Sizes follow
    grid's fontsize × lineheight rules.
-4. **Drawing.** Rust writes each geom, guide and theme element directly as SVG
-   elements, with panel clipping through `clipPath`.
-5. **PNG.** `usvg` + `resvg` + `tiny-skia`, using the same `fontdb` database,
-   so the SVG and PNG agree.
+4. **Display list.** Rust draws each geom, guide and theme element into a
+   flat, backend-neutral list of primitives in device coordinates: paths,
+   polylines, rect batches, point batches (shape, size, stroke, colours), text
+   runs (shaped glyphs plus font), rasters, and clip push/pop. Layout and geom
+   drawing happen once, here. Batches keep one entry per layer and style run,
+   not one per mark, so 1e6 points stay a few large arrays.
+5. **Backends.** Two consumers of the same display list:
+   - **SVG writer** (`alot_svg`). A plain serialiser, with panel clipping
+     through `clipPath`. It merges each point batch into one `<path>` per
+     style group (or `<defs>` + `<use>`; see open question 1) and writes
+     coordinates at fixed, limited precision.
+   - **Raster backend** (`alot_png`). Draws the display list directly with
+     `tiny-skia`, with no SVG string or DOM in between. It uses fast paths
+     SVG can't express: one prebuilt path per point shape and size,
+     transformed per point; `fill_rect` for axis-aligned rects and tiles; and
+     the paint set once per style run. Glyphs are shaped with `rustybuzz`,
+     taken as outlines from `ttf-parser` and filled as `tiny-skia` paths,
+     using the same font files as the measurement step.
 
-New Rust crate: `alot-core/src/render/` (IR, layout, text, svg), plus
-`resvg`. resvg is licensed MPL-2.0, which is compatible with an MIT package,
-but it must be declared in the licence note for vendored crates.
+   PNG does **not** go through SVG. Serialising and reparsing (`usvg` +
+   `resvg`) would cost tens of MB of text and a heap node per mark at 1e6
+   rows, which is more than the rasterisation itself and would lose to
+   ggplot2 + ragg on exactly the dense plots alot exists for.
+
+New Rust crate: `alot-core/src/render/` (IR, layout, text, display list,
+svg, raster), plus `tiny-skia`, `ttf-parser`, `rustybuzz` and `fontdb`.
+`tiny-skia` is BSD-3-Clause and must be declared in the licence note for
+vendored crates.
 
 ## In scope
 
@@ -90,7 +110,7 @@ but it must be declared in the licence note for vendored crates.
 
 | # | Milestone | Done when |
 |---|---|---|
-| 2.0 | **IR and renderer skeleton.** A blank canvas with background; `alot_svg()` and `alot_png()` end to end. | A blank theme renders, and resvg produces a PNG. |
+| 2.0 | **IR, display list and both backends.** A blank canvas with background; `alot_svg()` and `alot_png()` end to end. Point and rect batches drawn by both backends. | A blank theme renders to SVG and PNG. A 1e6-row `geom_point` and a 1000×1000 `geom_tile` panel (no axes or text) render to PNG faster than ggplot2 + ragg. |
 | 2.1 | **Layout engine and text metrics.** | Box positions match grid within 0.5 px across the theme and facet corpus (see Verification). |
 | 2.2 | **Single-panel cartesian plots.** Panel background, grid lines, axes and core geoms. | `geom_point/line/col/text` plots are visually equivalent. |
 | 2.3 | **Facets and strips.** | wrap/grid, free scales, switched strips. |
@@ -109,16 +129,26 @@ but it must be declared in the licence note for vendored crates.
   `ragg::agg_png`, then compare by per-pixel difference with a tolerance
   threshold. Store failing pairs and their diff image as test artefacts for
   manual review.
-- **SVG checks.** The output is well-formed and parses with `usvg`, and it is
-  deterministic: the same input gives byte-identical output.
-- **Performance.** Rendering time and size of the 1e6-point plots, compared
-  with ggplot2 + ragg and with ggplot2 + svglite.
+- **SVG checks.** The output is well-formed and parses with `usvg` (a test
+  dependency only), and it is deterministic: the same input gives
+  byte-identical output.
+- **Backend agreement.** For each corpus plot, rasterise `alot_svg()` output
+  with resvg (test-only) and compare it with `alot_png()` by per-pixel
+  difference. This catches the two backends drifting apart.
+- **Performance.** Rendering time and size of the 1e6-point and dense
+  `geom_tile` plots, compared with ggplot2 + ragg (PNG) and with ggplot2 +
+  svglite (SVG). The PNG path should beat ragg; the SVG path should beat
+  svglite in both time and file size.
 
 ## Open questions to settle before 2.0
 
 1. **SVG size for huge layers.** Should very large point layers be drawn as
-   one `<path>` or with `<use>` symbol references to keep files small?
-   Alternatively they could be rasterised inside the SVG above some threshold.
+   one `<path>` per style group or with `<use>` symbol references to keep
+   files small? Benchmark both on file size and on how fast browsers render
+   them. Separately, should there be an opt-in setting (off by default) that
+   rasterises dense layers into an embedded `<image>` with the raster
+   backend? That trades exact vector output for size, so it can't be the
+   default.
 2. **Default DPI and scaling.** Should defaults follow `ggsave()` (300 dpi,
    size taken from the device) or ragg's 72/96 conventions?
 3. **SVG fallback.** Should the whole-plot SVG fallback require svglite in
