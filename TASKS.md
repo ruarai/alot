@@ -42,7 +42,7 @@ not repeated below:
   `rextendr::document()` regenerates `R/extendr-wrappers.R` without a diff,
   and the existing tests pass.
 
-### T0.2 Vendoring for offline / CRAN builds
+### T0.2 Vendoring for offline / CRAN builds - (ignore for later)
 - **Depends:** T0.1
 - **Touches:** `src/rust/vendor.tar.xz`, `src/rust/vendor-config.toml`,
   `inst/AUTHORS`, `LICENSE.note`, `tools/config.R`
