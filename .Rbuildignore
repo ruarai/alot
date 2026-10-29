@@ -1,0 +1,12 @@
+^\.vscode$
+^\.claude$
+^AGENTS\.md$
+^PLAN\.md$
+^PHASE2\.md$
+^TASKS\.md$
+^src/\.cargo$
+^src/vendor$
+^src/rust/vendor$
+^src/rust/target$
+^src/Makevars$
+^src/Makevars\.win$

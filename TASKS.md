@@ -29,7 +29,7 @@ not repeated below:
 
 ## 1.0 Infrastructure
 
-### T0.1 Full rextendr scaffold
+### T0.1 Full rextendr scaffold — done
 - **Depends:** —
 - **Touches:** `configure`, `configure.win`, `tools/config.R`,
   `tools/msrv.R`, `src/Makevars.in`, `src/Makevars.win.in`, `src/rust/`,

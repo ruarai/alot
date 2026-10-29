@@ -5,7 +5,8 @@ use extendr_api::prelude::*;
 /// vector, `scale_id` 1-based scale indices, `existing` a length-2n double
 /// vector of current ranges (NaN pair for untrained). Returns a length-2n
 /// double vector of new ranges, NA pairs for scales that saw no values.
-#[extendr]
+/// @noRd
+#[extendr(r_name = "rs_train_continuous_grouped")]
 fn train_continuous_grouped(x: Robj, scale_id: &[i32], existing: &[f64]) -> extendr_api::Result<Doubles> {
     let n = existing.len() / 2;
     let ids: Vec<usize> = scale_id.iter().map(|&i| (i - 1) as usize).collect();

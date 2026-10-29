@@ -2,6 +2,7 @@
 name = "alot-core"
 version = "0.0.0"
 edition = "2021"
+rust-version = "1.78"
 publish = false
 
 [dependencies]

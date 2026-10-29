@@ -2,11 +2,17 @@
 name = "alot-r"
 version = "0.0.0"
 edition = "2021"
+rust-version = "1.78"
 publish = false
 
 [lib]
 name = "alot"
-crate-type = ["staticlib"]
+crate-type = ["rlib", "staticlib"]
+
+# Regenerates R/extendr-wrappers.R; run by src/Makevars.
+[[bin]]
+name = "document"
+path = "document.rs"
 
 [dependencies]
 alot-core = { path = "../alot-core" }
