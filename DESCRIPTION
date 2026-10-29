@@ -2,7 +2,7 @@ Package: alot
 Title: A Rust Backend for Building and Rendering 'ggplot2' Plots
 Version: 0.0.0.9000
 Authors@R:
-    person("Ruarai", "Tobin", email = "ruarai.tobin.unimelb@gmail.com",
+    person("Ruarai", "Tobin", email = "ruarai.tobin@unimelb.edu.au",
            role = c("aut", "cre"))
 Description: Re-implements the 'ggplot2' build step (ggplot_build()) and
     rendering to SVG/PNG, with performance-critical work in Rust. Components
