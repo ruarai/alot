@@ -95,3 +95,9 @@ test_that("upstream discrete non-position training and mapping match what alot r
   expect_snapshot(print(body(environment(ggplot2::ScaleDiscrete$map)$f)))
   expect_snapshot(print(body(scales::train_discrete)))
 })
+
+test_that("upstream print method matches the version alot_print mirrors", {
+  # Mirrored by alot_print() (R/print.R). If this fails, update the mirror to
+  # match, then update the snapshot.
+  expect_snapshot(print(body(getS3method("print", "ggplot2::ggplot"))))
+})

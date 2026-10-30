@@ -1,3 +1,4 @@
 export(alot_build)
 export(alot_coverage)
+export(alot_print)
 useDynLib(alot, .registration = TRUE)

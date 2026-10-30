@@ -962,3 +962,32 @@
               fct = fct)
       }
 
+# upstream print method matches the version alot_print mirrors
+
+    Code
+      print(body(getS3method("print", "ggplot2::ggplot")))
+    Output
+      {
+          set_last_plot(x)
+          if (newpage) 
+              grid.newpage()
+          grDevices::recordGraphics(requireNamespace("ggplot2", quietly = TRUE), 
+              list(), getNamespace("ggplot2"))
+          data <- ggplot_build(x)
+          gtable <- ggplot_gtable(data)
+          if (is.null(vp)) {
+              grid.draw(gtable)
+          }
+          else {
+              if (is.character(vp)) 
+                  seekViewport(vp)
+              else pushViewport(vp)
+              grid.draw(gtable)
+              upViewport()
+          }
+          if (isTRUE(getOption("BrailleR.VI")) && rlang::is_installed("BrailleR")) {
+              print(asNamespace("BrailleR")$VI(x))
+          }
+          invisible(x)
+      }
+
