@@ -1470,3 +1470,218 @@
           }
       }
 
+# upstream panel params setup matches the version alot mirrors
+
+    Code
+      print(body(environment(ggplot2::Layout$setup_panel_params)$f))
+    Output
+      {
+          self$coord$modify_scales(self$panel_scales_x, self$panel_scales_y)
+          index <- vec_unique_loc(self$layout$COORD)
+          order <- vec_match(self$layout$COORD, self$layout$COORD[index])
+          scales_x <- self$panel_scales_x[self$layout$SCALE_X[index]]
+          scales_y <- self$panel_scales_y[self$layout$SCALE_Y[index]]
+          panel_params <- Map(self$coord$setup_panel_params, scales_x, 
+              scales_y, MoreArgs = list(params = self$coord_params))[order]
+          self$panel_params <- self$facet$setup_panel_params(panel_params, 
+              self$coord)
+          invisible()
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::CoordCartesian$setup_panel_params)$f))
+    Output
+      {
+          c(view_scales_from_scale(scale_x, self$limits$x, params$expand[c(4, 
+              2)]), view_scales_from_scale(scale_y, self$limits$y, 
+              params$expand[c(3, 1)]), reverse = self$reverse %||% 
+              "none")
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::CoordFlip$setup_panel_params)$f))
+    Output
+      {
+          params$expand <- params$expand[c(2, 1, 4, 3)]
+          parent <- ggproto_parent(CoordCartesian, self)
+          panel_params <- parent$setup_panel_params(scale_x, scale_y, 
+              params)
+          flip_axis_labels(panel_params)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::ScaleContinuous$get_breaks)$f))
+    Output
+      {
+          if (self$is_empty()) {
+              return(numeric())
+          }
+          transformation <- self$get_transformation()
+          breaks <- self$breaks %|W|% transformation$breaks
+          if (is.null(breaks)) {
+              return(NULL)
+          }
+          domain <- suppressWarnings(transformation$transform(transformation$domain))
+          domain <- sort(domain)
+          if (length(domain) == 2 && !zero_range(domain)) {
+              limits <- oob_squish(limits, domain)
+          }
+          if (zero_range(as.numeric(limits))) {
+              return(limits[1])
+          }
+          if (is.function(breaks)) {
+              limits <- transformation$inverse(limits)
+              if (!is.null(self$n.breaks) && support_nbreaks(breaks)) {
+                  breaks <- breaks(limits, n = self$n.breaks)
+              }
+              else {
+                  breaks <- breaks(limits)
+                  if (!is.null(self$n.breaks)) {
+                      cli::cli_warn("Ignoring {.arg n.breaks}. Use a {.cls transform} object or \\\n            {.arg breaks} function that supports setting number of breaks", 
+                        call = self$call)
+                  }
+              }
+          }
+          transformation$transform(breaks)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          expansion <- default_expansion(scale, expand = expand)
+          limits <- scale$get_limits()
+          continuous_range <- expand_limits_scale(scale, expansion, 
+              limits, coord_limits = coord_limits)
+          aesthetic <- scale$aesthetics[1]
+          view_scales <- list(view_scale_primary(scale, limits, continuous_range), 
+              sec = view_scale_secondary(scale, limits, continuous_range), 
+              range = continuous_range)
+          names(view_scales) <- c(aesthetic, paste0(aesthetic, ".", 
+              names(view_scales)[-1]))
+          view_scales
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          continuous_scale_sorted <- sort(continuous_range)
+          if (!scale$is_discrete()) {
+              breaks <- scale$get_breaks(continuous_scale_sorted)
+              breaks <- censor(breaks, continuous_scale_sorted, only.finite = FALSE)
+          }
+          else {
+              breaks <- scale$get_breaks(limits)
+          }
+          minor_breaks <- scale$get_breaks_minor(b = breaks, limits = continuous_scale_sorted)
+          minor_breaks <- censor(minor_breaks, continuous_range, only.finite = FALSE)
+          ggproto(NULL, ViewScale, scale = scale, guide = scale$guide, 
+              position = scale$position, aesthetics = scale$aesthetics, 
+              name = scale$name, scale_is_discrete = scale$is_discrete(), 
+              limits = limits, continuous_range = continuous_range, 
+              breaks = breaks, minor_breaks = minor_breaks)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          if (is.null(scale$secondary.axis) || is_waiver(scale$secondary.axis) || 
+              scale$secondary.axis$empty()) {
+              primary_scale <- view_scale_primary(scale, limits, continuous_range)
+              scale_flip_position(primary_scale)
+              primary_scale$guide <- guide_none()
+              primary_scale
+          }
+          else {
+              scale$secondary.axis$init(scale)
+              break_info <- scale$secondary.axis$break_info(continuous_range, 
+                  scale)
+              names(break_info) <- gsub("sec\\.", "", names(break_info))
+              position <- switch(scale$position, top = "bottom", bottom = "top", 
+                  left = "right", right = "left", scale$position)
+              ggproto(NULL, ViewScale, scale = scale, guide = scale$secondary.axis$guide, 
+                  position = position, break_info = break_info, aesthetics = scale$aesthetics, 
+                  name = scale$sec_name(), make_title = function(self, 
+                      ...) self$scale$make_sec_title(...), continuous_range = sort(continuous_range), 
+                  dimension = function(self) self$break_info$range, 
+                  get_limits = function(self) self$break_info$range, 
+                  get_breaks = function(self) self$break_info$major_source, 
+                  get_breaks_minor = function(self) self$break_info$minor_source, 
+                  break_positions = function(self) self$break_info$major, 
+                  break_positions_minor = function(self) self$break_info$minor, 
+                  get_labels = function(self, breaks = self$get_breaks()) self$break_info$labels, 
+                  rescale = function(x) rescale(x, from = break_info$range, 
+                      to = c(0, 1)))
+          }
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          old_names <- names(x)
+          new_names <- old_names
+          new_names <- gsub("^x", "z", new_names)
+          new_names <- gsub("^y", "x", new_names)
+          new_names <- gsub("^z", "y", new_names)
+          setNames(x, new_names)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          scale$position <- opposite_position(scale$position)
+          invisible()
+      }
+
+---
+
+    Code
+      print(body(ggplot2::ggproto))
+    Output
+      {
+          e <- new.env(parent = emptyenv())
+          members <- list2(...)
+          if (length(members) != sum(nzchar(names(members)))) {
+              cli::cli_abort("All members of a {.cls ggproto} object must be named.")
+          }
+          if (length(members) > 0) {
+              list2env(members, envir = e)
+          }
+          `_inherit` <- substitute(`_inherit`)
+          env <- parent.frame()
+          find_super <- function() {
+              eval(`_inherit`, env, NULL)
+          }
+          super <- find_super()
+          if (!is.null(super)) {
+              check_object(super, is_ggproto, "a {.cls ggproto} object", 
+                  arg = "_inherit")
+              e$super <- find_super
+              class(e) <- c(`_class`, class(super))
+          }
+          else {
+              class(e) <- c(`_class`, "ggproto", "gg")
+          }
+          e
+      }
+

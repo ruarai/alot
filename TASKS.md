@@ -360,7 +360,7 @@ All stat kernels use the grouped driver (T0.4) and register under
 - **Done when:** outputs are identical to `labeling::extended` on about 1e5
   random ranges, including degenerate, tiny, huge and negative ranges.
 
-### T5.3 Mirror `setup_panel_params` and deduplicate per axis
+### T5.3 Mirror `setup_panel_params` and deduplicate per axis — done
 - **Depends:** T5.2
 - **Touches:** `R/layout.R`, `R/panel-params.R` (new)
 - **Do:**

@@ -65,7 +65,7 @@ build_plot <- function(plot) {
   data <- timed("ignore_data_2", gg_ignore_data(data))
   timed("reset_scales", layout$reset_scales())
   timed("train_position_2", layout_train_position(layout, data, scale_x(), scale_y()))
-  timed("setup_panel_params", layout$setup_panel_params())
+  timed("setup_panel_params", layout_setup_panel_params(layout))
   data <- timed("map_position_2", layout_map_position(layout, data))
 
   timed("setup_panel_guides", layout$setup_panel_guides(plot@guides, plot@layers))

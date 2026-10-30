@@ -18,6 +18,7 @@ Imports:
     ggplot2 (< 4.1.0),
     grid,
     labeling,
+    scales,
     rlang,
     utils,
     vctrs

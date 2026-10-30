@@ -490,3 +490,31 @@ spread.
   software. It runs only when the candidate labels span 0, the one case
   where the remainder matters; otherwise only its warning condition is
   checked.
+
+### T5.3 Panel params, deduplicated per axis (2026-10-30) — kept
+
+`inst/bench/panel-params.R`: the `setup_panel_params` step at 100 panels
+(200 rows per panel), sequential with interleaved reps and a gc before
+each.
+
+| case | ggplot2_ms | alot_ms | speedup |
+| --- | ---: | ---: | --- |
+| wrap_free_point | 388.4 | 147.5 | 2.63x |
+| grid_free_point | 313.2 | 37.3 | 8.39x |
+| wrap_fixed_point | 3.7 | 2.2 | 1.68x |
+
+Whole build (`facet-scaling.R`, `ALOT_BENCH_CORES=1`, 100 panels): wrap
+free 722 → 470 ms (1.54×), grid free 572 → 299 ms (1.91×), wrap fixed
+27 → 20 ms (1.35×). Before this task the free cases were about 1.0×.
+
+- **Kept.**
+- Each primary view scale was built twice by ggplot2 (the secondary
+  rebuilds it) and once per COORD; breaks are now computed once per
+  distinct x and y scale. The grid case gains most: 10 × 10 COORDs, but
+  only 10 + 10 distinct scales.
+- `extended_breaks()` calls go to one batched Rust call (T5.2), which
+  removed `labeling::extended` (about 40% of ggplot2's step).
+- Building one `guide_none()` per step and copying it saves about 15%.
+- What remains is mostly ggproto `$` lookups inside ggplot2's own helpers
+  (`expand_limits_scale`, `get_breaks_minor`) and the `ggproto()` calls
+  per COORD, which must stay to give each panel its own objects.

@@ -135,3 +135,17 @@ test_that("upstream labeling::extended matches the version alot ports", {
   }
   expect_snapshot(print(body(scales::extended_breaks)))
 })
+
+test_that("upstream panel params setup matches the version alot mirrors", {
+  # Mirrored by layout_setup_panel_params(), kernel_panel_params() and its
+  # helpers (R/panel-params.R). If these fail, update the mirror to match,
+  # then update the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::Layout$setup_panel_params)$f)))
+  expect_snapshot(print(body(environment(ggplot2::CoordCartesian$setup_panel_params)$f)))
+  expect_snapshot(print(body(environment(ggplot2::CoordFlip$setup_panel_params)$f)))
+  expect_snapshot(print(body(environment(ggplot2::ScaleContinuous$get_breaks)$f)))
+  for (f in c("view_scales_from_scale", "view_scale_primary", "view_scale_secondary", "flip_axis_labels", "scale_flip_position")) {
+    expect_snapshot(print(body(utils::getFromNamespace(f, "ggplot2"))))
+  }
+  expect_snapshot(print(body(ggplot2::ggproto)))
+})

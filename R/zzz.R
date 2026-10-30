@@ -11,6 +11,9 @@
   register_kernel("facet_compute_layout", "FacetGrid", kernel_facet_grid_layout)
   register_kernel("facet_map_data", "FacetWrap", kernel_facet_map_data)
   register_kernel("facet_map_data", "FacetGrid", kernel_facet_map_data)
+  for (class in c("CoordCartesian", "CoordFlip", "CoordFixed")) {
+    register_kernel("setup_panel_params", class, kernel_panel_params)
+  }
   # Every class whose transform is ggplot2's default_transform.
   for (class in c("ScaleContinuous", "ScaleContinuousPosition", "ScaleContinuousIdentity",
                   "ScaleBinned", "ScaleBinnedPosition")) {
