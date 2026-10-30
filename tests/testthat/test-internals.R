@@ -66,3 +66,22 @@ test_that("upstream non-position scale training and mapping match the versions a
   expect_snapshot(print(body(environment(ggplot2::Scale$train_df)$f)))
   expect_snapshot(print(body(environment(ggplot2::Scale$map_df)$f)))
 })
+
+test_that("upstream continuous colour training and mapping match the versions alot mirrors", {
+  # Mirrored by kernel_np_train_continuous() and kernel_np_map_continuous()
+  # (R/kernels-npscale.R), which also read the environments of the
+  # pal_gradient_n(), colour_ramp(), approxfun() and mid_rescaler()
+  # closures. If these fail, update the kernels (and alot-core's
+  # colour::ramp) to match, then update the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::ScaleContinuous$train)$f)))
+  expect_snapshot(print(body(environment(ggplot2::ScaleContinuous$map)$f)))
+  expect_snapshot(print(body(environment(ggplot2::ScaleContinuous$rescale)$f)))
+  expect_snapshot(print(body(utils::getFromNamespace("mid_rescaler", "ggplot2"))))
+  expect_snapshot(print(body(scales::pal_gradient_n)))
+  expect_snapshot(print(body(scales::colour_ramp)))
+  expect_snapshot(print(body(utils::getFromNamespace("rescale.numeric", "scales"))))
+  expect_snapshot(print(body(utils::getFromNamespace("rescale_mid.numeric", "scales"))))
+  expect_snapshot(print(body(scales::zero_range)))
+  expect_snapshot(print(body(stats::approxfun)))
+  expect_snapshot(print(body(farver::encode_colour)))
+})

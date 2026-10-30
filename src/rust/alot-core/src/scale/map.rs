@@ -66,6 +66,39 @@ impl Oob {
     }
 }
 
+/// The rescalers of continuous non-position scales, onto `to = c(0, 1)`.
+/// NaN is NA.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Rescale {
+    /// `scales::rescale.numeric(x, from = from)`, where `zero_range(from)`
+    /// is FALSE: `(x - from[1]) / diff(from) * diff(to) + to[1]`.
+    Linear { from: [f64; 2] },
+    /// `scales::rescale_mid.numeric(x, from = from, mid = mid)`, where
+    /// `zero_range(from)` is FALSE and `extent` is R's
+    /// `2 * max(abs(from - mid))`: `(x - mid) / extent * diff(to) +
+    /// mean(to)`.
+    Mid { mid: f64, extent: f64 },
+    /// Either rescaler when `zero_range(from)` is TRUE:
+    /// `ifelse(is.na(x), NA, mean(to))`.
+    Zero,
+}
+
+impl Rescale {
+    pub fn apply(self, x: f64) -> f64 {
+        match self {
+            Rescale::Linear { from } => (x - from[0]) / (from[1] - from[0]) * 1.0 + 0.0,
+            Rescale::Mid { mid, extent } => (x - mid) / extent * 1.0 + 0.5,
+            Rescale::Zero => {
+                if x.is_nan() {
+                    f64::NAN
+                } else {
+                    0.5
+                }
+            }
+        }
+    }
+}
+
 /// Maps `x` onto continuous position scales into `out`: `oob` against
 /// `limits[scale]`, then NA and NaN become `na_value`. `na_value` is
 /// written bit for bit, so R's `NA_real_` stays NA rather than NaN.
@@ -171,6 +204,17 @@ mod tests {
         let mut out = [0.0; 3];
         map_continuous([nan, None, Some(2.0)], [0, 0, 0], &[[0.0, 1.0]], Oob::Keep, -7.0, &mut out);
         assert_eq!(out, [-7.0, -7.0, 2.0]);
+    }
+
+    #[test]
+    fn rescalers() {
+        let lin = Rescale::Linear { from: [2.0, 6.0] };
+        assert_eq!([0.0, 2.0, 5.0, 6.0, INF].map(|v| lin.apply(v)), [-0.5, 0.0, 0.75, 1.0, INF]);
+        let mid = Rescale::Mid { mid: 0.0, extent: 8.0 };
+        assert_eq!([-4.0, 0.0, 2.0].map(|v| mid.apply(v)), [0.0, 0.5, 0.75]);
+        assert_eq!(Rescale::Zero.apply(-INF), 0.5);
+        assert!(Rescale::Zero.apply(f64::NAN).is_nan());
+        assert!(lin.apply(f64::NAN).is_nan());
     }
 
     #[test]

@@ -10,3 +10,4 @@
 
 pub mod hex;
 pub mod lab;
+pub mod ramp;

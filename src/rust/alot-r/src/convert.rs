@@ -16,6 +16,10 @@ extern "C" {
     fn SHALLOW_DUPLICATE_ATTRIB(to: SEXP, from: SEXP);
     // R API (Rinternals.h).
     fn STRING_PTR_RO(x: SEXP) -> *const SEXP;
+    // R API (Rinternals.h); `enc` is a `cetype_t`.
+    fn Rf_mkCharLenCE(s: *const std::os::raw::c_char, len: std::os::raw::c_int, enc: std::os::raw::c_int) -> SEXP;
+    // R API (Rinternals.h).
+    fn SET_STRING_ELT(x: SEXP, i: isize, v: SEXP);
 }
 
 /// Integer view; `NA_integer_` reads as `None`.
@@ -202,6 +206,70 @@ pub fn logicals(values: impl ExactSizeIterator<Item = Option<bool>>) -> Robj {
         *d = Rbool::from(v);
     }
     out.into()
+}
+
+/// New character vector of ASCII strings; `None` becomes `na`. Calls R's
+/// C API directly rather than building an `Rstr` per element, and makes
+/// one CHARSXP per run of equal strings.
+pub fn ascii_strings<'s>(values: impl ExactSizeIterator<Item = Option<&'s str>>, na: &Rstr) -> Robj {
+    let mut out: Robj = Strings::new(values.len()).into();
+    let mut last: Option<(&str, SEXP)> = None;
+    unsafe {
+        let sexp = out.get_mut();
+        for (i, v) in values.enumerate() {
+            let c = match v {
+                None => na.get(),
+                Some(v) => match last {
+                    Some((l, c)) if l == v => c,
+                    _ => {
+                        let c = mk_ascii(v);
+                        last = Some((v, c));
+                        c
+                    }
+                },
+            };
+            // The new CHARSXP is reachable from `out` before the next
+            // allocation can collect it.
+            SET_STRING_ELT(sexp, i as isize, c);
+        }
+    }
+    out
+}
+
+/// A CHARSXP for ASCII `v`; unprotected, so store it before allocating.
+unsafe fn mk_ascii(v: &str) -> SEXP {
+    debug_assert!(v.is_ascii());
+    // CE_NATIVE; the cache marks ASCII strings as such.
+    Rf_mkCharLenCE(v.as_ptr().cast(), v.len() as _, 0)
+}
+
+/// New character vector whose element `i` is `values[codes[i]]`, with
+/// `values` ASCII strings and `None` as `na`. Makes one CHARSXP per value
+/// and calls R's C API directly rather than building an `Rstr` per row.
+/// Every code must index `values`.
+pub fn coded_ascii_strings<'s>(
+    codes: &[u32],
+    values: impl ExactSizeIterator<Item = Option<&'s str>>,
+    na: &Rstr,
+) -> Robj {
+    let mut lookup: Robj = Strings::new(values.len()).into();
+    let mut out: Robj = Strings::new(codes.len()).into();
+    unsafe {
+        let sexp = lookup.get_mut();
+        for (i, v) in values.enumerate() {
+            let c = match v {
+                None => na.get(),
+                Some(v) => mk_ascii(v),
+            };
+            SET_STRING_ELT(sexp, i as isize, c);
+        }
+        let ptrs = std::slice::from_raw_parts(STRING_PTR_RO(lookup.get()), lookup.len());
+        let sexp = out.get_mut();
+        for (i, &c) in codes.iter().enumerate() {
+            SET_STRING_ELT(sexp, i as isize, ptrs[c as usize]);
+        }
+    }
+    out
 }
 
 /// New unordered factor from 1-based codes and levels.

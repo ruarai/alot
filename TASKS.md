@@ -191,7 +191,7 @@ not repeated below:
   `farver::encode_colour(farver::convert_colour(...))` on a dense Lab grid
   and on random inputs (an R test calling the Rust function), and NA gives NA.
 
-### T2.3 Continuous colour/fill mapping
+### T2.3 Continuous colour/fill mapping — done
 - **Depends:** T2.1, T2.2, T0.3
 - **Touches:** `R/kernels-npscale.R` (new), `alot-core/src/colour/ramp.rs`
 - **Do:**

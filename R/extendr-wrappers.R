@@ -17,6 +17,12 @@ rs_build_profile <- function() .Call(wrap__build_profile)
 #' @noRd
 rs_train_continuous_grouped <- function(x, scale_id, existing) .Call(wrap__train_continuous_grouped, x, scale_id, existing)
 
+#' Trains one continuous range on double or integer `x`, as
+#' `scales::train_continuous()`: `existing` is the current range (a NaN
+#' pair for none). Returns the new range, an NA pair for empty `x`.
+#' @noRd
+rs_train_continuous <- function(x, existing) .Call(wrap__train_continuous, x, existing)
+
 #' Rows that train a discrete position scale exactly as its whole slice
 #' does (see `alot_core::scale::discrete`): for factor, character and
 #' logical `x`, the first row of each distinct value per scale; for double
@@ -50,6 +56,16 @@ rs_factorize_strings <- function(x) .Call(wrap__factorize_strings, x)
 #' vector, or `NULL` (decline) for a key outside the table.
 #' @noRd
 rs_map_discrete <- function(x, scale_id, table, n_keys) .Call(wrap__map_discrete, x, scale_id, table, n_keys)
+
+#' Maps double or integer `x` onto colours through a continuous scale with
+#' a `pal_gradient_n()` palette (see `alot_core::colour::ramp`). `oob` and
+#' `only_finite` as for `rs_map_continuous()`, `limits` the scale's limits;
+#' `rescale` is 0 (`rescale()`, `par` unused), 1 (`rescale_mid()`, `par`
+#' = `c(mid, extent)`) or 2 (`zero_range(limits)`). `ramp` is
+#' `list(values, l, a, b, alpha)` of knot lists (`values` and `alpha` may
+#' be `NULL`), and `na_value` a length-1 character vector for NA results.
+#' @noRd
+rs_map_colour <- function(x, limits, oob, only_finite, rescale, par, ramp, na_value) .Call(wrap__map_colour, x, limits, oob, only_finite, rescale, par, ramp, na_value)
 
 #' Transforms double or integer `x` for a continuous scale (see
 #' `alot_core::scale::transform`); `code` is 0 (log10), 1 (sqrt) or 2

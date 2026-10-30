@@ -653,3 +653,226 @@
           }
       }
 
+# upstream continuous colour training and mapping match the versions alot mirrors
+
+    Code
+      print(body(environment(ggplot2::ScaleContinuous$train)$f))
+    Output
+      {
+          if (length(x) == 0) {
+              return()
+          }
+          self$range$train(x, call = self$call)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::ScaleContinuous$map)$f))
+    Output
+      {
+          x <- self$rescale(self$oob(x, range = limits), limits)
+          uniq <- unique0(x)
+          pal <- self$palette(uniq)
+          scaled <- pal[match(x, uniq)]
+          if (!anyNA(scaled)) {
+              return(scaled)
+          }
+          vec_assign(scaled, is.na(scaled), self$na.value)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::ScaleContinuous$rescale)$f))
+    Output
+      {
+          self$rescaler(x, from = range)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("mid_rescaler", "ggplot2")))
+    Output
+      {
+          transform <- as.trans(transform)
+          trans_mid <- transform$transform(mid)
+          check_transformation(mid, trans_mid, transform$name, arg = arg, 
+              call = call)
+          function(x, to = c(0, 1), from = range(x, na.rm = TRUE)) {
+              rescale_mid(x, to, from, trans_mid)
+          }
+      }
+
+---
+
+    Code
+      print(body(scales::pal_gradient_n))
+    Output
+      {
+          if (!identical(space, "Lab")) {
+              lifecycle::deprecate_stop("0.3.0", "pal_gradient_n(space = 'only supports be \"Lab\"')")
+          }
+          ramp <- colour_ramp(colours)
+          force(values)
+          fun <- function(x) {
+              if (length(x) == 0) {
+                  return(character())
+              }
+              if (!is.null(values)) {
+                  xs <- seq(0, 1, length.out = length(values))
+                  f <- stats::approxfun(values, xs)
+                  x <- f(x)
+              }
+              ramp(x)
+          }
+          new_continuous_palette(fun, "colour", na_safe = FALSE)
+      }
+
+---
+
+    Code
+      print(body(scales::colour_ramp))
+    Output
+      {
+          if (length(colors) == 0) {
+              cli::cli_abort("Must provide at least one colour to create a colour ramp")
+          }
+          if (length(colors) == 1) {
+              return(structure(function(x) {
+                  ifelse(is.na(x), na.color, colors)
+              }, safe_palette_func = TRUE))
+          }
+          colors <- tolower(colors)
+          lab_in <- farver::decode_colour(colour = colors, alpha = TRUE, 
+              to = "lab", na_value = "transparent")
+          x_in <- seq(0, 1, length.out = length(colors))
+          l_interp <- stats::approxfun(x_in, lab_in[, 1])
+          u_interp <- stats::approxfun(x_in, lab_in[, 2])
+          v_interp <- stats::approxfun(x_in, lab_in[, 3])
+          if (!alpha || all(lab_in[, 4] == 1)) {
+              alpha_interp <- function(x) NULL
+          }
+          else {
+              alpha_interp <- stats::approxfun(x_in, lab_in[, 4])
+          }
+          fun <- function(x) {
+              lab_out <- cbind(l_interp(x), u_interp(x), v_interp(x))
+              out <- farver::encode_colour(lab_out, alpha = alpha_interp(x), 
+                  from = "lab")
+              out[is.na(out)] <- na.color
+              out
+          }
+          new_continuous_palette(fun, type = "colour", na_safe = !is.na(na.color))
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("rescale.numeric", "scales")))
+    Output
+      {
+          if (zero_range(from) || zero_range(to)) {
+              return(ifelse(is.na(x), NA, mean(to)))
+          }
+          (x - from[1])/diff(from) * diff(to) + to[1]
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("rescale_mid.numeric", "scales")))
+    Output
+      {
+          if (zero_range(from) || zero_range(to)) {
+              return(ifelse(is.na(x), NA, mean(to)))
+          }
+          extent <- 2 * max(abs(from - mid))
+          (x - mid)/extent * diff(to) + mean(to)
+      }
+
+---
+
+    Code
+      print(body(scales::zero_range))
+    Output
+      {
+          if (length(x) == 1) {
+              return(TRUE)
+          }
+          if (length(x) != 2) 
+              cli::cli_abort("{.arg x} must be length 1 or 2")
+          if (anyNA(x)) {
+              return(NA)
+          }
+          if (x[1] == x[2]) {
+              return(TRUE)
+          }
+          if (any(is.infinite(x))) {
+              return(FALSE)
+          }
+          x <- as.numeric(unclass(x))
+          m <- min(abs(x))
+          if (m == 0) {
+              return(FALSE)
+          }
+          abs((x[1] - x[2])/m) < tol
+      }
+
+---
+
+    Code
+      print(body(stats::approxfun))
+    Output
+      {
+          method <- pmatch(method, c("linear", "constant"))
+          if (is.na(method)) 
+              stop("invalid interpolation method")
+          stopifnot(is.numeric(rule), (lenR <- length(rule)) >= 1L, 
+              lenR <= 2L)
+          if (lenR == 1) 
+              rule <- rule[c(1, 1)]
+          x <- regularize.values(x, y, ties, missing(ties), na.rm = na.rm)
+          nx <- if (na.rm || !x$keptNA) 
+              length(x$x)
+          else sum(x$notNA)
+          if (is.na(nx)) 
+              stop("invalid length(x)")
+          if (nx <= 1) {
+              if (method == 1) 
+                  stop("need at least two non-NA values to interpolate")
+              if (nx == 0) 
+                  stop("zero non-NA points")
+          }
+          y <- x$y
+          if (missing(yleft)) 
+              yleft <- if (rule[1L] == 1) 
+                  NA
+              else y[1L]
+          if (missing(yright)) 
+              yright <- if (rule[2L] == 1) 
+                  NA
+              else y[length(y)]
+          stopifnot(length(yleft) == 1L, length(yright) == 1L, length(f) == 
+              1L)
+          rm(rule, ties, lenR, nx)
+          x <- as.double(x$x)
+          y <- as.double(y)
+          .Call(C_ApproxTest, x, y, method, f, na.rm)
+          function(v) .approxfun(x, y, v, method, yleft, yright, f, 
+              na.rm)
+      }
+
+---
+
+    Code
+      print(body(farver::encode_colour))
+    Output
+      {
+          if (from != "rgb") {
+              white <- as_white_ref(white)
+          }
+          encode_c(colour, alpha, colourspace_match(from), white)
+      }
+

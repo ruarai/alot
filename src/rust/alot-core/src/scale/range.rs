@@ -2,7 +2,7 @@
 
 /// Train one continuous range per scale in a single pass.
 ///
-/// `scale_id[i]` is the 0-based scale that value `values[i]` trains.
+/// `scale_id` yields the 0-based scale that each value trains.
 /// `existing` holds each scale's current range, or `None` if untrained.
 /// Values are `Option<f64>` so integer NAs can be passed as `None`.
 ///
@@ -10,20 +10,21 @@
 /// scale (ggplot2 skips training on empty input), otherwise the new range.
 /// Like `range(existing, new, finite = TRUE)`, non-finite values are
 /// ignored and a range with no finite values is `[Inf, -Inf]`.
-pub fn train_continuous_grouped<I>(
+pub fn train_continuous_grouped<I, S>(
     values: I,
-    scale_id: &[usize],
+    scale_id: S,
     existing: &[Option<[f64; 2]>],
 ) -> Vec<Option<[f64; 2]>>
 where
     I: IntoIterator<Item = Option<f64>>,
+    S: IntoIterator<Item = usize>,
 {
     let n = existing.len();
     let mut seen = vec![false; n];
     let mut lo = vec![f64::INFINITY; n];
     let mut hi = vec![f64::NEG_INFINITY; n];
 
-    for (v, &s) in values.into_iter().zip(scale_id) {
+    for (v, s) in values.into_iter().zip(scale_id) {
         seen[s] = true;
         if let Some(v) = v {
             if v.is_finite() {
@@ -64,7 +65,7 @@ mod tests {
     fn ranges_per_scale() {
         let out = train_continuous_grouped(
             vals(&[3.0, 1.0, 10.0, -2.0]),
-            &[0, 0, 1, 1],
+            [0, 0, 1, 1],
             &[None, None],
         );
         assert_eq!(out, vec![Some([1.0, 3.0]), Some([-2.0, 10.0])]);
@@ -74,7 +75,7 @@ mod tests {
     fn ignores_non_finite_and_merges_existing() {
         let out = train_continuous_grouped(
             vec![Some(f64::NAN), Some(f64::INFINITY), None, Some(5.0)],
-            &[0, 0, 0, 0],
+            [0, 0, 0, 0],
             &[Some([0.0, 2.0])],
         );
         assert_eq!(out, vec![Some([0.0, 5.0])]);
@@ -82,7 +83,7 @@ mod tests {
 
     #[test]
     fn empty_scale_untouched_and_all_non_finite_is_inf() {
-        let out = train_continuous_grouped(vec![None], &[1], &[None, None]);
+        let out = train_continuous_grouped(vec![None], [1], &[None, None]);
         assert_eq!(out, vec![None, Some([f64::INFINITY, f64::NEG_INFINITY])]);
     }
 
@@ -90,7 +91,7 @@ mod tests {
     fn existing_infinite_range_is_dropped() {
         let out = train_continuous_grouped(
             vals(&[4.0]),
-            &[0],
+            [0],
             &[Some([f64::INFINITY, f64::NEG_INFINITY])],
         );
         assert_eq!(out, vec![Some([4.0, 4.0])]);

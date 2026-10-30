@@ -1,7 +1,7 @@
 library(ggplot2)
 
 # Non-position scale training and mapping (T2.1). The mirror dispatches each
-# scale; with no kernels registered yet, every scale falls back.
+# scale; kernels-npscale.R adds the continuous kernels (T2.3).
 
 np_coverage <- function(p) {
   cov <- alot_coverage(p)
@@ -51,7 +51,9 @@ test_that("coverage lists each non-position scale's train and map steps", {
   expect_equal(sum(cov$step == "np_train"), 4)
   expect_equal(sum(cov$step == "np_map"), 4)
   expect_setequal(unique(cov$class), c("ScaleContinuous", "ScaleDiscrete"))
-  expect_true(all(cov$path == "ggplot2"))
+  # The continuous colour scale has kernels (T2.3); the shape scale not yet.
+  expect_true(all(cov$path[cov$class == "ScaleContinuous"] == "rust"))
+  expect_true(all(cov$path[cov$class == "ScaleDiscrete"] == "ggplot2"))
 
   # No non-position scales: no steps.
   p <- ggplot(df, aes(x, y)) + geom_point()
@@ -65,7 +67,8 @@ test_that("coverage lists each non-position scale's train and map steps", {
 test_that("a registered kernel's result is used", {
   key_train <- "np_train:ScaleContinuous"
   key_map <- "np_map:ScaleContinuous"
-  on.exit(rm(list = c(key_train, key_map), envir = kernels))
+  old <- mget(c(key_train, key_map), envir = kernels)
+  on.exit(list2env(old, envir = kernels))
   calls <- 0
   register_kernel("np_train", "ScaleContinuous", function(scale, df) {
     calls <<- calls + 1

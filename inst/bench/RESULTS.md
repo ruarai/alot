@@ -353,3 +353,47 @@ so both of R's warnings fire; integers are 1–1000 with NA.
   as in the warning-free rows. Warnings stay in R by design (AGENTS.md).
 - `identity` needs no kernel: `ScalesList$transform_df` skips such scales
   before any per-scale work, and the mirror does the same.
+
+### T2.3 Continuous colour scales (2026-10-30) — kept
+
+`inst/bench/npscale-continuous.R`: `npscales_train_df()` and
+`npscales_map_df()` for one colour column of 1e6 values through one scale,
+sequential with interleaved reps and a full gc before each (same machine as
+the baseline). Doubles are `rnorm()` with 1% NA, so nearly every value is
+distinct; integers are 1–1000 with NA.
+
+| input | step | ggplot2_ms | alot_ms | speedup |
+| --- | --- | ---: | ---: | --- |
+| gradient | train | 19.8 | 2.5 | 8.0x |
+| gradient | map | 212.3 | 109.5 | 1.9x |
+| gradient_integer | train | 5.8 | 2.0 | 2.9x |
+| gradient_integer | map | 77.1 | 19.2 | 4.0x |
+| gradient2 | train | 5.4 | 2.5 | 2.2x |
+| gradient2 | map | 227.2 | 108.7 | 2.1x |
+| gradientn_values | train | 5.4 | 2.4 | 2.2x |
+| gradientn_values | map | 241.2 | 130.8 | 1.8x |
+| distiller | train | 5.4 | 2.4 | 2.2x |
+| distiller | map | 234.1 | 113.9 | 2.1x |
+| viridis | train | 6.1 | 3.2 | 1.9x |
+| viridis | map | 224.3 | 112.4 | 2.0x |
+| viridis_alpha | train | 6.2 | 3.2 | 1.9x |
+| viridis_alpha | map | 239.6 | 133.7 | 1.8x |
+
+- **Both kernels are kept.** (The first `gradient` train row includes a
+  one-off warm-up on the ggplot2 side; the others are about 5.5 ms.)
+- **Distinct values cap the map at about 2×.** Each distinct value still
+  needs three `pow()` calls in Lab → sRGB (the system libm's, for
+  byte-identical hex) and a new CHARSXP, as in farver. Rust skips R's
+  `unique()`/`match()`, the four `approxfun()` passes and the intermediate
+  vectors.
+- **Repeated values are coded first.** Like upstream, Rust colours each
+  unique value once and matches rows to it, which matters for integers
+  (4×). Hashing a million distinct doubles cost about 70 ms, though, which
+  brought the `rnorm()` rows down to 1.2×. So Rust first codes a sample of
+  4,096 rows, and if more than half are distinct it colours row by row
+  instead.
+
+Step profile (`step-profile.R`, `ALOT_BENCH_CORES=1`, not interleaved, 1e6
+rows): for `point_continuous` (the task's target), `npscales_map` is 205.3
+→ 106.4 ms (1.93×). The whole build is 435.9 → 220.5 ms (1.98×), counting
+the position kernels.

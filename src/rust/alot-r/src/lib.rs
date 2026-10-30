@@ -1,9 +1,10 @@
 pub mod convert;
 pub mod grouped;
 
+use alot_core::colour::ramp::{self, Approx, Ramp};
 use alot_core::colour::{hex, lab};
 use alot_core::group::{Columns, Values};
-use alot_core::scale::map::{self, Oob};
+use alot_core::scale::map::{self, Oob, Rescale};
 use alot_core::scale::transform::{self, Transform};
 use alot_core::scale::{discrete, range};
 use convert::{Column, ColumnData, ColumnsBuilder, Frame};
@@ -27,10 +28,10 @@ fn train_continuous_grouped(x: Robj, scale_id: &[i32], existing: &[f64]) -> exte
         .collect();
 
     let out = if let Some(v) = x.as_real_slice() {
-        range::train_continuous_grouped(v.iter().map(|&v| Some(v)), &ids, &existing)
+        range::train_continuous_grouped(v.iter().map(|&v| Some(v)), ids.iter().copied(), &existing)
     } else if let Some(v) = x.as_integer_slice() {
         let it = v.iter().map(|&v| (v != i32::MIN).then_some(v as f64));
-        range::train_continuous_grouped(it, &ids, &existing)
+        range::train_continuous_grouped(it, ids.iter().copied(), &existing)
     } else {
         return Err(Error::Other("x must be double or integer".into()));
     };
@@ -42,6 +43,29 @@ fn train_continuous_grouped(x: Robj, scale_id: &[i32], existing: &[f64]) -> exte
             None => [Rfloat::na(), Rfloat::na()],
         })
         .collect())
+}
+
+/// Trains one continuous range on double or integer `x`, as
+/// `scales::train_continuous()`: `existing` is the current range (a NaN
+/// pair for none). Returns the new range, an NA pair for empty `x`.
+/// @noRd
+#[extendr(r_name = "rs_train_continuous")]
+fn train_continuous(x: Robj, existing: &[f64]) -> extendr_api::Result<Doubles> {
+    let existing = match existing {
+        [l, _] if l.is_nan() => None,
+        &[l, h] => Some([l, h]),
+        _ => return Err(Error::Other("existing must have length 2".into())),
+    };
+    let ids = std::iter::repeat(0);
+    let out = match Column::new(&x).data {
+        ColumnData::Double(v) => range::train_continuous_grouped(v.iter().map(|&v| Some(v)), ids, &[existing]),
+        ColumnData::Integer(v) => range::train_continuous_grouped(v.iter().map(|v| v.map(f64::from)), ids, &[existing]),
+        _ => return Err(Error::Other("x must be double or integer".into())),
+    };
+    Ok(match out[0] {
+        Some([l, h]) => Doubles::from_values([l, h]),
+        None => Doubles::from_values([Rfloat::na(), Rfloat::na()]),
+    })
 }
 
 /// Rows that train a discrete position scale exactly as its whole slice
@@ -248,6 +272,77 @@ fn transform_values(x: Robj, code: i32) -> extendr_api::Result<Robj> {
     Ok(out.finish()?.into())
 }
 
+/// An `approxfun()`'s knots from `list(x, y, yleft, yright)`.
+fn approx_from(knots: &Robj) -> extendr_api::Result<Approx> {
+    let bad = || Error::Other("knots must be list(x, y, yleft, yright) of doubles".into());
+    let list = List::try_from(knots.clone()).map_err(|_| bad())?;
+    let get = |name: &str| -> extendr_api::Result<Vec<f64>> {
+        let v = list.dollar(name).map_err(|_| bad())?;
+        if v.len() == 0 {
+            return Ok(Vec::new());
+        }
+        v.as_real_slice().map(<[f64]>::to_vec).ok_or_else(bad)
+    };
+    let (x, y, yleft, yright) = (get("x")?, get("y")?, get("yleft")?, get("yright")?);
+    if x.len() != y.len() || yleft.len() != 1 || yright.len() != 1 {
+        return Err(bad());
+    }
+    Ok(Approx { x, y, yleft: yleft[0], yright: yright[0] })
+}
+
+/// Maps double or integer `x` onto colours through a continuous scale with
+/// a `pal_gradient_n()` palette (see `alot_core::colour::ramp`). `oob` and
+/// `only_finite` as for `rs_map_continuous()`, `limits` the scale's limits;
+/// `rescale` is 0 (`rescale()`, `par` unused), 1 (`rescale_mid()`, `par`
+/// = `c(mid, extent)`) or 2 (`zero_range(limits)`). `ramp` is
+/// `list(values, l, a, b, alpha)` of knot lists (`values` and `alpha` may
+/// be `NULL`), and `na_value` a length-1 character vector for NA results.
+/// @noRd
+#[extendr(r_name = "rs_map_colour")]
+#[allow(clippy::too_many_arguments)]
+fn map_colour(x: Robj, limits: &[f64], oob: i32, only_finite: bool, rescale: i32, par: &[f64], ramp: List, na_value: Strings) -> extendr_api::Result<Robj> {
+    let limits: [f64; 2] = limits.try_into().map_err(|_| Error::Other("limits must have length 2".into()))?;
+    let oob = match oob {
+        0 => Oob::Censor { only_finite },
+        1 => Oob::Squish { only_finite },
+        2 => Oob::SquishInfinite,
+        3 => Oob::Keep,
+        _ => return Err(Error::Other("unknown oob".into())),
+    };
+    let rescale = match (rescale, par) {
+        (0, _) => Rescale::Linear { from: limits },
+        (1, &[mid, extent]) => Rescale::Mid { mid, extent },
+        (2, _) => Rescale::Zero,
+        _ => return Err(Error::Other("unknown rescale".into())),
+    };
+    let part = |name: &str| ramp.dollar(name).map_err(|_| Error::Other(format!("ramp has no {name}")));
+    let optional = |name: &str| -> extendr_api::Result<Option<Approx>> {
+        let k = part(name)?;
+        if k.is_null() { Ok(None) } else { approx_from(&k).map(Some) }
+    };
+    let ramp = Ramp {
+        values: optional("values")?,
+        lab: [approx_from(&part("l")?)?, approx_from(&part("a")?)?, approx_from(&part("b")?)?],
+        alpha: optional("alpha")?,
+    };
+    if na_value.len() != 1 {
+        return Err(Error::Other("na_value must have length 1".into()));
+    }
+    let na = na_value.elt(0);
+    let out = match Column::new(&x).data {
+        ColumnData::Double(v) => ramp::map_colour(v.iter().copied(), limits, oob, rescale, &ramp),
+        ColumnData::Integer(v) => ramp::map_colour(v.iter().map(|v| v.map_or(f64::NAN, f64::from)), limits, oob, rescale, &ramp),
+        _ => return Err(Error::Other("x must be double or integer".into())),
+    };
+    fn hex(h: &Option<hex::Hex>) -> Option<&str> {
+        h.as_ref().map(hex::Hex::as_str)
+    }
+    Ok(match out {
+        ramp::Mapped::Coded { codes, colours } => convert::coded_ascii_strings(&codes, colours.iter().map(hex), &na),
+        ramp::Mapped::Rows(colours) => convert::ascii_strings(colours.iter().map(hex), &na),
+    })
+}
+
 /// The rows of the column-major n x 3 matrix `m`, `None` if `m` does not
 /// have 3 columns.
 fn rows3(m: &[f64]) -> Option<impl Iterator<Item = [f64; 3]> + '_> {
@@ -426,10 +521,12 @@ extendr_module! {
     mod alot;
     fn build_profile;
     fn train_continuous_grouped;
+    fn train_continuous;
     fn train_discrete_rows;
     fn map_continuous;
     fn factorize_strings;
     fn map_discrete;
+    fn map_colour;
     fn transform_values;
     fn encode_lab;
     fn rgb_to_lab;
