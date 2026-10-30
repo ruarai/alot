@@ -586,3 +586,70 @@
                   length(x)), minor_breaks = regular_minor_breaks(reverse = TRUE))
       }
 
+# upstream non-position scale training and mapping match the versions alot mirrors
+
+    Code
+      print(body(environment(utils::getFromNamespace("ScalesList", "ggplot2")$
+      train_df)$f))
+    Output
+      {
+          if (empty(df) || length(self$scales) == 0) {
+              return()
+          }
+          lapply(self$scales, function(scale) scale$train_df(df = df))
+      }
+
+---
+
+    Code
+      print(body(environment(utils::getFromNamespace("ScalesList", "ggplot2")$map_df)$
+        f))
+    Output
+      {
+          if (empty(df) || length(self$scales) == 0) {
+              return(df)
+          }
+          mapped <- unlist(lapply(self$scales, function(scale) scale$map_df(df = df)), 
+              recursive = FALSE)
+          df[names(mapped)] <- mapped
+          df
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Scale$train_df)$f))
+    Output
+      {
+          if (empty(df)) 
+              return()
+          aesthetics <- intersect(self$aesthetics, names(df))
+          for (aesthetic in aesthetics) {
+              self$train(df[[aesthetic]])
+          }
+          invisible()
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Scale$map_df)$f))
+    Output
+      {
+          if (empty(df)) {
+              return()
+          }
+          self$palette <- self$palette %||% fetch_ggproto(self, "fallback_palette")
+          aesthetics <- intersect(self$aesthetics, names(df))
+          names(aesthetics) <- aesthetics
+          if (length(aesthetics) == 0) {
+              return()
+          }
+          if (is.null(i)) {
+              lapply(aesthetics, function(j) self$map(df[[j]]))
+          }
+          else {
+              lapply(aesthetics, function(j) self$map(df[[j]][i]))
+          }
+      }
+

@@ -75,9 +75,9 @@ build_plot <- function(plot) {
   npscales <- scales$non_position_scales()
   if (npscales$n() > 0) {
     timed("set_palettes", npscales$set_palettes(plot@theme))
-    timed("npscales_train", lapply(data, npscales$train_df))
+    timed("npscales_train", lapply(data, function(d) npscales_train_df(npscales, d)))
     plot@guides <- timed("guides_build", plot@guides$build(npscales, plot@layers, plot@labels, data, plot@theme))
-    data <- timed("npscales_map", lapply(data, npscales$map_df))
+    data <- timed("npscales_map", lapply(data, function(d) npscales_map_df(npscales, d)))
   } else {
     plot@guides <- timed("guides_build", plot@guides$get_custom())
   }

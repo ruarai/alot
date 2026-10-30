@@ -56,3 +56,13 @@ test_that("upstream scale transformation matches the versions alot mirrors", {
   expect_snapshot(print(body(scales::transform_sqrt)))
   expect_snapshot(print(body(scales::transform_reverse)))
 })
+
+test_that("upstream non-position scale training and mapping match the versions alot mirrors", {
+  # Mirrored by npscales_train_df() and npscales_map_df() (R/npscales.R),
+  # which dispatch each scale's train_df() and map_df(). If these fail,
+  # update the mirror to match, then update the snapshots.
+  expect_snapshot(print(body(environment(utils::getFromNamespace("ScalesList", "ggplot2")$train_df)$f)))
+  expect_snapshot(print(body(environment(utils::getFromNamespace("ScalesList", "ggplot2")$map_df)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Scale$train_df)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Scale$map_df)$f)))
+})

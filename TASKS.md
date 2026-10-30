@@ -173,7 +173,7 @@ not repeated below:
 
 ## 1.2 Non-position scales
 
-### T2.1 Mirror `npscales$train_df` / `map_df`
+### T2.1 Mirror `npscales$train_df` / `map_df` — done
 - **Depends:** —
 - **Touches:** `R/build.R`, `R/npscales.R` (new)
 - **Do:** Mirror `ScalesList$train_df` and `ScalesList$map_df` with
