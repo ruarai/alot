@@ -2,6 +2,7 @@ pub mod convert;
 pub mod grouped;
 
 use alot_core::group::{Columns, Values};
+use alot_core::scale::map::{self, Oob};
 use alot_core::scale::{discrete, range};
 use convert::{Column, ColumnData, ColumnsBuilder, Frame};
 use extendr_api::prelude::*;
@@ -92,6 +93,116 @@ fn train_discrete_rows(x: Robj, scale_id: &[i32], n_scales: i32) -> extendr_api:
     out.push("rows", convert::integers(flat.collect::<Vec<_>>().into_iter()));
     out.push("offsets", convert::integers(offsets.into_iter()));
     Ok(out.finish()?.into())
+}
+
+/// 0-based scale per row from 1-based `scale_id`, after checking every id
+/// is in `1..=n`.
+fn scale_index(scale_id: &[i32], n: usize) -> extendr_api::Result<impl Iterator<Item = usize> + '_> {
+    if scale_id.iter().any(|&i| i < 1 || i as usize > n) {
+        return Err(Error::Other("scale_id out of range".into()));
+    }
+    Ok(scale_id.iter().map(|&i| (i - 1) as usize))
+}
+
+/// A new double vector of length `n`, filled by `fill`.
+fn new_doubles(n: usize, fill: impl FnOnce(&mut [f64])) -> Robj {
+    let mut out: Robj = Doubles::new(n).into();
+    if n > 0 {
+        fill(out.as_real_slice_mut().unwrap());
+    }
+    out
+}
+
+/// Maps double or integer `x` onto continuous position scales (see
+/// `alot_core::scale::map`). `limits` holds each scale's limits as a
+/// length-2n vector, `oob` is 0 (censor), 1 (squish), 2 (squish_infinite)
+/// or 3 (keep), and `na_value` a length-1 double copied bit for bit.
+/// @noRd
+#[extendr(r_name = "rs_map_continuous")]
+fn map_continuous(x: Robj, scale_id: &[i32], limits: &[f64], oob: i32, only_finite: bool, na_value: &[f64]) -> extendr_api::Result<Robj> {
+    let limits: Vec<[f64; 2]> = limits.chunks_exact(2).map(|r| [r[0], r[1]]).collect();
+    let ids = scale_index(scale_id, limits.len())?;
+    let oob = match oob {
+        0 => Oob::Censor { only_finite },
+        1 => Oob::Squish { only_finite },
+        2 => Oob::SquishInfinite,
+        3 => Oob::Keep,
+        _ => return Err(Error::Other("unknown oob".into())),
+    };
+    let na = na_value[0];
+    let col = Column::new(&x);
+    if col.len() != scale_id.len() {
+        return Err(Error::Other("x and scale_id differ in length".into()));
+    }
+    Ok(match col.data {
+        ColumnData::Double(v) => new_doubles(v.len(), |out| {
+            map::map_continuous(v.iter().map(|&v| Some(v)), ids, &limits, oob, na, out)
+        }),
+        ColumnData::Integer(v) => new_doubles(v.len(), |out| {
+            map::map_continuous(v.iter().map(|v| v.map(f64::from)), ids, &limits, oob, na, out)
+        }),
+        _ => return Err(Error::Other("x must be double or integer".into())),
+    })
+}
+
+/// Codes a character vector by CHARSXP pointer in order of first
+/// appearance: `list(codes, rows)`, both 1-based, where `rows[k]` is the
+/// first row with code `k`. Strings that are equal but differently encoded
+/// get separate codes; R's `match()` on `x[rows]` resolves them.
+/// @noRd
+#[extendr(r_name = "rs_factorize_strings")]
+fn factorize_strings(x: Strings) -> extendr_api::Result<List> {
+    let (codes, first) = map::factorize(convert::str_ptrs(&x).iter().map(|&p| p as usize));
+    let one_based = |v: Vec<usize>| convert::integers(v.into_iter().map(|i| Some(i as i32 + 1)));
+    let mut out = ColumnsBuilder::new();
+    out.push("codes", one_based(codes));
+    out.push("rows", one_based(first));
+    out.finish()
+}
+
+/// Maps discrete `x` onto position scales through `table`, the column-major
+/// `n_keys` x n-scales matrix of mapped values R computed from each scale's
+/// limits and palette. Keys: a factor's codes with NA last (`n_keys` must
+/// be its levels plus one); for a logical FALSE, TRUE, NA; for an integer
+/// vector the 1-based codes of `rs_factorize_strings()`. Returns a double
+/// vector, or `NULL` (decline) for a key outside the table.
+/// @noRd
+#[extendr(r_name = "rs_map_discrete")]
+fn map_discrete(x: Robj, scale_id: &[i32], table: &[f64], n_keys: i32) -> extendr_api::Result<Robj> {
+    let k = n_keys as usize;
+    if k == 0 || table.len() % k != 0 {
+        return Err(Error::Other("table must have n_keys rows".into()));
+    }
+    let ids = scale_index(scale_id, table.len() / k)?;
+    let col = Column::new(&x);
+    if col.len() != scale_id.len() {
+        return Err(Error::Other("x and scale_id differ in length".into()));
+    }
+    let n = col.len();
+    Ok(match col.data {
+        ColumnData::Factor(f) => {
+            if f.levels.len() + 1 != k || f.codes.iter().any(|c| c.is_some_and(|c| c < 1 || c as usize >= k)) {
+                return Ok(().into());
+            }
+            let keys = f.codes.iter().map(|c| c.map_or(k - 1, |c| c as usize - 1));
+            new_doubles(n, |out| map::map_discrete(keys, ids, table, k, out))
+        }
+        ColumnData::Logical(v) => {
+            if k != 3 {
+                return Ok(().into());
+            }
+            let keys = v.iter().map(|b| b.map_or(2, usize::from));
+            new_doubles(n, |out| map::map_discrete(keys, ids, table, k, out))
+        }
+        ColumnData::Integer(v) => {
+            if v.iter().any(|c| c.map_or(true, |c| c < 1 || c as usize > k)) {
+                return Ok(().into());
+            }
+            let keys = v.0.iter().map(|&c| c as usize - 1);
+            new_doubles(n, |out| map::map_discrete(keys, ids, table, k, out))
+        }
+        _ => return Ok(().into()),
+    })
 }
 
 /// Round-trips the columns of `df` through the interchange layer, for
@@ -216,6 +327,9 @@ extendr_module! {
     fn build_profile;
     fn train_continuous_grouped;
     fn train_discrete_rows;
+    fn map_continuous;
+    fn factorize_strings;
+    fn map_discrete;
     fn convert_roundtrip;
     fn convert_inspect;
     fn group_index;

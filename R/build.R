@@ -51,7 +51,7 @@ build_plot <- function(plot) {
   scale_y <- function() scales$get_scales("y")
 
   timed("train_position_1", layout_train_position(layout, data, scale_x(), scale_y()))
-  data <- timed("map_position_1", layout$map_position(data))
+  data <- timed("map_position_1", layout_map_position(layout, data))
   data <- timed("expose_data_1", gg_expose_data(data))
 
   data <- timed("compute_statistic", gg_by_layer(function(l, d) layer_compute_statistic(l, d, layout), layers, data, "computing stat"))
@@ -66,7 +66,7 @@ build_plot <- function(plot) {
   timed("reset_scales", layout$reset_scales())
   timed("train_position_2", layout_train_position(layout, data, scale_x(), scale_y()))
   timed("setup_panel_params", layout$setup_panel_params())
-  data <- timed("map_position_2", layout$map_position(data))
+  data <- timed("map_position_2", layout_map_position(layout, data))
 
   timed("setup_panel_guides", layout$setup_panel_guides(plot@guides, plot@layers))
 

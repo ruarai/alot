@@ -73,3 +73,72 @@ scales_train <- function(data, vars, scale_id, scales) {
   }
   invisible()
 }
+
+# Mirrors Layout$map_position (ggplot2 R/layout.R). A layout whose
+# map_position is not Layout's own falls back to it whole.
+layout_map_position <- function(layout, data) {
+  class_map <- environment(ggplot2::Layout$map_position)$f
+  if (!identical(environment(layout$map_position)$f, class_map)) {
+    record_trace("map_position", class(layout)[1], "ggplot2")
+    return(layout$map_position(data))
+  }
+  panels <- layout$layout
+
+  lapply(data, function(layer_data) {
+    match_id <- NULL
+
+    x_vars <- intersect(layout$panel_scales_x[[1]]$aesthetics, names(layer_data))
+    if (length(x_vars) > 0) {
+      match_id <- match(layer_data$PANEL, panels$PANEL)
+      names(x_vars) <- x_vars
+      SCALE_X <- panels$SCALE_X[match_id]
+      new_x <- scales_map(layer_data, x_vars, SCALE_X, layout$panel_scales_x)
+      layer_data[, x_vars] <- new_x
+    }
+
+    y_vars <- intersect(layout$panel_scales_y[[1]]$aesthetics, names(layer_data))
+    if (length(y_vars) > 0) {
+      if (is.null(match_id)) {
+        match_id <- match(layer_data$PANEL, panels$PANEL)
+      }
+      names(y_vars) <- y_vars
+      SCALE_Y <- panels$SCALE_Y[match_id]
+      new_y <- scales_map(layer_data, y_vars, SCALE_Y, layout$panel_scales_y)
+      layer_data[, y_vars] <- new_y
+    }
+
+    layer_data
+  })
+}
+
+# Mirrors scale_apply(method = "map") (ggplot2 R/layout.R): map each of
+# `vars` through the scale its rows are routed to by `scale_id`, returning
+# one vector per var in row order. As in scales_train(), the fallback splits
+# rows once per call, and only if a var needs it.
+scales_map <- function(data, vars, scale_id, scales) {
+  if (length(vars) == 0) return()
+  if (nrow(data) == 0) return()
+  if (anyNA(scale_id)) {
+    rlang::abort("`scale_id` must not contain any NA.")
+  }
+  scale_index <- NULL
+  lapply(vars, function(var) {
+    x <- data[[var]]
+    dispatch(
+      "scale_map", scales[[1]],
+      list(x = x, scale_id = scale_id, scales = scales),
+      function() {
+        if (is.null(scale_index)) {
+          scale_index <<- gg_split_with_index(seq_along(scale_id), scale_id, length(scales))
+        }
+        pieces <- lapply(seq_along(scales), function(i) {
+          scales[[i]]$map(vctrs::vec_slice(x, scale_index[[i]]))
+        })
+        # Remove empty vectors to avoid coercion issues with vctrs
+        pieces[lengths(pieces) == 0] <- NULL
+        o <- order(unlist(scale_index))[seq_len(sum(lengths(pieces)))]
+        vctrs::vec_c(!!!pieces)[o]
+      }
+    )
+  })
+}

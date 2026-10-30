@@ -28,6 +28,29 @@ rs_train_continuous_grouped <- function(x, scale_id, existing) .Call(wrap__train
 #' @noRd
 rs_train_discrete_rows <- function(x, scale_id, n_scales) .Call(wrap__train_discrete_rows, x, scale_id, n_scales)
 
+#' Maps double or integer `x` onto continuous position scales (see
+#' `alot_core::scale::map`). `limits` holds each scale's limits as a
+#' length-2n vector, `oob` is 0 (censor), 1 (squish), 2 (squish_infinite)
+#' or 3 (keep), and `na_value` a length-1 double copied bit for bit.
+#' @noRd
+rs_map_continuous <- function(x, scale_id, limits, oob, only_finite, na_value) .Call(wrap__map_continuous, x, scale_id, limits, oob, only_finite, na_value)
+
+#' Codes a character vector by CHARSXP pointer in order of first
+#' appearance: `list(codes, rows)`, both 1-based, where `rows[k]` is the
+#' first row with code `k`. Strings that are equal but differently encoded
+#' get separate codes; R's `match()` on `x[rows]` resolves them.
+#' @noRd
+rs_factorize_strings <- function(x) .Call(wrap__factorize_strings, x)
+
+#' Maps discrete `x` onto position scales through `table`, the column-major
+#' `n_keys` x n-scales matrix of mapped values R computed from each scale's
+#' limits and palette. Keys: a factor's codes with NA last (`n_keys` must
+#' be its levels plus one); for a logical FALSE, TRUE, NA; for an integer
+#' vector the 1-based codes of `rs_factorize_strings()`. Returns a double
+#' vector, or `NULL` (decline) for a key outside the table.
+#' @noRd
+rs_map_discrete <- function(x, scale_id, table, n_keys) .Call(wrap__map_discrete, x, scale_id, table, n_keys)
+
 #' Round-trips the columns of `df` through the interchange layer, for
 #' tests and benchmarks. With `copy = FALSE` every column passes through;
 #' with `copy = TRUE` each atomic column is rebuilt from its view and given

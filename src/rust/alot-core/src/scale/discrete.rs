@@ -100,7 +100,7 @@ where
 /// cost for pointer and integer keys; this mixes high bits back down so
 /// aligned pointers still spread over buckets.
 #[derive(Default)]
-struct MixHasher(u64);
+pub(crate) struct MixHasher(u64);
 
 impl Hasher for MixHasher {
     fn write(&mut self, bytes: &[u8]) {

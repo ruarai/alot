@@ -141,7 +141,7 @@ not repeated below:
 - **Done when:** the shared criteria hold, including mixed factor and
   character input across layers and locale-sensitive strings.
 
-### T1.2 `layout$map_position` mirror and kernels
+### T1.2 `layout$map_position` mirror and kernels — done
 - **Depends:** T0.3, T1.1
 - **Touches:** `R/layout.R`, `R/build.R`, `R/kernels-scale.R`,
   `alot-core/src/scale/map.rs` (new)

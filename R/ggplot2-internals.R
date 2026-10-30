@@ -22,3 +22,4 @@ gg_check_required_aesthetics <- function(...) gg("check_required_aesthetics")(..
 gg_snake_class       <- function(...) gg("snake_class")(...)
 gg_dapply            <- function(...) gg("dapply")(...)
 gg_split_with_index  <- function(...) gg("split_with_index")(...)
+gg_mapped_discrete   <- function(...) gg("mapped_discrete")(...)

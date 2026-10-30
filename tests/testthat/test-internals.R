@@ -23,3 +23,21 @@ test_that("upstream discrete position training matches what alot relies on", {
   expect_snapshot(print(body(utils::getFromNamespace("clevels", "scales"))))
   expect_snapshot(print(body(scales::train_continuous)))
 })
+
+test_that("upstream position mapping matches the versions alot mirrors", {
+  # Mirrored by layout_map_position() and scales_map() (R/layout.R); the
+  # map kernels (R/kernels-scale.R) reproduce the scales' map() methods and
+  # the oob functions they recognise. If these fail, update the mirror and
+  # kernels to match, then update the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::Layout$map_position)$f)))
+  expect_snapshot(print(body(utils::getFromNamespace("scale_apply", "ggplot2"))))
+  expect_snapshot(print(body(environment(ggplot2::ScaleContinuousPosition$map)$f)))
+  expect_snapshot(print(body(environment(ggplot2::ScaleDiscretePosition$map)$f)))
+  expect_snapshot(print(body(utils::getFromNamespace("mapped_discrete", "ggplot2"))))
+  expect_snapshot(print(body(scales::oob_censor)))
+  expect_snapshot(print(body(scales::oob_censor_any)))
+  expect_snapshot(print(body(scales::oob_squish)))
+  expect_snapshot(print(body(scales::oob_squish_any)))
+  expect_snapshot(print(body(scales::oob_squish_infinite)))
+  expect_snapshot(print(body(scales::oob_keep)))
+})

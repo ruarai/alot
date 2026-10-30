@@ -282,3 +282,42 @@ Step profile (`step-profile.R`, `ALOT_BENCH_CORES=1`, not interleaved):
 `train_position_1` is 67.7 → 20.3 ms (3.3×) for `boxplot`, and 38.9 → 21.0 ms
 (1.85×) for `bar_dodge`. In `bar_dodge` about 11 ms of that step is
 `match(PANEL, …)` in the `Facet$train_scales` mirror, outside the kernel.
+
+### T1.2 Position mapping (2026-10-30) — kept
+
+`inst/bench/scale-map.R`: the `scale_map` dispatch for one column of 1e6
+values through trained panel scales, sequential with interleaved reps (same
+machine as the baseline). The continuous inputs have 1% NA.
+
+| input | panels | ggplot2_ms | alot_ms | speedup |
+| --- | --- | ---: | ---: | --- |
+| double_censor | 1 | 56.0 | 5.0 | 11.2x |
+| double_censor | 25 | 74.0 | 11.0 | 6.7x |
+| double_squish | 1 | 57.0 | 4.0 | 14.3x |
+| double_squish | 25 | 73.0 | 10.0 | 7.3x |
+| integer | 1 | 57.0 | 4.0 | 14.3x |
+| integer | 25 | 75.0 | 10.0 | 7.5x |
+| factor_10 | 1 | 73.0 | 3.0 | 24.3x |
+| factor_10 | 25 | 338.0 | 9.0 | 37.6x |
+| character_10 | 1 | 74.0 | 11.0 | 6.7x |
+| character_10 | 25 | 204.0 | 14.0 | 14.6x |
+| character_1e4 | 1 | 73.0 | 12.0 | 6.1x |
+| character_1e4 | 25 | 187.0 | 18.0 | 10.4x |
+| logical | 1 | 40.0 | 2.0 | 20.0x |
+| logical | 25 | 213.0 | 9.0 | 23.7x |
+| mapped_discrete | 1 | 56.0 | 6.0 | 9.3x |
+| mapped_discrete | 25 | 183.0 | 2.0 | 91.5x |
+
+Both kernels are kept: every input clears 2×. Much of ggplot2's cost is
+`scale_apply`'s split, `vec_c()` and reorder, which the kernels skip.
+`mapped_discrete` input (the second pass on a discrete scale) needs only a
+cast in R and no split.
+
+Step profile (`step-profile.R`, `ALOT_BENCH_CORES=1`, not interleaved, 1e6
+rows): for `point_discrete` (the task's target; x and y continuous),
+`map_position_1` is 68.2 → 39.1 ms (1.75×) and `map_position_2` 60.8 →
+19.1 ms (3.2×); for `boxplot` (discrete x), `map_position_1` is 89.6 →
+31.9 ms (2.8×). The step includes more than the kernels. Timed alone on
+the `point_discrete` layer, the step is about 19 ms with kernels on, of
+which `match(PANEL, …)` in the `Layout$map_position` mirror is 8 ms and
+each kernel call about 4 ms.

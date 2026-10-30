@@ -290,3 +290,180 @@
               finite = TRUE))
       }
 
+# upstream position mapping matches the versions alot mirrors
+
+    Code
+      print(body(environment(ggplot2::Layout$map_position)$f))
+    Output
+      {
+          layout <- self$layout
+          lapply(data, function(layer_data) {
+              match_id <- NULL
+              x_vars <- intersect(self$panel_scales_x[[1]]$aesthetics, 
+                  names(layer_data))
+              if (length(x_vars) > 0) {
+                  match_id <- match(layer_data$PANEL, layout$PANEL)
+                  names(x_vars) <- x_vars
+                  SCALE_X <- layout$SCALE_X[match_id]
+                  new_x <- scale_apply(layer_data, x_vars, "map", SCALE_X, 
+                      self$panel_scales_x)
+                  layer_data[, x_vars] <- new_x
+              }
+              y_vars <- intersect(self$panel_scales_y[[1]]$aesthetics, 
+                  names(layer_data))
+              if (length(y_vars) > 0) {
+                  if (is.null(match_id)) {
+                      match_id <- match(layer_data$PANEL, layout$PANEL)
+                  }
+                  names(y_vars) <- y_vars
+                  SCALE_Y <- layout$SCALE_Y[match_id]
+                  new_y <- scale_apply(layer_data, y_vars, "map", SCALE_Y, 
+                      self$panel_scales_y)
+                  layer_data[, y_vars] <- new_y
+              }
+              layer_data
+          })
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("scale_apply", "ggplot2")))
+    Output
+      {
+          if (length(vars) == 0) 
+              return()
+          if (nrow(data) == 0) 
+              return()
+          if (anyNA(scale_id)) {
+              cli::cli_abort("{.arg scale_id} must not contain any {.val NA}.")
+          }
+          scale_index <- split_with_index(seq_along(scale_id), scale_id, 
+              length(scales))
+          lapply(vars, function(var) {
+              pieces <- lapply(seq_along(scales), function(i) {
+                  scales[[i]][[method]](vec_slice(data[[var]], scale_index[[i]]))
+              })
+              pieces[lengths(pieces) == 0] <- NULL
+              o <- order(unlist(scale_index))[seq_len(sum(lengths(pieces)))]
+              vec_c(!!!pieces)[o]
+          })
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::ScaleContinuousPosition$map)$f))
+    Output
+      {
+          scaled <- as.numeric(self$oob(x, limits))
+          if (!anyNA(scaled)) {
+              return(scaled)
+          }
+          vec_assign(scaled, is.na(scaled), self$na.value)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::ScaleDiscretePosition$map)$f))
+    Output
+      {
+          if (inherits(x, "AsIs")) {
+              return(x)
+          }
+          if (is_discrete(x)) {
+              values <- self$palette(length(limits))
+              if (!is.numeric(values)) {
+                  cli::cli_abort("The {.arg palette} function must return a {.cls numeric} vector.", 
+                      call = self$call)
+              }
+              if (length(values) < length(limits)) {
+                  cli::cli_abort("The {.arg palette} function must return at least \\\n            {length(limits)} values.", 
+                      call = self$call)
+              }
+              x <- values[match(as.character(x), limits)]
+          }
+          mapped_discrete(x)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("mapped_discrete", "ggplot2")))
+    Output
+      {
+          if (is.null(x)) 
+              return(NULL)
+          new_mapped_discrete(vec_cast(x, double()))
+      }
+
+---
+
+    Code
+      print(body(scales::oob_censor))
+    Output
+      {
+          force(range)
+          finite <- if (only.finite) 
+              is.finite(x)
+          else TRUE
+          x[finite & x < range[1]] <- NA_real_
+          x[finite & x > range[2]] <- NA_real_
+          x
+      }
+
+---
+
+    Code
+      print(body(scales::oob_censor_any))
+    Output
+      {
+          oob_censor(x, range = range, only.finite = FALSE)
+      }
+
+---
+
+    Code
+      print(body(scales::oob_squish))
+    Output
+      {
+          force(range)
+          finite <- if (only.finite) 
+              is.finite(x)
+          else TRUE
+          x[finite & x < range[1]] <- range[1]
+          x[finite & x > range[2]] <- range[2]
+          x
+      }
+
+---
+
+    Code
+      print(body(scales::oob_squish_any))
+    Output
+      {
+          oob_squish(x, range, only.finite = FALSE)
+      }
+
+---
+
+    Code
+      print(body(scales::oob_squish_infinite))
+    Output
+      {
+          force(range)
+          x[x == -Inf] <- range[1]
+          x[x == Inf] <- range[2]
+          x
+      }
+
+---
+
+    Code
+      print(body(scales::oob_keep))
+    Output
+      {
+          x
+      }
+
