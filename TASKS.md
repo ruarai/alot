@@ -216,7 +216,7 @@ not repeated below:
     must match: character for colours, integer or character for shapes.
 - **Done when:** the shared criteria hold.
 
-### T2.5 Size, alpha and linewidth scales
+### T2.5 Size, alpha and linewidth scales (deferred)
 - **Depends:** T2.1, T0.3
 - **Touches:** `R/kernels-npscale.R`, `alot-core/src/scale/map.rs`
 - **Do:** Add `rescale` with `area_pal` / `rescale_pal` for continuous size,
@@ -231,7 +231,7 @@ not repeated below:
 
 ---
 
-## 1.3 Stats
+## 1.3 Stats (all deferred)
 
 All stat kernels use the grouped driver (T0.4) and register under
 `dispatch("stat", …)`.
@@ -310,7 +310,7 @@ All stat kernels use the grouped driver (T0.4) and register under
 
 ---
 
-## 1.4 Positions
+## 1.4 Positions (all deferred)
 
 ### T4.1 `PositionStack` and `PositionFill`
 - **Depends:** T0.4
