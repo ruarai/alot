@@ -41,3 +41,18 @@ test_that("upstream position mapping matches the versions alot mirrors", {
   expect_snapshot(print(body(scales::oob_squish_infinite)))
   expect_snapshot(print(body(scales::oob_keep)))
 })
+
+test_that("upstream scale transformation matches the versions alot mirrors", {
+  # Mirrored by scales_transform_df() (R/build.R); kernel_transform
+  # (R/kernels-scale.R) reproduces Scale$transform_df with default_transform
+  # for the scales transforms it recognises. If these fail, update the
+  # mirror and kernel to match, then update the snapshots.
+  expect_snapshot(print(body(environment(utils::getFromNamespace("ScalesList", "ggplot2")$transform_df)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Scale$transform_df)$f)))
+  expect_snapshot(print(body(utils::getFromNamespace("default_transform", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("has_default_transform", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("check_transformation", "ggplot2"))))
+  expect_snapshot(print(body(scales::transform_log)))
+  expect_snapshot(print(body(scales::transform_sqrt)))
+  expect_snapshot(print(body(scales::transform_reverse)))
+})

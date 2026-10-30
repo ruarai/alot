@@ -51,6 +51,15 @@ rs_factorize_strings <- function(x) .Call(wrap__factorize_strings, x)
 #' @noRd
 rs_map_discrete <- function(x, scale_id, table, n_keys) .Call(wrap__map_discrete, x, scale_id, table, n_keys)
 
+#' Transforms double or integer `x` for a continuous scale (see
+#' `alot_core::scale::transform`); `code` is 0 (log10), 1 (sqrt) or 2
+#' (reverse). Returns `list(x, nan, finite)`: the new vector (integer for
+#' reverse on integer input, else double) and the 1-based first rows where
+#' R would warn "NaNs produced" and `check_transformation()` would warn, 0
+#' for none. `NULL` (decline) for any other input type.
+#' @noRd
+rs_transform <- function(x, code) .Call(wrap__transform_values, x, code)
+
 #' Round-trips the columns of `df` through the interchange layer, for
 #' tests and benchmarks. With `copy = FALSE` every column passes through;
 #' with `copy = TRUE` each atomic column is rebuilt from its view and given

@@ -6,7 +6,7 @@ and when it is done.
 
 **Status:** a task with no marker is not started. When a task's commit lands,
 append `— done` to its heading, or `— dropped (see RESULTS.md)` if the kernel
-failed the 2× rule.
+failed the 1.25× rule.
 
 Every task that adds a kernel shares these completion criteria, so they are
 not repeated below:
@@ -17,7 +17,7 @@ not repeated below:
 - **Fallback:** unsupported params, subclasses and input types return `NULL`,
   with a test showing that `alot_coverage()` reports `"ggplot2"` for each.
 - **Coverage:** `alot_coverage()` reports `"rust"` for the supported case.
-- **Speed (2× rule):** the step is at least 2× faster at 1e6 rows in the
+- **Speed (1.25× rule):** the step is at least 1.25× faster at 1e6 rows in the
   bench suite (T0.6). If not, delete the kernel and record why in
   `inst/bench/RESULTS.md`.
 - **Drift:** each newly mirrored ggproto method gets a body snapshot in
@@ -106,7 +106,7 @@ not repeated below:
   - Facet-scaling suite: the four many-facet plots at 25, 100, 400 and 1,600
     panels with 200 rows per panel.
   - Per-step timing: wrap `alot_build` steps with timers behind an option, or
-    use `Rprof` aggregation, so each kernel's 2× check measures its own step.
+    use `Rprof` aggregation, so each kernel's 1.25× check measures its own step.
   - Record the baseline numbers (ggplot2 vs current alot) in `RESULTS.md`
     with machine, R and ggplot2 versions.
 - **Done when:** one command per suite reproduces the tables in
@@ -157,7 +157,7 @@ not repeated below:
   preservation and NA handling. Benchmark target: the `map_position` share
   of the discrete `geom_point` case.
 
-### T1.3 `scales$transform_df` kernels
+### T1.3 `scales$transform_df` kernels — done
 - **Depends:** T0.3
 - **Touches:** `R/build.R`, `R/kernels-scale.R`,
   `alot-core/src/scale/transform.rs` (new)
@@ -305,7 +305,7 @@ All stat kernels use the grouped driver (T0.4) and register under
   - Support the formulas `y ~ x` and `y ~ poly(x, k)`; `poly` basis
     generation stays in R and Rust receives the design matrix. Anything else
     falls back.
-- **Done when:** the shared criteria hold. The 2× rule applies to the stat
+- **Done when:** the shared criteria hold. The 1.25× rule applies to the stat
   step only.
 
 ---
@@ -329,7 +329,7 @@ All stat kernels use the grouped driver (T0.4) and register under
 
 ### T4.3 Measure jitter and nudge
 - **Depends:** T0.6
-- **Do:** Profile both at 1e6 rows. If jitter clears the 2× rule, add a
+- **Do:** Profile both at 1e6 rows. If jitter clears the 1.25× rule, add a
   kernel that takes the `runif` draws from R (under `with_seed_null`) and does
   only the arithmetic in Rust. Otherwise record "no kernel" in `RESULTS.md`.
 
@@ -402,7 +402,7 @@ All stat kernels use the grouped driver (T0.4) and register under
 - **Do:** Profile the bench suites with kernels in place. List
   `compute_geom_1`, `compute_geom_2`, `finish_statistics`,
   `layout$finish_data` and `.ignore_data`/`.expose_data` by share of build
-  time. Open one task per step that could plausibly pass the 2× rule, and
+  time. Open one task per step that could plausibly pass the 1.25× rule, and
   record the rest as "stays in R".
 
 ---

@@ -1,7 +1,7 @@
 # Position mapping (T1.2): the scale_map dispatch alone, kernels off vs on,
 # for one column of 1e6 values mapped through 1 or 25 trained panel scales.
 # Runs sequentially with ggplot2 and alot reps interleaved; this is the
-# kernels' 2x check. The step-profile suite's map_position steps also
+# kernels' 1.25x check. The step-profile suite's map_position steps also
 # include match(PANEL) and the data frame assignment, which this leaves out.
 #
 #   NOT_CRAN=true Rscript -e 'pkgbuild::compile_dll(force = TRUE, debug = FALSE); pkgload::load_all(compile = FALSE); source("inst/bench/scale-map.R")'

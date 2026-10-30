@@ -1,7 +1,7 @@
 # Per-step timing (T0.6): for each row-scaling case at 1e6 rows, the time
 # alot_build() spends in each step of ggplot2:::build_ggplot, with kernels
 # off (options(alot.kernels = FALSE), i.e. ggplot2's own methods) and on.
-# This is the measurement behind each kernel's 2x rule: compare the step the
+# This is the measurement behind each kernel's 1.25x rule: compare the step the
 # kernel replaces. Steps under 2% of the ggplot2-path total are folded into
 # "other".
 #

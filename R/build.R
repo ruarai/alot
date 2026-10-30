@@ -45,7 +45,7 @@ build_plot <- function(plot) {
   plot@labels <- timed("setup_plot_labels", gg_setup_plot_labels(plot, layers, data))
 
   data <- timed("ignore_data_1", gg_ignore_data(data))
-  data <- timed("transform_df", lapply(data, scales$transform_df))
+  data <- timed("transform_df", lapply(data, function(d) scales_transform_df(scales, d)))
 
   scale_x <- function() scales$get_scales("x")
   scale_y <- function() scales$get_scales("y")
@@ -127,4 +127,44 @@ layer_compute_position <- function(layer, data, layout) {
     function() position$compute_layer(data, params, layout)
   )
   gg_merge_attrs(data, ptype)
+}
+
+# Mirrors ScalesList$transform_df (ggplot2 R/scales-.R), dispatching each
+# scale's Scale$transform_df. A ScalesList whose transform_df is not its
+# own falls back whole.
+scales_transform_df <- function(scales, df) {
+  class_transform_df <- environment(gg("ScalesList")$transform_df)$f
+  if (!identical(environment(scales$transform_df)$f, class_transform_df)) {
+    record_trace("transform_df", class(scales)[1], "ggplot2")
+    return(scales$transform_df(df))
+  }
+  if (gg_empty(df)) {
+    return(df)
+  }
+
+  # If the scale contains to trans or trans is identity, there is no need
+  # to transform anything
+  idx_skip <- vapply(scales$scales, function(x) {
+    transformation <- x$get_transformation()
+    gg_has_default_transform(x) &&
+      (is.null(transformation) || identical(transformation$transform, identity))
+  }, logical(1L))
+  scales <- scales$scales[!idx_skip]
+
+  if (length(scales) == 0) {
+    return(df)
+  }
+
+  transformed <- unlist(lapply(
+    scales,
+    function(scale) {
+      dispatch(
+        "scale_transform", scale, list(scale = scale, df = df),
+        function() scale$transform_df(df = df)
+      )
+    }
+  ), recursive = FALSE)
+
+  df[names(transformed)] <- transformed
+  df
 }

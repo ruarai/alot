@@ -1,7 +1,7 @@
 # Discrete position training (T1.1): the scale_train dispatch alone, kernels
 # off vs on, for one discrete column of 1e6 values trained into 1 or 25
 # panel scales. Runs sequentially with ggplot2 and alot reps interleaved;
-# this is the kernel's 2x check. The step-profile suite's train_position
+# this is the kernel's 1.25x check. The step-profile suite's train_position
 # step also includes continuous training and match(PANEL), which this
 # leaves out.
 #

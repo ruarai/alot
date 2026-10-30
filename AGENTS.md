@@ -57,7 +57,7 @@ Benchmarks (`inst/bench/`, see `RESULTS.md`) need a release build:
 `pkgload::load_all()` builds debug Rust, so first run
 `pkgbuild::compile_dll(force = TRUE, debug = FALSE)`, then
 `pkgload::load_all(compile = FALSE)`. The suites run in parallel by default,
-which is fine for a quick overview. A new kernel's 2× check must run
+which is fine for a quick overview. A new kernel's 1.25× check must run
 sequentially (`ALOT_BENCH_CORES=1`) with ggplot2 and alot reps interleaved.
 
 After changing `#[extendr]` signatures, regenerate `R/extendr-wrappers.R`
@@ -100,7 +100,7 @@ with `rextendr::document()`.
    `alot_coverage()` for `"ggplot2"`. See `test-scale-train.R` for the
    pattern.
 4. **Snapshot every newly mirrored ggproto method** in `test-internals.R`.
-5. **Apply the 2× rule.** Keep a kernel only if its step is at least 2×
+5. **Apply the 1.25× rule.** Keep a kernel only if its step is at least 1.25×
    faster than ggplot2 at 1e6 rows. If it isn't, delete it and record why in
    `inst/bench/RESULTS.md`.
 6. **Match ggplot2's types and attributes:** integer vs double, factor

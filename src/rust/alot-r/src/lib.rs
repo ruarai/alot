@@ -3,6 +3,7 @@ pub mod grouped;
 
 use alot_core::group::{Columns, Values};
 use alot_core::scale::map::{self, Oob};
+use alot_core::scale::transform::{self, Transform};
 use alot_core::scale::{discrete, range};
 use convert::{Column, ColumnData, ColumnsBuilder, Frame};
 use extendr_api::prelude::*;
@@ -205,6 +206,47 @@ fn map_discrete(x: Robj, scale_id: &[i32], table: &[f64], n_keys: i32) -> extend
     })
 }
 
+/// Transforms double or integer `x` for a continuous scale (see
+/// `alot_core::scale::transform`); `code` is 0 (log10), 1 (sqrt) or 2
+/// (reverse). Returns `list(x, nan, finite)`: the new vector (integer for
+/// reverse on integer input, else double) and the 1-based first rows where
+/// R would warn "NaNs produced" and `check_transformation()` would warn, 0
+/// for none. `NULL` (decline) for any other input type.
+/// @noRd
+#[extendr(r_name = "rs_transform")]
+fn transform_values(x: Robj, code: i32) -> extendr_api::Result<Robj> {
+    let t = match code {
+        0 => Transform::Log10,
+        1 => Transform::Sqrt,
+        2 => Transform::Reverse,
+        _ => return Err(Error::Other("unknown transform".into())),
+    };
+    let col = Column::new(&x);
+    let n = col.len();
+    let mut report = transform::Report::default();
+    let values = match col.data {
+        ColumnData::Double(v) => new_doubles(n, |out| report = transform::transform(v.iter().copied(), t, out)),
+        ColumnData::Integer(v) if t == Transform::Reverse => {
+            let mut out: Robj = Integers::new(n).into();
+            if n > 0 {
+                transform::reverse_integers(v.iter(), out.as_integer_slice_mut().unwrap());
+            }
+            out
+        }
+        ColumnData::Integer(v) => {
+            let it = v.iter().map(|v| v.map_or(transform::NA_REAL, f64::from));
+            new_doubles(n, |out| report = transform::transform(it, t, out))
+        }
+        _ => return Ok(().into()),
+    };
+    let row = |i: Option<usize>| Integers::from_values([i.map_or(0, |i| i as i32 + 1)]);
+    let mut out = ColumnsBuilder::new();
+    out.push("x", values);
+    out.push("nan", row(report.nan_produced));
+    out.push("finite", row(report.finite_changed));
+    Ok(out.finish()?.into())
+}
+
 /// Round-trips the columns of `df` through the interchange layer, for
 /// tests and benchmarks. With `copy = FALSE` every column passes through;
 /// with `copy = TRUE` each atomic column is rebuilt from its view and given
@@ -330,6 +372,7 @@ extendr_module! {
     fn map_continuous;
     fn factorize_strings;
     fn map_discrete;
+    fn transform_values;
     fn convert_roundtrip;
     fn convert_inspect;
     fn group_index;

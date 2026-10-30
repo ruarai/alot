@@ -159,3 +159,75 @@ kernel_map_discrete <- function(x, scale_id, scales) {
   class(out) <- c("mapped_discrete", "numeric")
   out
 }
+
+# The transforms the transform kernel handles, keyed by the code
+# rs_transform() takes. A transformation matches by name and by its
+# transform function: the same closure as scales' own (body, formals and,
+# for log, `base`), defined in the scales namespace. transform_identity()
+# needs no kernel: scales_transform_df() skips it, as upstream does.
+transform_kernels <- function() {
+  list(
+    list(ref = scales::transform_log10(), code = 0L),
+    list(ref = scales::transform_sqrt(), code = 1L),
+    list(ref = scales::transform_reverse(), code = 2L)
+  )
+}
+
+transform_code <- function(transformation) {
+  if (!inherits(transformation, "transform")) return(NULL)
+  fn <- transformation$transform
+  for (k in transform_kernels()) {
+    ref <- k$ref$transform
+    if (!identical(transformation$name, k$ref$name)) next
+    if (is.primitive(ref)) {
+      if (identical(fn, ref)) return(k$code)
+      next
+    }
+    if (!is.function(fn) || is.primitive(fn)) next
+    env <- environment(fn)
+    if (!identical(fn, ref, ignore.environment = TRUE) ||
+        !identical(topenv(env), asNamespace("scales")) ||
+        !identical(env$base, environment(ref)$base)) next
+    return(k$code)
+  }
+  NULL
+}
+
+# Replays a transform on the row Rust flagged, so R raises the "NaNs
+# produced" warning as default_transform's call to it would. The warning's
+# call depends on whether the caller is byte-compiled, as ggplot2 is, so
+# this is compiled even under pkgload::load_all(). The caller passes the
+# row twice: a scalar would take the bytecode's scalar path, which reports
+# `log(x, base)` instead.
+replay_transform <- compiler::cmpfun(function(transformation, x) {
+  transformation$transform(x)
+})
+
+# Continuous scale transformation: Scale$transform_df (ggplot2 R/scale-.R)
+# with ggplot2's default_transform: each aesthetic column through the
+# transformation, then check_transformation(). Rust transforms the column
+# and reports the first row at which R would warn, and R replays each
+# warning on that row alone, in upstream's order. Only plain double and
+# integer columns are handled. Single-row data falls back: R's scalar path differs from its vector path in NaN bits
+# and in the warning's call.
+kernel_transform <- function(scale, df) {
+  if (nrow(df) < 2) return(NULL)
+  if (!identical(environment(scale$transform_df)$f, environment(ggplot2::Scale$transform_df)$f) ||
+      !identical(environment(scale$transform)$f, gg("default_transform"))) return(NULL)
+  aesthetics <- intersect(scale$aesthetics, names(df))
+  cols <- df[aesthetics]
+  plain_column <- function(x) typeof(x) %in% c("double", "integer") && is.null(attributes(x))
+  if (!all(vapply(cols, plain_column, logical(1)))) return(NULL)
+  transformation <- scale$get_transformation()
+  code <- transform_code(transformation)
+  if (is.null(code)) return(NULL)
+
+  lapply(cols, function(x) {
+    out <- rs_transform(x, code)
+    if (out$nan > 0L) replay_transform(transformation, x[c(out$nan, out$nan)])
+    if (out$finite > 0L) {
+      gg_check_transformation(x[out$finite], out$x[out$finite], transformation$name, call = scale$call)
+    }
+    out$x
+  })
+}

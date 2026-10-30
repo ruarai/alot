@@ -467,3 +467,122 @@
           x
       }
 
+# upstream scale transformation matches the versions alot mirrors
+
+    Code
+      print(body(environment(utils::getFromNamespace("ScalesList", "ggplot2")$
+        transform_df)$f))
+    Output
+      {
+          if (empty(df)) {
+              return(df)
+          }
+          idx_skip <- vapply(self$scales, function(x) {
+              transformation <- x$get_transformation()
+              has_default_transform(x) && (is.null(transformation) || 
+                  identical(transformation$transform, identity))
+          }, logical(1L))
+          scales <- self$scales[!idx_skip]
+          if (length(scales) == 0) {
+              return(df)
+          }
+          transformed <- unlist(lapply(scales, function(scale) scale$transform_df(df = df)), 
+              recursive = FALSE)
+          df[names(transformed)] <- transformed
+          df
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Scale$transform_df)$f))
+    Output
+      {
+          if (empty(df)) {
+              return()
+          }
+          aesthetics <- intersect(self$aesthetics, names(df))
+          if (length(aesthetics) == 0) {
+              return()
+          }
+          lapply(df[aesthetics], self$transform)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("default_transform", "ggplot2")))
+    Output
+      {
+          transformation <- self$get_transformation()
+          new_x <- transformation$transform(x)
+          check_transformation(x, new_x, transformation$name, call = self$call)
+          new_x
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("has_default_transform", "ggplot2")))
+    Output
+      {
+          transform_method <- environment(scale$transform)$f
+          identical(default_transform, transform_method) || identical(identity, 
+              transform_method)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("check_transformation", "ggplot2")))
+    Output
+      {
+          if (!any(is_finite(x) != is_finite(transformed))) {
+              return(invisible())
+          }
+          if (is.null(arg)) {
+              end <- "."
+          }
+          else {
+              end <- paste0(" in {.arg {arg}}.")
+          }
+          msg <- paste0("{.field {name}} transformation introduced infinite values", 
+              end)
+          cli::cli_warn(msg, call = call)
+      }
+
+---
+
+    Code
+      print(body(scales::transform_log))
+    Output
+      {
+          force(base)
+          new_transform(paste0("log-", format(base)), function(x) log(x, 
+              base), function(x) base^x, d_transform = function(x) 1/x/log(base), 
+              d_inverse = function(x) base^x * log(base), breaks = log_breaks(base = base), 
+              domain = c(1e-100, Inf))
+      }
+
+---
+
+    Code
+      print(body(scales::transform_sqrt))
+    Output
+      {
+          new_transform("sqrt", "sqrt", function(x) ifelse(x < 0, NA_real_, 
+              x^2), d_transform = function(x) 0.5/sqrt(x), d_inverse = function(x) 2 * 
+              x, domain = c(0, Inf))
+      }
+
+---
+
+    Code
+      print(body(scales::transform_reverse))
+    Output
+      {
+          new_transform("reverse", function(x) -x, function(x) -x, 
+              d_transform = function(x) rep(-1, length(x)), d_inverse = function(x) rep(-1, 
+                  length(x)), minor_breaks = regular_minor_breaks(reverse = TRUE))
+      }
+

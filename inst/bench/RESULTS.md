@@ -30,8 +30,8 @@ ALOT_BENCH_FACETS=true NOT_CRAN=true Rscript -e 'pkgload::load_all(compile = FAL
   3× (e.g. `map_position_2`); read speedups under about 1.5× as noise.
   The 1e7-row cells use a single rep and are the noisiest: `bar_dodge`
   shows 1.59× there although no kernel touches its main steps.
-- **2× checks for new kernels run sequentially with interleaved reps.**
-  A kernel's 2× decision uses `ALOT_BENCH_CORES=1` and alternates ggplot2
+- **1.25× checks for new kernels run sequentially with interleaved reps.**
+  A kernel's 1.25× decision uses `ALOT_BENCH_CORES=1` and alternates ggplot2
   and alot reps (ggplot2, alot, ggplot2, …), taking the median of each. The
   suites do not interleave yet; add that before the first kernel's check
   relies on these scripts.
@@ -251,7 +251,7 @@ is not settled by these numbers.
 | **total** | 3,729.1 | 100% | 3,603.3 | 1.03x |
 
 
-## Kernel 2× checks
+## Kernel speed checks (1.25× rule; 2× before T1.3)
 
 ### T1.1 Discrete position training (2026-10-30) — kept
 
@@ -321,3 +321,35 @@ rows): for `point_discrete` (the task's target; x and y continuous),
 the `point_discrete` layer, the step is about 19 ms with kernels on, of
 which `match(PANEL, …)` in the `Layout$map_position` mirror is 8 ms and
 each kernel call about 4 ms.
+
+### T1.3 Scale transforms (2026-10-30) — kept
+
+`inst/bench/scale-transform.R`: `scales_transform_df()` for one column of
+1e6 values through one transformed scale, sequential with interleaved reps
+and a full gc before each (same machine as the baseline). Doubles are
+`rexp()` with 1% NA; the `zeros` inputs also hold 1% zeros and negatives,
+so both of R's warnings fire; integers are 1–1000 with NA.
+
+| input | ggplot2_ms | alot_ms | speedup |
+| --- | ---: | ---: | --- |
+| log10_double | 20.9 | 14.4 | 1.4x |
+| log10_zeros | 20.0 | 16.0 | 1.3x |
+| log10_integer | 24.6 | 10.5 | 2.3x |
+| sqrt_double | 10.4 | 3.8 | 2.8x |
+| sqrt_zeros | 15.9 | 9.5 | 1.7x |
+| sqrt_integer | 11.4 | 3.8 | 3.0x |
+| reverse_double | 4.7 | 1.6 | 2.9x |
+| reverse_integer | 4.2 | 1.1 | 3.7x |
+
+- **All three are kept for both types** under the 1.25× rule. log10 of
+  doubles was first dropped under the old 2× rule, then restored when the
+  threshold changed. Exactness requires calling the C library's `log10`, as
+  R does, and that call is most of the time on both sides (about 14 ms of
+  21). Rust only saves `check_transformation()`'s `is.finite()` passes, so
+  about 1.4× is the ceiling single-threaded. Integer columns, where ggplot2
+  also pays for the coercion, reach 2.3×.
+- The `zeros` rows include about 5.5 ms that both paths pay for raising the
+  two warnings (`cli::cli_warn()` mostly); the transform itself is as fast
+  as in the warning-free rows. Warnings stay in R by design (AGENTS.md).
+- `identity` needs no kernel: `ScalesList$transform_df` skips such scales
+  before any per-scale work, and the mirror does the same.

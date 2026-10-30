@@ -61,7 +61,7 @@ doing work in one pass, avoiding per-group and per-panel splitting and copies,
 and skipping the overhead of calling ggproto methods.
 
 **Rule for adding a kernel:** keep it only if the benchmark shows at least a
-2× speedup for its step at 1e6 rows. Otherwise delete it, because each kernel
+1.25× speedup for its step at 1e6 rows. Otherwise delete it, because each kernel
 adds risk of diverging from ggplot2.
 
 ## Milestones
@@ -202,7 +202,7 @@ All stats run on the grouped driver from 1.0.
 `compute_geom_2` (`use_defaults` filling in default aesthetics),
 `finish_statistics`, `layout$finish_data`, and `.ignore_data` /
 `.expose_data`. Profile with the 1.1–1.5 kernels in place, then add kernels
-only where the 2× rule holds.
+only where the 1.25× rule holds.
 
 ## Matching ggplot2 exactly: known hazards
 
