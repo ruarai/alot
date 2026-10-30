@@ -22,7 +22,8 @@ fn points(n: usize, w: f64, h: f64) -> Vec<Point> {
             shape: shapes[(rnd() * 4.0) as usize],
             size: 10.86,
             lwd: 1.476,
-            rgba: [(rnd() * 255.0) as u8, 100, 50, 76],
+            col: [(rnd() * 255.0) as u8, 100, 50, 76],
+            fill: [0; 4],
         })
         .collect()
 }
@@ -30,7 +31,7 @@ fn points(n: usize, w: f64, h: f64) -> Vec<Point> {
 fn page(pts: &[Point]) -> DisplayList {
     let mut list = DisplayList::new();
     list.push(Item::Clear([255, 255, 255, 255]));
-    list.push(Item::Points(PointBatch::new(pts.iter().copied())));
+    list.push(Item::Points(PointBatch::new(pts, 0)));
     list
 }
 

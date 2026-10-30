@@ -1685,3 +1685,160 @@
           e
       }
 
+# upstream point drawing matches what the hybrid tier mirrors
+
+    Code
+      print(body(environment(ggplot2::GeomPoint$draw_panel)$f))
+    Output
+      {
+          data$shape <- translate_shape_string(data$shape)
+          coords <- coord$transform(data, panel_params)
+          ggname("geom_point", pointsGrob(coords$x, coords$y, pch = coords$shape, 
+              gp = gg_par(col = alpha(coords$colour, coords$alpha), 
+                  fill = fill_alpha(coords$fill, coords$alpha), pointsize = coords$size, 
+                  stroke = coords$stroke)))
+      }
+
+---
+
+    Code
+      print(body(environment(utils::getFromNamespace("Layer", "ggplot2")$draw_geom)$f))
+    Output
+      {
+          if (empty(data)) {
+              n <- nrow(layout$layout)
+              return(rep(list(zeroGrob()), n))
+          }
+          data <- self$geom$handle_na(data, self$computed_geom_params)
+          self$geom$draw_layer(data, self$computed_geom_params, layout, 
+              layout$coord)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Geom$handle_na)$f))
+    Output
+      {
+          remove_missing(data, params$na.rm, c(self$required_aes, self$non_missing_aes), 
+              snake_class(self))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Geom$draw_layer)$f))
+    Output
+      {
+          if (empty(data)) {
+              n <- if (is.factor(data$PANEL)) 
+                  nlevels(data$PANEL)
+              else 1L
+              return(rep(list(zeroGrob()), n))
+          }
+          params <- params[intersect(names(params), self$parameters())]
+          if (nlevels(as.factor(data$PANEL)) > 1L) {
+              data_panels <- split(data, data$PANEL)
+          }
+          else {
+              data_panels <- list(data)
+          }
+          lapply(data_panels, function(data) {
+              if (empty(data)) 
+                  return(zeroGrob())
+              panel_params <- layout$panel_params[[data$PANEL[1]]]
+              inject(self$draw_panel(data, panel_params, coord, !!!params))
+          })
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("gg_par", "ggplot2")))
+    Output
+      {
+          args <- list2(...)
+          args <- args[lengths(args) > 0]
+          if (!is.null(args$lwd)) {
+              args$lwd <- args$lwd * .pt
+          }
+          if (!is.null(stroke)) {
+              args$lwd <- stroke * .stroke/2
+          }
+          if (!is.null(pointsize)) {
+              stroke <- stroke %||% 0
+              stroke[is.na(stroke)] <- 0
+              args$fontsize <- pointsize * .pt + stroke * .stroke/2
+          }
+          if (!is.null(args$lty)) {
+              if (is.logical(args$lty)) {
+                  args$lty <- as.integer(args$lty)
+              }
+              if (anyNA(args$lty)) {
+                  args$lty[is.na(args$lty)] <- if (is.character(args$lty)) 
+                      "blank"
+                  else 0
+              }
+          }
+          inject(gpar(!!!args))
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("translate_shape_string", "ggplot2")))
+    Output
+      {
+          if (!is.character(shape_string)) {
+              return(shape_string)
+          }
+          if (nchar(shape_string[1]) <= 1) {
+              return(shape_string)
+          }
+          pch_table <- c(`square open` = 0, `circle open` = 1, `triangle open` = 2, 
+              plus = 3, cross = 4, `diamond open` = 5, `triangle down open` = 6, 
+              `square cross` = 7, asterisk = 8, `diamond plus` = 9, 
+              `circle plus` = 10, star = 11, `square plus` = 12, `circle cross` = 13, 
+              `square triangle` = 14, `triangle square` = 14, square = 15, 
+              `circle small` = 16, triangle = 17, diamond = 18, circle = 19, 
+              bullet = 20, `circle filled` = 21, `square filled` = 22, 
+              `diamond filled` = 23, `triangle filled` = 24, `triangle down filled` = 25)
+          shape_match <- charmatch(shape_string, names(pch_table))
+          invalid_strings <- is.na(shape_match)
+          nonunique_strings <- shape_match == 0
+          if (any(invalid_strings)) {
+              bad_string <- unique0(shape_string[invalid_strings])
+              cli::cli_abort("Shape aesthetic contains invalid value{?s}: {.val {bad_string}}.")
+          }
+          if (any(nonunique_strings)) {
+              bad_string <- unique0(shape_string[nonunique_strings])
+              cli::cli_abort(c("Shape names must be given unambiguously.", 
+                  i = "Fix {.val {bad_string}}."))
+          }
+          unname(pch_table[shape_match])
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("remove_missing", "ggplot2")))
+    Output
+      {
+          check_bool(na.rm)
+          missing <- detect_missing(df, vars, finite)
+          if (any(missing)) {
+              df <- df[!missing, , drop = FALSE]
+              if (!na.rm) {
+                  if (name != "") 
+                      name <- paste(" ({.fn ", name, "})", sep = "")
+                  msg <- paste0("Removed {sum(missing)} row{?s} containing ", 
+                      if (finite) 
+                        "non-finite"
+                      else "missing values or values", " outside the scale range", 
+                      name, ".")
+                  cli::cli_warn(msg)
+              }
+          }
+          df
+      }
+

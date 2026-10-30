@@ -60,13 +60,36 @@ test_that("ggplot2's default point renders like ragg", {
   expect_render_close(p, tier = "hybrid")
 })
 
-test_that("supported shapes render like ragg", {
-  for (shape in c(0:4, 15:17, 19, 20)) {
-    p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) +
-      ggplot2::geom_point(shape = shape, size = 4, alpha = 0.5, colour = "steelblue")
-    expect_true(uses_rust(p))
-    expect_render_close(p, tier = "hybrid")
+test_that("every shape renders like ragg at several sizes, strokes, alphas and dpis", {
+  combos <- list(
+    list(size = 1.5, stroke = 0.5, alpha = 1, res = 96, fill = NA),
+    list(size = 4, stroke = 1, alpha = 0.5, res = 150, fill = "orange"),
+    list(size = 8, stroke = 2, alpha = 0.7, res = 72, fill = "#3366CC"),
+    list(size = 3, stroke = 0, alpha = 1, res = 300, fill = "orange")
+  )
+  for (shape in 0:25) {
+    for (k in combos) {
+      p <- ggplot2::ggplot(d[1:60, ], ggplot2::aes(x, y)) +
+        ggplot2::geom_point(
+          shape = shape, size = k$size, stroke = k$stroke, alpha = k$alpha,
+          colour = "steelblue4", fill = k$fill
+        )
+      expect_true(uses_rust(p))
+      expect_render_close(p, res = k$res, tier = "hybrid", label = sprintf("shape %d, size %g, stroke %g, %g dpi", shape, k$size, k$stroke, k$res))
+    }
   }
+})
+
+test_that("mapped size, shape names and fill render like ragg", {
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y, size = c, fill = s)) +
+    ggplot2::geom_point(shape = "circle filled", alpha = 0.6)
+  expect_true(uses_rust(p))
+  expect_render_close(p, tier = "hybrid")
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y, shape = s)) +
+    ggplot2::geom_point(colour = "grey20", fill = "red", size = 3, stroke = 0) +
+    ggplot2::scale_shape_manual(values = 21:24)
+  expect_true(uses_rust(p))
+  expect_render_close(p, tier = "hybrid")
 })
 
 test_that("mapped colour, shape, stroke, facets and log scales render like ragg", {
@@ -93,12 +116,11 @@ test_that("unsupported layers and coords keep ggplot2's pointsGrob, with a reaso
   na <- d
   na$y[1] <- NA
   cases <- list(
-    "unsupported shape" = base + ggplot2::geom_point(shape = 21, fill = "red"),
-    "unsupported shape" = base + ggplot2::geom_point(shape = "circle filled"),
+    "unsupported shape" = base + ggplot2::geom_point(shape = 30),
+    "character pch" = base + ggplot2::geom_point(shape = "a"),
     "clip is not \"on\"" = base + ggplot2::geom_point() + ggplot2::coord_cartesian(clip = "off"),
     "coord is not an unreversed coord_cartesian()" = base + ggplot2::geom_point() + ggplot2::coord_flip(),
-    "NA in x, y, size, stroke or colour" =
-      ggplot2::ggplot(na, ggplot2::aes(x, y)) + ggplot2::geom_point(na.rm = TRUE),
+    "NA in x, y, size or stroke" = base + ggplot2::geom_point(stroke = NA),
     "position scale does not rescale linearly" =
       base + ggplot2::geom_point() + ggplot2::continuous_scale(
         "x", palette = identity, guide = "axis", position = "bottom", super = ggplot2::ScaleContinuousPosition,
@@ -113,6 +135,17 @@ test_that("unsupported layers and coords keep ggplot2's pointsGrob, with a reaso
     expect_false(uses_rust(p))
     expect_equal(alot_render_coverage(p)$layers$reason, reason)
   }
+})
+
+test_that("rows with missing values are removed as ggplot2 does", {
+  na <- d
+  na$y[1:3] <- NA
+  p <- ggplot2::ggplot(na, ggplot2::aes(x, y)) + ggplot2::geom_point(size = 3)
+  expect_true(suppressWarnings(uses_rust(p)))
+  b <- ggplot2::ggplot_build(p)
+  # alot warns as ggplot2 does; the reference drawing warns too.
+  expect_warning(render_raster(b, render_size), "Removed 3 rows")
+  suppressWarnings(expect_render_close(b, tier = "hybrid"))
 })
 
 test_that("alot_render_coverage() reports each layer", {

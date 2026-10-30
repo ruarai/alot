@@ -601,7 +601,7 @@ alongside Phase 1's remaining tasks.
   20 × 20 in page at 300 dpi renders within a memory bound set by the band
   size.
 
-### R1.2 Point batches: all shapes
+### R1.2 Point batches: all shapes — done
 - **Depends:** R1.1
 - **Touches:** `alot-core/src/render/points.rs`
 - **Do:**

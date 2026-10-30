@@ -108,7 +108,8 @@ render_coverage <- function(built) {
   layers <- built@plot@layers
   layout <- built@layout
   reason <- vapply(seq_along(layers), function(i) {
-    hybrid_decline(layers[[i]], built@data[[i]], layout) %||% NA_character_
+    data <- suppressWarnings(hybrid_data(layers[[i]], built@data[[i]]))
+    hybrid_decline(layers[[i]], data, layout) %||% NA_character_
   }, character(1))
   geom <- vapply(layers, function(l) class(l$geom)[1], character(1))
   engine <- ifelse(is.na(reason), "rust", "ggplot2")
@@ -172,14 +173,37 @@ hybrid_layer <- function(layer) {
   )
 }
 
-# Why the hybrid tier draws a layer with ggplot2, or NULL if Rust draws it.
-# draw_points_layer() makes the same check, so coverage and drawing agree.
+# A layer's data as its geom draws it: Layer$draw_geom() removes missing
+# values first (ggplot2 R/layer.R), and GeomPoint$draw_panel() translates
+# shape names (R/geom-point.R).
+hybrid_data <- function(layer, data) {
+  if (!identical(layer$geom, ggplot2::GeomPoint) || gg_empty(data)) {
+    return(data)
+  }
+  data <- point_handle_na(layer, data)
+  data$shape <- gg_translate_shape_string(data$shape)
+  data
+}
+
+# GeomPoint$handle_na(), skipped when nothing is missing: remove_missing()
+# (ggplot2 R/utilities.R) then returns the data unchanged, and scanning 1e6
+# rows for it costs more than drawing them.
+point_handle_na <- function(layer, data) {
+  geom <- layer$geom
+  vars <- intersect(c(geom$required_aes, geom$non_missing_aes), names(data))
+  complete <- all(vapply(data[vars], function(v) is.atomic(v) && !anyNA(v), logical(1)))
+  if (complete) data else geom$handle_na(data, layer$computed_geom_params)
+}
+
+# Why the hybrid tier draws a layer with ggplot2, or NULL if Rust draws it,
+# given the layer's data from hybrid_data(). draw_points_layer() makes the
+# same check, so coverage and drawing agree.
 hybrid_decline <- function(layer, data, layout) {
   if (!identical(layer$geom, ggplot2::GeomPoint)) {
     return("no Rust drawer for this geom")
   }
   coord <- layout$coord
-  cols <- c("x", "y", "shape", "colour", "size", "stroke", "alpha")
+  cols <- c("x", "y", "shape", "colour", "fill", "size", "stroke", "alpha")
   if (!identical(class(coord), class(ggplot2::coord_cartesian())) ||
     !identical(coord$reverse %||% "none", "none")) {
     return("coord is not an unreversed coord_cartesian()")
@@ -196,13 +220,19 @@ hybrid_decline <- function(layer, data, layout) {
   if (!is.double(data$x) || !is.double(data$y) || !is.character(data$colour)) {
     return("x, y or colour has an unsupported type")
   }
+  if (!is.character(data$fill) && !(is.logical(data$fill) && all(is.na(data$fill)))) {
+    return("fill is not a colour vector")
+  }
   # Coord$transform() leaves AsIs positions untransformed (transform_position
   # callers in ggplot2 R/coord-.R); the hybrid would rescale them.
   if (inherits(data$x, "AsIs") || inherits(data$y, "AsIs")) {
     return("x or y is AsIs")
   }
-  if (anyNA(data$x) || anyNA(data$y) || anyNA(data$size) || anyNA(data$stroke) || anyNA(data$colour)) {
-    return("NA in x, y, size, stroke or colour")
+  if (anyNA(data$x) || anyNA(data$y) || anyNA(data$size) || anyNA(data$stroke)) {
+    return("NA in x, y, size or stroke")
+  }
+  if (is.character(data$shape)) {
+    return("character pch")
   }
   if (!rs_point_shapes_supported(data$shape)) {
     return("unsupported shape")
@@ -219,17 +249,26 @@ hybrid_decline <- function(layer, data, layout) {
 # Mirrors Layer$draw_geom and Geom$draw_layer (ggplot2 R/layer.R, R/geom-.R)
 # for GeomPoint, without splitting the data: one lazy grob per panel.
 draw_points_layer <- function(data, layout, layer) {
-  colour <- if (is.null(hybrid_decline(layer, data, layout))) point_colours(data$colour, data$alpha)
-  if (is.null(colour)) {
+  if (gg_empty(data)) {
     return(layer$draw_geom(data, layout))
+  }
+  data <- point_handle_na(layer, data)
+  data$shape <- gg_translate_shape_string(data$shape)
+  ok <- is.null(hybrid_decline(layer, data, layout))
+  colour <- if (ok) point_colours(data$colour, data$alpha)
+  fill <- if (!is.null(colour)) point_colours(as.character(data$fill), data$alpha)
+  if (is.null(fill)) {
+    return(layer$geom$draw_layer(data, layer$computed_geom_params, layout, layout$coord))
   }
 
   n_panels <- nlevels(as.factor(data$PANEL))
   panel <- as.integer(data$PANEL)
   counts <- tabulate(panel, n_panels)
   shared <- list(
-    x = data$x, y = data$y, panel = panel, shape = data$shape,
-    size = data$size, stroke = data$stroke, colour = colour,
+    x = data$x, y = data$y, panel = panel,
+    rows = split(seq_len(nrow(data)), factor(panel, levels = seq_len(n_panels))),
+    shape = data$shape,
+    size = data$size, stroke = data$stroke, colour = colour, fill = fill,
     data = data, coord = layout$coord
   )
   lapply(seq_len(n_panels), function(i) {
@@ -245,11 +284,11 @@ draw_points_layer <- function(data, layout, layer) {
 
 # Packed RGBA for rs_render_points(), as scales::alpha(colour, alpha). Rust
 # parses hex; other colour specs (names) go through col2rgb() once per
-# distinct value.
+# distinct value. NA stays NA, which Rust packs as transparent.
 point_colours <- function(colour, alpha) {
   out <- rs_point_colours(colour, alpha)
   if (is.null(out)) {
-    u <- unique(colour)
+    u <- unique(colour[!is.na(colour)])
     rgba <- grDevices::col2rgb(u, alpha = TRUE)
     hex <- grDevices::rgb(rgba[1, ], rgba[2, ], rgba[3, ], rgba[4, ], maxColorValue = 255)
     out <- rs_point_colours(hex[match(colour, u)], alpha)
@@ -318,15 +357,19 @@ drawDetails.alot_hybrid_points <- function(x, recording) {
 
   s <- x$shared
   img <- rs_render_points(
-    s$x, s$y, s$panel, x$panel, x_range, y_range,
+    s$x, s$y, s$rows[[x$panel]], x_range, y_range,
     c(left - x0, top - y0, right - left, bottom - top), as.integer(c(w, h)),
-    s$shape, s$size, s$stroke, s$colour,
+    s$shape, s$size, s$stroke, s$colour, s$fill,
     c(ggplot2::.pt, ggplot2::.stroke, res),
     render_threads()
   )
   if (is.null(img)) {
     return(grid::grid.draw(points_fallback_grob(x)))
   }
+  # Rust clipped each point to the panel, as ragg clips each mark; clipping
+  # the raster again would cut the edge pixels twice.
+  grid::pushViewport(grid::viewport(clip = "off"))
+  on.exit(grid::popViewport())
   grid::grid.raster(
     img,
     x = grid::unit(x0 / res - lo$x, "in"),

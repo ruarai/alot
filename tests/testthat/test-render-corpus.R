@@ -22,20 +22,13 @@ render_counts <- new.env()
 render_counts$tier <- character()
 render_counts$reasons <- character()
 
-# Looser tolerances for the hybrid tier's point drawer (R0.1 prototype),
-# measured on the full render corpus at R0.2:
-# - Disc edges: sprite coverage (16 x 16 samples, 1/16-px offsets) differs
-#   from AGG's exact-area coverage by up to about 14 of 255 per point, and
-#   the difference compounds where points overplot (duplicate rows in mpg),
-#   reaching about 150 on a few edge pixels while well under 1% of pixels
-#   differ by more than 8. Point sprite fidelity is R1.2's, which should
-#   restore the default `max`.
-# - Many faint overlapping points: ragg rounds to 8 bits on every blend, so
-#   low-alpha overplotting stalls short of where alot's f32 accumulation
-#   ends (about 2% of pixels differ by more than 8). Mirroring that is a
-#   canvas question for R1.1.
-hybrid_max <- 160
-hybrid_share <- c("geom_point.Rd #9" = 0.025, "geom_point.Rd #10" = 0.025)
+# Looser tolerances where many marks overplot: ragg rounds to 8 bits on
+# every blend, alot accumulates in f32 (PHASE2.md, Canvas). Faint points
+# (alpha 1/20, 1/100) stall short of alot's result on about 2% of pixels;
+# about 100 opaque points stacked on one spot (scale_identity.Rd #1, the
+# grey ramp at u = v = 0) differ on their shared edge pixels.
+render_share <- c("geom_point.Rd #9" = 0.025, "geom_point.Rd #10" = 0.025)
+render_max <- c("geom_point.Rd #10" = 64, "scale_identity.Rd #1" = 48)
 
 render_corpus_check <- function(id, p) {
   set.seed(1)
@@ -46,11 +39,9 @@ render_corpus_check <- function(id, p) {
     render_counts$reasons <- c(render_counts$reasons, unique(cov$layers$reason))
     return(succeed())
   }
-  if (cov$tier == "hybrid") {
-    share <- if (id %in% names(hybrid_share)) hybrid_share[[id]] else 0.01
-    return(suppressMessages(expect_render_close(b, max = hybrid_max, share = share, tier = "hybrid", label = id)))
-  }
-  suppressMessages(expect_render_close(b, tier = cov$tier, label = id))
+  share <- if (id %in% names(render_share)) render_share[[id]] else 0.01
+  max <- if (id %in% names(render_max)) render_max[[id]] else 32
+  suppressMessages(expect_render_close(b, max = max, share = share, tier = cov$tier, label = id))
 }
 
 # As run_corpus_block() in test-corpus.R, checking the listed plots only.

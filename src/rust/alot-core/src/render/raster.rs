@@ -167,11 +167,17 @@ fn draw_bands(page: &Page, first: usize, out: &mut [u32], threads: usize) {
 
 /// Shares of each pixel column and band row inside the current clip.
 pub struct ClipShares {
+    /// The clip box in page pixels.
+    pub rect: Rect,
     pub cols: Vec<f32>,
     pub rows: Vec<f32>,
     /// Columns and band rows with a non-zero share: `[lo, hi)`.
     pub x: (usize, usize),
     pub y: (usize, usize),
+    /// The (at most two) columns and band rows the clip edges cross, with a
+    /// share strictly between 0 and 1.
+    edge_cols: [usize; 2],
+    edge_rows: [usize; 2],
 }
 
 impl ClipShares {
@@ -182,7 +188,21 @@ impl ClipShares {
             Some(lo) => (lo, v.len() - v.iter().rev().position(|&s| s > 0.0).unwrap()),
             None => (0, 0),
         };
-        ClipShares { x: span(&cols), y: span(&rows), cols, rows }
+        let edges = |v: &[f32], (lo, hi): (usize, usize)| {
+            let partial = |k: usize| k < v.len() && v[k] > 0.0 && v[k] < 1.0;
+            let first = if partial(lo) { lo } else { usize::MAX };
+            let last = if hi > 0 && partial(hi - 1) { hi - 1 } else { usize::MAX };
+            [first, last]
+        };
+        let (x, y) = (span(&cols), span(&rows));
+        ClipShares { rect: *clip, edge_cols: edges(&cols, x), edge_rows: edges(&rows, y), x, y, cols, rows }
+    }
+
+    /// Whether band rows `[j0, j1)` or columns `[i0, i1)` include one a clip
+    /// edge crosses, where a per-pixel share is not the clipped mark's
+    /// coverage.
+    pub fn crosses_edge(&self, j0: usize, j1: usize, i0: usize, i1: usize) -> bool {
+        self.edge_rows.iter().any(|&k| (j0..j1).contains(&k)) || self.edge_cols.iter().any(|&k| (i0..i1).contains(&k))
     }
 }
 
@@ -246,7 +266,7 @@ mod tests {
     }
 
     fn square(x: f64, y: f64, rgba: [u8; 4]) -> Point {
-        Point { x, y, shape: 15, size: 16.0 / (2.0 * 0.375), lwd: 1.0, rgba }
+        Point { x, y, shape: 15, size: 16.0 / (2.0 * 0.375), lwd: 1.0, col: rgba, fill: [0; 4] }
     }
 
     #[test]
@@ -265,7 +285,7 @@ mod tests {
         let pts: Vec<Point> = (0..500)
             .map(|i| square((i * 37 % 200) as f64 + 0.3, (i * 53 % 150) as f64 + 0.6, [(i % 255) as u8, 40, 200, 90]))
             .collect();
-        list.push(Item::Points(PointBatch::new(pts)));
+        list.push(Item::Points(PointBatch::new(&pts, 0)));
         let reference = render(&list, 200, 150, &opts(1, 1000));
         for (threads, band) in [(1, 1), (3, 7), (8, 64), (16, 5)] {
             assert_eq!(render(&list, 200, 150, &opts(threads, band)), reference);
@@ -285,13 +305,13 @@ mod tests {
         // A 16 px opaque square centred at (10, 10) covers [2, 18).
         let mut list = DisplayList::new();
         list.push(Item::PushClip(Rect { x0: 5.25, y0: 0.0, x1: 12.5, y1: 20.0 }));
-        list.push(Item::Points(PointBatch::new([square(10.0, 10.0, [0, 0, 0, 255])])));
+        list.push(Item::Points(PointBatch::new(&[square(10.0, 10.0, [0, 0, 0, 255])], 0)));
         list.push(Item::PopClip);
-        list.push(Item::Points(PointBatch::new([square(10.0, 30.0, [0, 0, 0, 255])])));
+        list.push(Item::Points(PointBatch::new(&[square(10.0, 30.0, [0, 0, 0, 255])], 0)));
         let img = render(&list, 20, 40, &opts(2, 8));
         let a = |x: usize, y: usize| img[y * 20 + x] >> 24;
         assert_eq!(a(4, 10), 0);
-        assert_eq!(a(5, 10), 191); // 0.75 of the pixel is inside
+        assert_eq!(a(5, 10), 192); // 0.75 of the pixel is inside (AGG: 0.75 * 256)
         assert_eq!(a(6, 10), 255);
         assert_eq!(a(12, 10), 128); // 0.5
         assert_eq!(a(13, 10), 0);
@@ -304,7 +324,9 @@ mod tests {
     fn background_plus_points_matches_the_hybrid_composite() {
         // The hybrid renders points on a transparent panel raster that
         // ragg then blends over the white page; the full tier draws both in
-        // one list. They agree to rounding.
+        // one list. They agree to rounding: the hybrid's raster is
+        // quantised to 8 bits (non-premultiplied, so low alphas lose colour
+        // precision) before it is composited.
         let mut seed = 7u64;
         let mut rnd = || {
             seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
@@ -318,13 +340,14 @@ mod tests {
                 shape: shapes[(rnd() * 6.0) as usize],
                 size: [4.0, 5.5, 7.0][(rnd() * 3.0) as usize],
                 lwd: 1.4,
-                rgba: [(rnd() * 255.0) as u8, (rnd() * 255.0) as u8, 50, 76],
+                col: [(rnd() * 255.0) as u8, (rnd() * 255.0) as u8, 50, 76],
+                fill: [0; 4],
             })
             .collect();
-        let hybrid = crate::render::points::render(300, 200, pts.iter().copied());
+        let hybrid = crate::render::points::render(300, 200, &pts);
         let mut list = DisplayList::new();
         list.push(Item::Clear([255, 255, 255, 255]));
-        list.push(Item::Points(PointBatch::new(pts)));
+        list.push(Item::Points(PointBatch::new(&pts, 0)));
         let page = render(&list, 300, 200, &opts(8, 16));
         for (&h, &p) in hybrid.iter().zip(&page) {
             let a = (h >> 24) as f64 / 255.0;
@@ -332,7 +355,7 @@ mod tests {
                 let src = ((h >> (8 * c)) & 255) as f64;
                 let over = src * a + 255.0 * (1.0 - a);
                 let got = ((p >> (8 * c)) & 255) as f64;
-                assert!((over - got).abs() <= 1.0, "{over} vs {got}");
+                assert!((over - got).abs() <= 2.0, "{over} vs {got}");
             }
             assert_eq!(p >> 24, 255);
         }
@@ -347,7 +370,7 @@ mod tests {
         assert!(bound < 64 << 20, "{bound}");
         let mut list = DisplayList::new();
         list.push(Item::Clear([255, 255, 255, 255]));
-        list.push(Item::Points(PointBatch::new((0..1000).map(|i| square((i * 6) as f64, (i * 6) as f64, [0, 0, 0, 255])))));
+        list.push(Item::Points(PointBatch::new(&(0..1000).map(|i| square((i * 6) as f64, (i * 6) as f64, [0, 0, 0, 255])).collect::<Vec<_>>(), 0)));
         let mut rows = 0;
         execute(&list, w, h, &o, |_, px| {
             rows += px.len() / w;

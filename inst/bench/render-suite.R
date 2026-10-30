@@ -55,6 +55,13 @@ render_cases <- list(
     },
     size = readme_size
   ),
+  size_1e4 = list(
+    plot = function() {
+      d <- data.frame(x = stats::runif(1e4), y = stats::runif(1e4), s = stats::runif(1e4))
+      ggplot(d, aes(x, y, size = s)) + geom_point(alpha = 0.5)
+    },
+    size = readme_size
+  ),
   tile_1000 = list(
     plot = function() {
       d <- expand.grid(x = 1:1000, y = 1:1000)

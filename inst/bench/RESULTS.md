@@ -757,3 +757,35 @@ prototype's drawer at the same sprite resolution (17–19 ms). The render
 suite's README draw step read 195 ms (174 ms at R0.3); 8 and 16 threads
 give the same time, and the panel benchmark shows no regression, so this
 is run-to-run variation.
+
+## R1.2: point batches for every shape (2026-10-30)
+
+Sprites are now rasterised with a port of AGG's exact-area rasteriser and
+stroker (`alot-core/src/render/agg.rs`), the code ragg draws symbols with,
+at 1/32-px offsets built lazily per offset. Placement is parallel, with no
+hashing while the size and stroke stay constant. The hybrid clips each
+point to the panel in Rust (geometrically where a clip edge crosses it),
+as ragg clips each mark, and draws its raster unclipped.
+
+Distinct sizes (`cargo run --release -p alot-core --example size_bench`,
+1e4 points, all sizes distinct, 1600 × 1000): 75 ms cold, 12–14 ms with
+the sprites cached.
+
+Render suite, release build (render = gtable + draw + encode, ms):
+
+| case | ggplot2 draw | hybrid draw | ggplot2 render | hybrid render |
+|---|---:|---:|---:|---:|
+| size_1e4 (size mapped to 1e4 values) | 235 | 55 | 486 | 110 |
+| readme | 2445 | 163 | 3249 | 398 |
+| readme_page (7 × 7 in, 300 dpi) | 3904 | 333 | 4977 | 576 |
+| readme_10 | 74 | 54 | 250 | 200 |
+| point_1e6 | 6340 | 141 | 6735 | 213 |
+
+The README draw step is 163 ms (174 ms at R0.3); readme_page is a
+pre-row-split measurement. The executor bench (`points_bench`, 1e6 points
+on one page) is 62 ms at 8 threads and 327 ms at 1.
+
+Fidelity: every pch 0–25 passes `expect_render_close()` at the default
+tolerance across four size/stroke/alpha/dpi combinations, and the render
+corpus passes at the default max for all 864 hybrid plots except three
+documented overplotting cases (8-bit per-blend rounding in ragg).

@@ -149,3 +149,17 @@ test_that("upstream panel params setup matches the version alot mirrors", {
   }
   expect_snapshot(print(body(ggplot2::ggproto)))
 })
+
+test_that("upstream point drawing matches what the hybrid tier mirrors", {
+  # draw_points_layer() and hybrid_data() (R/render.R) mirror these for
+  # GeomPoint; the Rust drawer mirrors pointsGrob() as GESymbol() draws it
+  # with gg_par()'s fontsize and lwd. If these fail, update the mirror,
+  # then the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::GeomPoint$draw_panel)$f)))
+  expect_snapshot(print(body(environment(utils::getFromNamespace("Layer", "ggplot2")$draw_geom)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Geom$handle_na)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Geom$draw_layer)$f)))
+  expect_snapshot(print(body(utils::getFromNamespace("gg_par", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("translate_shape_string", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("remove_missing", "ggplot2"))))
+})

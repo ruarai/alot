@@ -2,6 +2,7 @@
 //! device pixels, executed in row bands, and PNG encoding. So far the
 //! drawers are the point batches the hybrid tier uses.
 
+pub mod agg;
 pub mod display;
 pub mod png;
 pub mod points;
