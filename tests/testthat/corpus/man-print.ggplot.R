@@ -3,6 +3,20 @@
 
 corpus_block("print.ggplot.Rd", {
   colours <- c("class", "drv", "fl")
-  .plot("print.ggplot.Rd #1", ggplot(mpg, aes(displ, hwy, colour = .data[[colour]])) + geom_point())
+  colour <- (colours)[[1L]]
+  .plot("print.ggplot.Rd #1", ggplot(mpg, aes(displ, hwy, colour = .data[[colour]])) +
+      geom_point())
+  colour <- (colours)[[2L]]
+  .plot("print.ggplot.Rd #2", ggplot(mpg, aes(displ, hwy, colour = .data[[colour]])) +
+      geom_point())
+  colour <- (colours)[[3L]]
+  .plot("print.ggplot.Rd #3", ggplot(mpg, aes(displ, hwy, colour = .data[[colour]])) +
+      geom_point())
+  colour <- (colours)[[1L]]
+  .plot("print.ggplot.Rd #4", ggplot(mpg, aes(displ, hwy, colour = .data[[colour]])) + geom_point())
+  colour <- (colours)[[2L]]
+  .plot("print.ggplot.Rd #5", ggplot(mpg, aes(displ, hwy, colour = .data[[colour]])) + geom_point())
+  colour <- (colours)[[3L]]
+  .plot("print.ggplot.Rd #6", ggplot(mpg, aes(displ, hwy, colour = .data[[colour]])) + geom_point())
 })
 

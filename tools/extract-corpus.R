@@ -159,6 +159,23 @@ extract_block <- function(name, stmts) {
         if (!is.null(branch)) for (s in .corpus_tools$brace_stmts(branch)) if (!.corpus_skip) .corpus_handle(s$expr, s$ref)
         return()
       }
+      # for (var in seq) body: unrolled, each iteration emitting the loop
+      # variable's binding and then the body's statements. Loops using next
+      # or break run as one statement instead.
+      if (nm == "for" && !any(c("next", "break") %in% all.names(expr[[4]]))) {
+        seq <- .corpus_try(expr[[3]])
+        if (!seq$ok) {
+          .corpus_tools$log_drop(.corpus_name, expr, seq$msg)
+          return()
+        }
+        var <- as.character(expr[[2]])
+        for (i in seq_along(seq$value)) {
+          bind <- call("<-", as.name(var), call("[[", call("(", expr[[3]]), i))
+          .corpus_handle(bind, NULL)
+          for (s in .corpus_tools$brace_stmts(expr[[4]])) if (!.corpus_skip) .corpus_handle(s$expr, s$ref)
+        }
+        return()
+      }
       if (nm %in% .corpus_tools$with_calls) {
         .corpus_handle_with(expr)
         return()
