@@ -9,6 +9,22 @@ and when it is done.
 append `— done` to its heading, or `— dropped (see RESULTS.md)` if the kernel
 failed the 1.25× rule.
 
+## Run order
+
+Work through this queue in order, one task at a time (a range such as
+R1.2–R1.5 means each in turn), skipping tasks marked done. Tasks marked
+deferred (in their heading or their section's) or "ignore for later" are not
+in it. Each task still follows its own entry and its phase's shared
+criteria.
+
+1. **Phase 1:** T0.7 → T5.4 → T5.5 → T6.2 → T6.1, then any tasks T6.1
+   opens, in the order it lists them.
+2. **Phase 2:** in "Suggested order (Phase 2)": R0.1, R0.2 → R0.3, R0.4 →
+   R1.1 → R1.2–R1.5 → R2.1, R3.1 → R3.2, R2.2, R4.1 → R4.2 → R5.1 → R5.2 →
+   R5.3 → R6.1–R6.6 → R7.1 → R7.2 → R7.3.
+
+## Phase 1 completion criteria
+
 Every Phase 1 task that adds a kernel shares these completion criteria, so they are
 not repeated below:
 
@@ -388,23 +404,30 @@ All stat kernels use the grouped driver (T0.4) and register under
   `facet_wrap` and the 20×20 `facet_grid` free cases are at least 2× faster.
 
 ### T5.5 Facet-scaling verification
-- **Depends:** T3.3, T4.1, T5.1, T5.3, T5.4
-- **Do:** Run the facet-scaling suite and confirm the histogram is at least
-  5× faster at 400 panels, the free-scale cases at least 2× faster, and the
-  fixed-scale control no slower. Confirm that cost grows linearly from 100 to
-  1,600 panels. Fix any per-panel overhead that remains.
+- **Depends:** T5.1, T5.3, T5.4
+- **Do:** Run the facet-scaling suite and confirm the free-scale cases are
+  at least 2× faster at 400 panels and the fixed-scale control is no slower.
+  Confirm that cost grows linearly from 100 to 1,600 panels. Fix any
+  per-panel overhead that remains. The histogram case (at least 5× faster)
+  waits for the deferred T3.3 and T4.1; record its current numbers but
+  don't treat them as a target.
+- **Done when:** the point cases meet the targets above, recorded in
+  `RESULTS.md`.
 
 ---
 
 ## 1.6 Remaining per-row steps
 
 ### T6.1 Re-profile and pick targets
-- **Depends:** 1.1–1.5 kernels merged
+- **Depends:** T6.2 and the non-deferred 1.1–1.5 kernels
 - **Do:** Profile the bench suites with kernels in place. List
   `compute_geom_1`, `compute_geom_2`, `finish_statistics`,
   `layout$finish_data` and `.ignore_data`/`.expose_data` by share of build
-  time. Open one task per step that could plausibly pass the 1.25× rule, and
-  record the rest as "stays in R".
+  time. Open one task per step that could plausibly pass the 1.25× rule
+  (as `T6.3`, `T6.4`, …, under 1.6, listed in the run order), and record
+  the rest as "stays in R".
+- **Done when:** the ranked list is in `RESULTS.md`, and any new tasks are
+  in this file and in the run order.
 
 ### T6.2 Overhead around the position scale kernels
 - **Depends:** T1.1, T1.2
@@ -428,8 +451,9 @@ All stat kernels use the grouped driver (T0.4) and register under
 
 ## Phase 1 exit
 
-### T7.1 Exit checklist
-- **Depends:** everything above
+### T7.1 Exit checklist (deferred)
+- **Depends:** everything above, including the deferred stats, positions and
+  T0.2
 - **Do:** Verify each criterion in "Phase 1 is done when" in PLAN.md:
   - the corpus is green and the allow-list is documented;
   - coverage shows Rust for every component in 1.1–1.5 on representative
