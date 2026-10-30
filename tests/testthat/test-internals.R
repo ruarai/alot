@@ -123,3 +123,15 @@ test_that("upstream facet layout computation matches the versions alot mirrors",
   expect_snapshot(print(body(environment(ggplot2::FacetGrid$compute_layout)$f)))
   expect_snapshot(print(body(utils::getFromNamespace("combine_vars", "ggplot2"))))
 })
+
+test_that("upstream labeling::extended matches the version alot ports", {
+  # Ported by alot_core::breaks::extended, called through
+  # extended_breaks_batch() (R/breaks.R). If these fail, update the port to
+  # match, then update the snapshots.
+  expect_identical(as.character(utils::packageVersion("labeling")), "0.4.3")
+  expect_snapshot(print(body(labeling::extended)))
+  for (f in c(".simplicity", ".simplicity.max", ".coverage", ".coverage.max", ".density", ".density.max", ".legibility")) {
+    expect_snapshot(print(body(utils::getFromNamespace(f, "labeling"))))
+  }
+  expect_snapshot(print(body(scales::extended_breaks)))
+})

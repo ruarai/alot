@@ -2,6 +2,7 @@ pub mod convert;
 pub mod grouped;
 
 use alot_core::colour::ramp::{self, Approx, Ramp};
+use alot_core::breaks::{extended, fmod};
 use alot_core::colour::{hex, lab};
 use alot_core::facet;
 use alot_core::group::{Columns, Values};
@@ -504,6 +505,30 @@ fn rgb_to_lab(rgb: &[f64], white: &[f64], cap: bool) -> extendr_api::Result<Robj
     }))
 }
 
+/// `labeling::extended(dmin[i], dmax[i], m[i])` for each `i` (see
+/// `alot_core::breaks::extended`). Returns a list with a double vector of
+/// breaks per range, `NULL` where R would raise an error or warning.
+/// @noRd
+#[extendr(r_name = "rs_extended_breaks")]
+fn extended_breaks(dmin: &[f64], dmax: &[f64], m: &[f64]) -> extendr_api::Result<List> {
+    if dmax.len() != dmin.len() || m.len() != dmin.len() {
+        return Err(Error::Other("dmin, dmax and m must have the same length".into()));
+    }
+    let ranges: Vec<(f64, f64, f64)> = (0..dmin.len()).map(|i| (dmin[i], dmax[i], m[i])).collect();
+    let out = extended::extended_batch(&ranges)
+        .into_iter()
+        .map(|b| b.map_or_else(|| ().into(), |b| Robj::from(Doubles::from_values(b))));
+    Ok(List::from_values(out))
+}
+
+/// R's `x %% y` (`alot_core::breaks::fmod::r_mod`) elementwise, for tests;
+/// `NA` where R would warn. `y` must be positive.
+/// @noRd
+#[extendr(r_name = "rs_r_mod")]
+fn r_mod(x: &[f64], y: &[f64]) -> Doubles {
+    Doubles::from_values(x.iter().zip(y).map(|(&x, &y)| fmod::r_mod(x, y).map_or(Rfloat::na(), Rfloat::from)))
+}
+
 /// Round-trips the columns of `df` through the interchange layer, for
 /// tests and benchmarks. With `copy = FALSE` every column passes through;
 /// with `copy = TRUE` each atomic column is rebuilt from its view and given
@@ -744,6 +769,8 @@ extendr_module! {
     fn build_profile;
     fn facet_panels;
     fn facet_distinct_rows;
+    fn extended_breaks;
+    fn r_mod;
     fn train_continuous_grouped;
     fn train_continuous;
     fn train_discrete_rows;

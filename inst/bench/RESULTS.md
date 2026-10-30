@@ -468,3 +468,25 @@ for `facet_wrap_point` at 1e6 rows, `layout_setup` is 32.1 → 11.6 ms
 (2.78×) and the whole build 257.8 → 138.7 ms (1.86×), counting the
 position kernels. For `wrap_fixed_point` at 400 panels, `layout_setup`
 is 4.7 → 2.6 ms (1.78×).
+
+### T5.2 Batched `labeling::extended` (2026-10-30) — no kernel yet
+
+`inst/bench/extended-breaks.R`: breaks for 400 axis ranges (as for a
+400-panel free-scale facet), `scales::extended_breaks()` per range vs one
+`rs_extended_breaks()` call, sequential with interleaved reps and a full gc
+before each. The ranges come from 50 normal draws with random centre and
+spread.
+
+| input | labeling_ms | alot_ms | speedup |
+| --- | ---: | ---: | --- |
+| 400 ranges | 134.0 | 1.3 | 103x |
+
+- No build step uses this yet; T5.3 calls it from `setup_panel_params`, and
+  the 1.25× rule applies there.
+- **Exactness:** `labeling` computes `lmin %% lstep`, and R's `%%` uses x87
+  long doubles (and warns only above `1/LDBL_EPSILON`). Doubles give a
+  different remainder for about a fifth of break-like inputs, so
+  `alot_core::breaks::fmod` emulates the 64-bit-significand operations in
+  software. It runs only when the candidate labels span 0, the one case
+  where the remainder matters; otherwise only its warning condition is
+  checked.

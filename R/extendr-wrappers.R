@@ -29,6 +29,17 @@ rs_facet_panels <- function(data, na, cards, layout, panel) .Call(wrap__facet_pa
 #' @noRd
 rs_facet_distinct_rows <- function(df, n) .Call(wrap__facet_distinct_rows, df, n)
 
+#' `labeling::extended(dmin[i], dmax[i], m[i])` for each `i` (see
+#' `alot_core::breaks::extended`). Returns a list with a double vector of
+#' breaks per range, `NULL` where R would raise an error or warning.
+#' @noRd
+rs_extended_breaks <- function(dmin, dmax, m) .Call(wrap__extended_breaks, dmin, dmax, m)
+
+#' R's `x %% y` (`alot_core::breaks::fmod::r_mod`) elementwise, for tests;
+#' `NA` where R would warn. `y` must be positive.
+#' @noRd
+rs_r_mod <- function(x, y) .Call(wrap__r_mod, x, y)
+
 #' Train continuous ranges for `n` scales. `x` is a double or integer
 #' vector, `scale_id` 1-based scale indices, `existing` a length-2n double
 #' vector of current ranges (NaN pair for untrained). Returns a length-2n

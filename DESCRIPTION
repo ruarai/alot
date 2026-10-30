@@ -17,6 +17,7 @@ Imports:
     ggplot2 (>= 4.0.0),
     ggplot2 (< 4.1.0),
     grid,
+    labeling,
     rlang,
     utils,
     vctrs

@@ -351,7 +351,7 @@ All stat kernels use the grouped driver (T0.4) and register under
 - **Done when:** the shared criteria hold. Benchmark target: the 19%
   `layout$setup` share of `facet_wrap` + point.
 
-### T5.2 Batched `labeling::extended` in Rust
+### T5.2 Batched `labeling::extended` in Rust — done
 - **Depends:** —
 - **Touches:** `alot-core/src/breaks/extended.rs`
 - **Do:** Port `labeling::extended` with the same floating-point operation
