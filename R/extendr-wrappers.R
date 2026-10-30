@@ -60,6 +60,21 @@ rs_map_discrete <- function(x, scale_id, table, n_keys) .Call(wrap__map_discrete
 #' @noRd
 rs_transform <- function(x, code) .Call(wrap__transform_values, x, code)
 
+#' `farver::encode_colour(lab, alpha, from = "lab", white)` (see
+#' `alot_core::colour::hex`): `lab` a double n x 3 matrix, `alpha` `NULL`
+#' or a double vector on the 0..1 scale, `white` the XYZ tristimulus of
+#' `farver::as_white_ref()`. For tests.
+#' @noRd
+rs_encode_lab <- function(lab, alpha, white) .Call(wrap__encode_lab, lab, alpha, white)
+
+#' `farver::convert_colour(rgb, "rgb", "lab", white)` (`cap = TRUE`) or the
+#' Lab of `farver::decode_colour(to = "lab")` (`cap = FALSE`, for RGB the
+#' hex codes give): `rgb` a double n x 3 matrix. Returns the n x 3 Lab
+#' values as a column-major double vector, NA rows for invalid input. For
+#' tests.
+#' @noRd
+rs_rgb_to_lab <- function(rgb, white, cap) .Call(wrap__rgb_to_lab, rgb, white, cap)
+
 #' Round-trips the columns of `df` through the interchange layer, for
 #' tests and benchmarks. With `copy = FALSE` every column passes through;
 #' with `copy = TRUE` each atomic column is rebuilt from its view and given

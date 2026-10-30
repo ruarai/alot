@@ -182,7 +182,7 @@ not repeated below:
 - **Done when:** the corpus passes and `alot_coverage()` lists the
   non-position scale steps.
 
-### T2.2 farver-exact colour encoding
+### T2.2 farver-exact colour encoding — done
 - **Depends:** —
 - **Touches:** `alot-core/src/colour/` (new: `lab.rs`, `hex.rs`)
 - **Do:** Port farver's sRGB↔XYZ↔Lab conversions, white point and rounding

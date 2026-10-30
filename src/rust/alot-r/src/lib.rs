@@ -1,6 +1,7 @@
 pub mod convert;
 pub mod grouped;
 
+use alot_core::colour::{hex, lab};
 use alot_core::group::{Columns, Values};
 use alot_core::scale::map::{self, Oob};
 use alot_core::scale::transform::{self, Transform};
@@ -247,6 +248,63 @@ fn transform_values(x: Robj, code: i32) -> extendr_api::Result<Robj> {
     Ok(out.finish()?.into())
 }
 
+/// The rows of the column-major n x 3 matrix `m`, `None` if `m` does not
+/// have 3 columns.
+fn rows3(m: &[f64]) -> Option<impl Iterator<Item = [f64; 3]> + '_> {
+    let n = m.len() / 3;
+    (m.len() % 3 == 0).then(|| (0..n).map(move |i| [m[i], m[n + i], m[2 * n + i]]))
+}
+
+/// The white reference `white` (length 3) as an array.
+fn white3(white: &[f64]) -> extendr_api::Result<lab::White> {
+    white.try_into().map_err(|_| Error::Other("white must have length 3".into()))
+}
+
+/// `farver::encode_colour(lab, alpha, from = "lab", white)` (see
+/// `alot_core::colour::hex`): `lab` a double n x 3 matrix, `alpha` `NULL`
+/// or a double vector on the 0..1 scale, `white` the XYZ tristimulus of
+/// `farver::as_white_ref()`. For tests.
+/// @noRd
+#[extendr(r_name = "rs_encode_lab")]
+fn encode_lab(lab: &[f64], alpha: Robj, white: &[f64]) -> extendr_api::Result<Strings> {
+    let white = white3(white)?;
+    let rows = rows3(lab).ok_or_else(|| Error::Other("lab must have 3 columns".into()))?;
+    let alpha = if alpha.is_null() {
+        None
+    } else {
+        Some(alpha.as_real_slice().ok_or_else(|| Error::Other("alpha must be double".into()))?)
+    };
+    let alpha = hex::Alpha::new(alpha);
+    Ok(rows
+        .enumerate()
+        .map(|(i, v)| hex::encode_lab(v, &alpha, i, &white).map_or_else(Rstr::na, |h| Rstr::from(h.as_str())))
+        .collect())
+}
+
+/// `farver::convert_colour(rgb, "rgb", "lab", white)` (`cap = TRUE`) or the
+/// Lab of `farver::decode_colour(to = "lab")` (`cap = FALSE`, for RGB the
+/// hex codes give): `rgb` a double n x 3 matrix. Returns the n x 3 Lab
+/// values as a column-major double vector, NA rows for invalid input. For
+/// tests.
+/// @noRd
+#[extendr(r_name = "rs_rgb_to_lab")]
+fn rgb_to_lab(rgb: &[f64], white: &[f64], cap: bool) -> extendr_api::Result<Robj> {
+    let white = white3(white)?;
+    let rows = rows3(rgb).ok_or_else(|| Error::Other("rgb must have 3 columns".into()))?;
+    let n = rgb.len() / 3;
+    Ok(new_doubles(rgb.len(), |out| {
+        for (i, v) in rows.enumerate() {
+            // `Rgb::Cap()` before converting (only for valid, i.e. finite,
+            // input), then `Lab::Cap()` after.
+            let v = if cap && v.iter().all(|c| c.is_finite()) { v.map(|c| c.clamp(0.0, 255.0)) } else { v };
+            let lab = lab::rgb_to_lab(v, &white).map(|l| if cap { lab::cap_lab(l) } else { l });
+            for k in 0..3 {
+                out[k * n + i] = lab.map_or(transform::NA_REAL, |l| l[k]);
+            }
+        }
+    }))
+}
+
 /// Round-trips the columns of `df` through the interchange layer, for
 /// tests and benchmarks. With `copy = FALSE` every column passes through;
 /// with `copy = TRUE` each atomic column is rebuilt from its view and given
@@ -373,6 +431,8 @@ extendr_module! {
     fn factorize_strings;
     fn map_discrete;
     fn transform_values;
+    fn encode_lab;
+    fn rgb_to_lab;
     fn convert_roundtrip;
     fn convert_inspect;
     fn group_index;
