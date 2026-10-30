@@ -5,6 +5,11 @@
 #' @useDynLib alot, .registration = TRUE
 NULL
 
+#' The cargo profile this library was built with: "debug" or "release".
+#' The benchmark suites refuse to time a debug build.
+#' @noRd
+rs_build_profile <- function() .Call(wrap__build_profile)
+
 #' Train continuous ranges for `n` scales. `x` is a double or integer
 #' vector, `scale_id` 1-based scale indices, `existing` a length-2n double
 #' vector of current ranges (NaN pair for untrained). Returns a length-2n

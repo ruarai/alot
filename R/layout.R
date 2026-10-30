@@ -47,21 +47,26 @@ facet_train_scales <- function(x_scales, y_scales, panels, data) {
 }
 
 # Mirrors scale_apply(method = "train") (ggplot2 R/layout.R): train each of
-# `scales` on the rows of `data` routed to it by `scale_id`.
+# `scales` on the rows of `data` routed to it by `scale_id`. The fallback
+# splits rows with split_with_index() as upstream does, once per call, so
+# kernels-off timings (inst/bench/step-profile.R) match ggplot2's.
 scales_train <- function(data, vars, scale_id, scales) {
   if (length(vars) == 0 || nrow(data) == 0) return(invisible())
   if (anyNA(scale_id)) {
     rlang::abort("`scale_id` must not contain any NA.")
   }
+  scale_index <- NULL
   for (var in vars) {
     x <- data[[var]]
     dispatch(
       "scale_train", scales[[1]],
       list(x = x, scale_id = scale_id, scales = scales),
       function() {
-        index <- split(seq_along(scale_id), factor(scale_id, levels = seq_along(scales)))
+        if (is.null(scale_index)) {
+          scale_index <<- gg_split_with_index(seq_along(scale_id), scale_id, length(scales))
+        }
         for (i in seq_along(scales)) {
-          scales[[i]]$train(vctrs::vec_slice(x, index[[i]]))
+          scales[[i]]$train(vctrs::vec_slice(x, scale_index[[i]]))
         }
       }
     )

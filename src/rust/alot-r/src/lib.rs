@@ -150,8 +150,17 @@ fn grouped_test_position(df: List, col: &str) -> extendr_api::Result<Robj> {
     })
 }
 
+/// The cargo profile this library was built with: "debug" or "release".
+/// The benchmark suites refuse to time a debug build.
+/// @noRd
+#[extendr(r_name = "rs_build_profile")]
+fn build_profile() -> &'static str {
+    if cfg!(debug_assertions) { "debug" } else { "release" }
+}
+
 extendr_module! {
     mod alot;
+    fn build_profile;
     fn train_continuous_grouped;
     fn convert_roundtrip;
     fn convert_inspect;

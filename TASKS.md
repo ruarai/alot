@@ -84,7 +84,7 @@ not repeated below:
   multi-panel, multi-group data, including groups with `group = -1`. A test
   pins the ordering against `dapply`.
 
-### T0.5 Corpus harness
+### T0.5 Corpus harness — done
 - **Depends:** —
 - **Touches:** `tests/testthat/test-corpus.R`, `tools/extract-corpus.R`
   (new), `tests/testthat/corpus/` (generated), `tests/testthat/corpus-allow.R`
@@ -97,7 +97,7 @@ not repeated below:
   the count of plots run vs allow-listed is printed. Regenerating the corpus
   is a single command.
 
-### T0.6 Benchmark suites
+### T0.6 Benchmark suites — done
 - **Depends:** —
 - **Touches:** `inst/bench/row-scaling.R`, `inst/bench/facet-scaling.R`,
   `inst/bench/step-profile.R`, `inst/bench/RESULTS.md`

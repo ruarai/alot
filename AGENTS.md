@@ -31,6 +31,20 @@ NOT_CRAN=true Rscript -e 'pkgload::load_all(); testthat::test_dir("tests/testtha
 NOT_CRAN=true Rscript -e 'pkgload::load_all(); testthat::test_file("tests/testthat/test-scale-train.R", load_package = "none")'
 ```
 
+The full corpus (`test-corpus.R`, about 2,000 plots) is slow. Unless the
+user asks for the full corpus, limit it with `ALOT_CORPUS`, a regex on the
+file names in `tests/testthat/corpus/`, to a small subset (around ten files)
+relevant to your change, e.g.
+`ALOT_CORPUS='^(man-geom_point|man-geom_histogram|test-geom-bar|test-scales)\.R$'`.
+The corpus may be regenerated on a ggplot2 update with `Rscript tools/extract-corpus.R`.
+
+Benchmarks (`inst/bench/`, see `RESULTS.md`) need a release build:
+`pkgload::load_all()` builds debug Rust, so first run
+`pkgbuild::compile_dll(force = TRUE, debug = FALSE)`, then
+`pkgload::load_all(compile = FALSE)`. The suites run in parallel by default,
+which is fine for a quick overview. A new kernel's 2× check must run
+sequentially (`ALOT_BENCH_CORES=1`) with ggplot2 and alot reps interleaved.
+
 After changing `#[extendr]` signatures, regenerate `R/extendr-wrappers.R`
 with `rextendr::document()`.
 

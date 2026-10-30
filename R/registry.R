@@ -31,7 +31,9 @@ record_trace <- function(step, class, path) {
 dispatch <- function(step, obj, args, fallback) {
   cls <- class(obj)[1]
   kernel <- find_kernel(step, obj)
-  if (!is.null(kernel)) {
+  # options(alot.kernels = FALSE) forces every component onto ggplot2's
+  # path; the benchmarks use it to time each step both ways.
+  if (!is.null(kernel) && !isFALSE(getOption("alot.kernels"))) {
     out <- do.call(kernel, args)
     if (!is.null(out)) {
       record_trace(step, cls, "rust")

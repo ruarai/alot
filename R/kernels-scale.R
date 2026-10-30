@@ -1,7 +1,11 @@
 # Continuous range training: ScaleContinuous$train -> scales::train_continuous().
 kernel_train_continuous <- function(x, scale_id, scales) {
+  # An instance can override `train` without changing its class, as
+  # ViewScale$make_fixed_copy() does (ggplot2 R/scale-view.R).
+  class_train <- environment(ggplot2::ScaleContinuousPosition$train)$f
   plain_scale <- function(s) {
-    class(s)[1] == "ScaleContinuousPosition" && class(s$range)[1] == "ContinuousRange"
+    class(s)[1] == "ScaleContinuousPosition" && class(s$range)[1] == "ContinuousRange" &&
+      identical(environment(s$train)$f, class_train)
   }
   if (!all(vapply(scales, plain_scale, logical(1)))) return(NULL)
   if (!typeof(x) %in% c("double", "integer") || is.factor(x)) return(NULL)

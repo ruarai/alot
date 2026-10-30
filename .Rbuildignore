@@ -12,3 +12,4 @@
 ^src/Makevars\.win$
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^tools/extract-corpus\.R$

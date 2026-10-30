@@ -37,3 +37,14 @@ test_that("unsupported scales fall back to ggplot2", {
   expect_build_equal(p)
   expect_build_equal(ggplot(mpg, aes(class, hwy)) + geom_boxplot())
 })
+
+test_that("scales that override train() fall back to ggplot2", {
+  # Found by the corpus (test-scales.R: ViewScales can make fixed copies).
+  b <- ggplot_build(ggplot(mpg, aes(drv, displ)) + geom_boxplot())@layout$panel_params[[1]]
+  p <- ggplot(mpg, aes(drv, cyl)) + geom_violin() + annotate("point", x = 15, y = 100) +
+    b$y$make_fixed_copy()
+  # The fixed y scale censors most rows, so both builds warn.
+  cov <- suppressWarnings(alot_coverage(p))
+  expect_true(all(cov$path[cov$step == "scale_train" & cov$class == "ScaleContinuousPosition"] == "ggplot2"))
+  suppressWarnings(expect_build_equal(p))
+})

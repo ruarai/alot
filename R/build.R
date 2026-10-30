@@ -22,7 +22,8 @@ alot_build <- function(plot) {
   build_plot(plot)
 }
 
-# Mirrors ggplot2:::build_ggplot (ggplot2 4.0.3, R/plot-build.R).
+# Mirrors ggplot2:::build_ggplot (ggplot2 4.0.3, R/plot-build.R). Each step is
+# wrapped in timed() (R/timing.R) for the benchmark suites.
 build_plot <- function(plot) {
   plot <- gg_plot_clone(plot)
   if (length(plot@layers) == 0) {
@@ -34,58 +35,58 @@ build_plot <- function(plot) {
 
   scales <- plot@scales
 
-  data <- gg_by_layer(function(l, d) l$layer_data(plot@data), layers, data, "computing layer data")
-  data <- gg_by_layer(function(l, d) l$setup_layer(d, plot), layers, data, "setting up layer")
+  data <- timed("layer_data", gg_by_layer(function(l, d) l$layer_data(plot@data), layers, data, "computing layer data"))
+  data <- timed("setup_layer", gg_by_layer(function(l, d) l$setup_layer(d, plot), layers, data, "setting up layer"))
 
-  layout <- gg_create_layout(plot@facet, plot@coordinates, plot@layout)
-  data <- layout$setup(data, plot@data, plot@plot_env)
+  layout <- timed("create_layout", gg_create_layout(plot@facet, plot@coordinates, plot@layout))
+  data <- timed("layout_setup", layout$setup(data, plot@data, plot@plot_env))
 
-  data <- gg_by_layer(function(l, d) l$compute_aesthetics(d, plot), layers, data, "computing aesthetics")
-  plot@labels <- gg_setup_plot_labels(plot, layers, data)
+  data <- timed("compute_aesthetics", gg_by_layer(function(l, d) l$compute_aesthetics(d, plot), layers, data, "computing aesthetics"))
+  plot@labels <- timed("setup_plot_labels", gg_setup_plot_labels(plot, layers, data))
 
-  data <- gg_ignore_data(data)
-  data <- lapply(data, scales$transform_df)
+  data <- timed("ignore_data_1", gg_ignore_data(data))
+  data <- timed("transform_df", lapply(data, scales$transform_df))
 
   scale_x <- function() scales$get_scales("x")
   scale_y <- function() scales$get_scales("y")
 
-  layout_train_position(layout, data, scale_x(), scale_y())
-  data <- layout$map_position(data)
-  data <- gg_expose_data(data)
+  timed("train_position_1", layout_train_position(layout, data, scale_x(), scale_y()))
+  data <- timed("map_position_1", layout$map_position(data))
+  data <- timed("expose_data_1", gg_expose_data(data))
 
-  data <- gg_by_layer(function(l, d) layer_compute_statistic(l, d, layout), layers, data, "computing stat")
-  data <- gg_by_layer(function(l, d) l$map_statistic(d, plot), layers, data, "mapping stat to aesthetics")
+  data <- timed("compute_statistic", gg_by_layer(function(l, d) layer_compute_statistic(l, d, layout), layers, data, "computing stat"))
+  data <- timed("map_statistic", gg_by_layer(function(l, d) l$map_statistic(d, plot), layers, data, "mapping stat to aesthetics"))
 
-  plot@scales$add_missing(c("x", "y"), plot@plot_env)
+  timed("add_missing", plot@scales$add_missing(c("x", "y"), plot@plot_env))
 
-  data <- gg_by_layer(function(l, d) l$compute_geom_1(d), layers, data, "setting up geom")
-  data <- gg_by_layer(function(l, d) layer_compute_position(l, d, layout), layers, data, "computing position")
+  data <- timed("compute_geom_1", gg_by_layer(function(l, d) l$compute_geom_1(d), layers, data, "setting up geom"))
+  data <- timed("compute_position", gg_by_layer(function(l, d) layer_compute_position(l, d, layout), layers, data, "computing position"))
 
-  data <- gg_ignore_data(data)
-  layout$reset_scales()
-  layout_train_position(layout, data, scale_x(), scale_y())
-  layout$setup_panel_params()
-  data <- layout$map_position(data)
+  data <- timed("ignore_data_2", gg_ignore_data(data))
+  timed("reset_scales", layout$reset_scales())
+  timed("train_position_2", layout_train_position(layout, data, scale_x(), scale_y()))
+  timed("setup_panel_params", layout$setup_panel_params())
+  data <- timed("map_position_2", layout$map_position(data))
 
-  layout$setup_panel_guides(plot@guides, plot@layers)
+  timed("setup_panel_guides", layout$setup_panel_guides(plot@guides, plot@layers))
 
-  plot@theme <- gg_plot_theme(plot)
+  plot@theme <- timed("plot_theme", gg_plot_theme(plot))
 
   npscales <- scales$non_position_scales()
   if (npscales$n() > 0) {
-    npscales$set_palettes(plot@theme)
-    lapply(data, npscales$train_df)
-    plot@guides <- plot@guides$build(npscales, plot@layers, plot@labels, data, plot@theme)
-    data <- lapply(data, npscales$map_df)
+    timed("set_palettes", npscales$set_palettes(plot@theme))
+    timed("npscales_train", lapply(data, npscales$train_df))
+    plot@guides <- timed("guides_build", plot@guides$build(npscales, plot@layers, plot@labels, data, plot@theme))
+    data <- timed("npscales_map", lapply(data, npscales$map_df))
   } else {
-    plot@guides <- plot@guides$get_custom()
+    plot@guides <- timed("guides_build", plot@guides$get_custom())
   }
-  data <- gg_expose_data(data)
+  data <- timed("expose_data_2", gg_expose_data(data))
 
-  data <- gg_by_layer(function(l, d) l$compute_geom_2(d, theme = plot@theme), layers, data, "setting up geom aesthetics")
-  data <- gg_by_layer(function(l, d) l$finish_statistics(d), layers, data, "finishing layer stat")
+  data <- timed("compute_geom_2", gg_by_layer(function(l, d) l$compute_geom_2(d, theme = plot@theme), layers, data, "setting up geom aesthetics"))
+  data <- timed("finish_statistics", gg_by_layer(function(l, d) l$finish_statistics(d), layers, data, "finishing layer stat"))
 
-  data <- layout$finish_data(data)
+  data <- timed("finish_data", layout$finish_data(data))
 
   plot@labels$alt <- gg_get_alt_text(plot)
 
