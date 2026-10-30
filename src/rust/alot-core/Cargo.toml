@@ -6,4 +6,8 @@ rust-version = "1.78"
 publish = false
 
 [dependencies]
+crc32fast = "1"
+flate2 = "1"
+
+[dev-dependencies]
 png = "0.17"

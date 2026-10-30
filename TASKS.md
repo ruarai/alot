@@ -639,7 +639,7 @@ alongside Phase 1's remaining tasks.
 - **Done when:** lines, polygons and dashes at several lwds pass
   `expect_render_close()`, and a 1e6-point `geom_line` beats ragg.
 
-### R1.5 PNG output
+### R1.5 PNG output — done
 - **Depends:** R1.1
 - **Touches:** `alot-core/src/render/png.rs`
 - **Do:** Move the prototype's encoder over and make it stream: take bands

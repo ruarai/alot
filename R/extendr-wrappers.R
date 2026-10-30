@@ -166,10 +166,12 @@ rs_grouped_test_stat <- function(df, cols) .Call(wrap__grouped_test_stat, df, co
 #' @noRd
 rs_grouped_test_position <- function(df, col) .Call(wrap__grouped_test_position, df, col)
 
-#' Writes a nativeRaster (`dim` = height, width) to `path` as PNG: RGBA if
-#' `alpha`, else RGB; with a `pHYs` chunk if `dpi` is positive.
+#' Writes a nativeRaster (`dim` = height, width) to `path` as PNG with the
+#' metadata ragg's `agg_png()` writes for device background `bg` (R, G, B,
+#' A, 0-255): RGBA unless `bg` is opaque, `bKGD`, and `pHYs` if `dpi` is
+#' positive.
 #' @noRd
-rs_write_png <- function(raster, path, alpha, dpi) .Call(wrap__write_png, raster, path, alpha, dpi)
+rs_write_png <- function(raster, path, bg, dpi) .Call(wrap__write_png, raster, path, bg, dpi)
 
 #' Colours of a point layer as `scales::alpha(colour, alpha)` would give
 #' them, packed as nativeRaster ints (`R | G << 8 | B << 16 | A << 24`).

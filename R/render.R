@@ -57,11 +57,12 @@ alot_png <- function(plot, filename, width = 7, height = 7, units = c("in", "cm"
 }
 
 # Writes a nativeRaster as ragg's agg_png() would for this background and
-# resolution: RGBA only if `bg` is not opaque (ragg src/png_dev.cpp), and a
-# pHYs chunk from `dpi` unless it is NA.
+# resolution (ragg src/png_dev.cpp, src/AggDevicePng.h): RGBA only if `bg` is
+# not opaque, a bKGD chunk from `bg`, and a pHYs chunk from `dpi` unless it
+# is NA.
 write_png <- function(raster, filename, bg = "white", dpi = NA) {
-  alpha <- grDevices::col2rgb(bg, alpha = TRUE)[4, 1] < 255
-  rs_write_png(raster, filename, alpha, if (is.na(dpi)) 0 else as.double(dpi))
+  rgba <- as.integer(grDevices::col2rgb(bg, alpha = TRUE)[, 1])
+  rs_write_png(raster, filename, rgba, if (is.na(dpi)) 0 else as.double(dpi))
 }
 
 # Draws a built plot with the first tier that supports it. Returns the

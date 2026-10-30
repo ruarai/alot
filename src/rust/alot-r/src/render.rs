@@ -5,6 +5,7 @@ use alot_core::colour::hex;
 use alot_core::render::points::{self, Point};
 use alot_core::render::agg::{Cap, Join, Rule};
 use alot_core::render::paths::{PathBatch, PathSpec, Stroke};
+use alot_core::render::png::{Encoder, PngOptions};
 use alot_core::render::display::{DisplayList, Item, Rect};
 use alot_core::render::rects::{RectBatch, RectSpec, RectStyle};
 use alot_core::render::raster;
@@ -392,18 +393,25 @@ fn render_paths(
     out
 }
 
-/// Writes a nativeRaster (`dim` = height, width) to `path` as PNG: RGBA if
-/// `alpha`, else RGB; with a `pHYs` chunk if `dpi` is positive.
+/// Writes a nativeRaster (`dim` = height, width) to `path` as PNG with the
+/// metadata ragg's `agg_png()` writes for device background `bg` (R, G, B,
+/// A, 0-255): RGBA unless `bg` is opaque, `bKGD`, and `pHYs` if `dpi` is
+/// positive.
 /// @noRd
 #[extendr(r_name = "rs_write_png")]
-fn write_png(raster: Robj, path: &str, alpha: bool, dpi: f64) -> extendr_api::Result<()> {
+fn write_png(raster: Robj, path: &str, bg: &[i32], dpi: f64) -> extendr_api::Result<()> {
     let dim = raster.get_attrib("dim").and_then(|d| d.as_integer_vector()).unwrap_or_default();
-    let (Some(px), &[h, w]) = (raster.as_integer_slice(), &dim[..]) else {
-        return Err(Error::Other("expected a nativeRaster".into()));
+    let (Some(px), &[h, w], &[r, g, b, a]) = (raster.as_integer_slice(), &dim[..], bg) else {
+        return Err(Error::Other("expected a nativeRaster and an RGBA background".into()));
     };
     let px = unsafe { std::slice::from_raw_parts(px.as_ptr() as *const u32, px.len()) };
-    let bytes = alot_core::render::png::encode(w as u32, h as u32, px, alpha, (dpi > 0.0).then_some(dpi)).map_err(|e| Error::Other(e.to_string()))?;
-    std::fs::write(path, bytes).map_err(|e| Error::Other(e.to_string()))
+    let byte = |v: i32| v.clamp(0, 255) as u8;
+    let opts = PngOptions::for_background([byte(r), byte(g), byte(b), byte(a)], (dpi > 0.0).then_some(dpi));
+    let file = std::fs::File::create(path).map_err(|e| Error::Other(e.to_string()))?;
+    let mut enc = Encoder::new(std::io::BufWriter::new(file), w as u32, h as u32, &opts).map_err(|e| Error::Other(e.to_string()))?;
+    // Rows go to the encoder in bands, as the executor hands them over.
+    enc.write_rows(px).map_err(|e| Error::Other(e.to_string()))?;
+    enc.finish().map_err(|e| Error::Other(e.to_string()))
 }
 
 extendr_module! {

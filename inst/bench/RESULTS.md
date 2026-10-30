@@ -837,3 +837,30 @@ Render suite, release build (ms):
 | case | ggplot2 draw | hybrid draw | ggplot2 render | hybrid render |
 |---|---:|---:|---:|---:|
 | line_1e6 (`geom_line`, 1e6 points) | 571 | 245 | 1475 | 431 |
+
+## R1.5: PNG output — parallel deflate (2026-10-30)
+
+The encoder now streams rows (from the band executor or a capture) and
+compresses in parallel: Sub-filtered rows in ~512 KB chunks, each deflated
+at level 1 on its own thread with a sync flush and written as its own IDAT
+chunk, the Adler-32 combined from the chunks'. Files carry ragg's IHDR,
+bKGD (premultiplied background) and pHYs, in ragg's order, and decode to
+the canvas exactly.
+
+Measured first in a scratch crate on deliberately busy synthetic pages
+(1e6 points everywhere), median of 5:
+
+| page | fdeflate fast (png crate) | parallel deflate, 8 threads |
+|---|---:|---:|
+| 1600 × 1000 | 24.5 ms, 2021 KB | 5.4 ms, 2134 KB |
+| 2100 × 2100 | 114.3 ms, 6652 KB | 13.2 ms, 7291 KB |
+
+Parallel deflate was adopted (5–9× faster for files 5–10% larger). The
+png crate's streaming writer could not use fdeflate's fast path anyway
+(streamed encoding measured 20 ms on the README page against 10 ms
+whole-image).
+
+On the real README plot (hybrid tier, release), encoding alone takes
+8 ms at 1600 × 1000 (1.6 MB) and 19 ms on the 7 × 7 in, 300 dpi page
+(3.7 MB). In the render suite the encode step (including ragg's capture
+readback) is 10 ms and 25 ms, against ragg's 111 ms and 386 ms.

@@ -4,13 +4,14 @@
 # same, so edge pixels may differ slightly (anti-aliasing, subpixel
 # positions).
 
-# Header fields of a PNG: width, height, colour type (2 RGB, 6 RGBA) and
-# the pHYs chunk's pixels per unit (x, y) and unit, NULL if absent.
+# Header fields of a PNG: width, height, colour type (2 RGB, 6 RGBA), the
+# pHYs chunk's pixels per unit (x, y) and unit (NULL if absent), the bKGD
+# chunk's bytes, and the order of the chunks other than image data.
 png_info <- function(file) {
   bytes <- readBin(file, "raw", file.size(file))
   stopifnot(identical(bytes[1:8], as.raw(c(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))))
   int <- function(at) readBin(bytes[at:(at + 3)], "integer", endian = "big")
-  out <- list(phys = NULL)
+  out <- list(phys = NULL, bkgd = NULL, chunks = character())
   at <- 9
   while (at < length(bytes)) {
     len <- int(at)
@@ -22,6 +23,8 @@ png_info <- function(file) {
       out$colour_type <- as.integer(bytes[data + 9])
     }
     if (type == "pHYs") out$phys <- c(int(data), int(data + 4), as.integer(bytes[data + 8]))
+    if (type == "bKGD") out$bkgd <- as.integer(bytes[data:(data + len - 1)])
+    if (!type %in% c("IDAT", "IEND")) out$chunks <- c(out$chunks, type)
     if (type == "IEND") break
     at <- data + len + 4
   }
@@ -275,6 +278,7 @@ test_that("alot_ggsave() matches ggsave() with ragg for PNGs", {
     list(plot = points, width = 80, height = 60, units = "mm", dpi = "screen", scale = 1.5),
     list(plot = points, width = 640, height = 480, units = "px", dpi = 72),
     list(plot = points, width = 3, height = 2, dpi = "retina", bg = "transparent"),
+    list(plot = points, width = 3, height = 2, dpi = 100, bg = "#33669980"),
     list(plot = points + ggplot2::theme(plot.background = ggplot2::element_rect(fill = NA)), width = 3, height = 2, dpi = 100),
     list(plot = lines, width = 3, height = 2, dpi = 120)
   )
