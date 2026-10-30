@@ -44,6 +44,10 @@ setup_calls <- c(
   "update_theme_settings", "local_edition", "local_options", "local_seed",
   "local_locale", "local_envvar", "local_timezone", "defer", "rm"
 )
+# withr calls whose `code` is handled statement by statement inside the
+# wrapper's context, then kept wrapped in the same call.
+with_calls <- c("with_options", "with_seed", "with_preserve_seed", "with_locale",
+                "with_collate", "with_envvar", "with_timezone", "with_language")
 # Calls never evaluated (they draw, write files or need a graphics device).
 drop_calls <- c("print", "plot", "ggsave", "grid.draw", "grid.newpage", "dev.off",
                 "local_pdf", "local_tempfile", "with_tempfile", "str", "summary")
@@ -155,6 +159,10 @@ extract_block <- function(name, stmts) {
         if (!is.null(branch)) for (s in .corpus_tools$brace_stmts(branch)) if (!.corpus_skip) .corpus_handle(s$expr, s$ref)
         return()
       }
+      if (nm %in% .corpus_tools$with_calls) {
+        .corpus_handle_with(expr)
+        return()
+      }
       # Plots handed to consumers inside this statement, evaluated in the
       # state before the statement runs.
       for (arg in .corpus_tools$consumer_args(expr)) {
@@ -182,6 +190,37 @@ extract_block <- function(name, stmts) {
       } else if (.corpus_tools$is_assignment(expr) || nm %in% .corpus_tools$setup_calls || startsWith(nm, "local_")) {
         .corpus_lines <<- c(.corpus_lines, .corpus_tools$stmt_text(expr, ref))
       }
+    }
+
+    # withr::with_*(..., code): run `code`'s statements through
+    # .corpus_handle() inside the wrapper, so its options, seed or locale
+    # apply and its assignments land in this frame, as they would in the
+    # test. The kept lines are emitted wrapped in the same call.
+    .corpus_handle_with <- function(expr) {
+      fn <- .corpus_try(expr[[1]])
+      matched <- if (fn$ok && is.function(fn$value)) match.call(fn$value, expr) else NULL
+      if (is.null(matched$code)) {
+        .corpus_tools$log_drop(.corpus_name, expr, "with_*: no `code` argument")
+        return()
+      }
+      code <- matched$code
+      outer_lines <- .corpus_lines
+      .corpus_lines <<- character()
+      matched$code <- as.call(list(function() {
+        for (s in .corpus_tools$brace_stmts(code)) if (!.corpus_skip) .corpus_handle(s$expr, s$ref)
+      }))
+      res <- .corpus_try(matched)
+      inner_lines <- .corpus_lines
+      .corpus_lines <<- outer_lines
+      if (!res$ok) {
+        .corpus_tools$log_drop(.corpus_name, expr, res$msg)
+        return()
+      }
+      if (length(inner_lines) == 0) return()
+      matched$code <- quote(.CORPUS_CODE.)
+      head <- strsplit(paste(deparse(matched, width.cutoff = 500L), collapse = " "), ".CORPUS_CODE.", fixed = TRUE)[[1]]
+      body <- paste0("  ", gsub("\n", "\n  ", inner_lines))
+      .corpus_lines <<- c(.corpus_lines, paste(c(paste0(head[1], "{"), body, paste0("}", head[2])), collapse = "\n"))
     }
 
     for (.corpus_s in .corpus_stmts) {

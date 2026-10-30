@@ -71,7 +71,16 @@ corpus_block("test-scale-discrete.R: discrete scale defaults can be set globally
       two = c("a", "b", "a", "b"),
       four = c("a", "b", "c", "d")
     )
-  .plot("test-scale-discrete.R: discrete scale defaults can be set globally #1", two)
+  withr::with_options(new = list(ggplot2.discrete.fill = c("#FFFFFF", "#000000"), ggplot2.discrete.colour = c("#FFFFFF", "#000000")), code = {
+    .plot("test-scale-discrete.R: discrete scale defaults can be set globally #1", two <- ggplot(df, aes(x, y, colour = two, fill = two)) + geom_point())
+    .plot("test-scale-discrete.R: discrete scale defaults can be set globally #2", four_default <- ggplot(df, aes(x, y, colour = four, fill = four)) +
+            geom_point())
+    .plot("test-scale-discrete.R: discrete scale defaults can be set globally #3", four_hue <- four_default + scale_fill_hue())
+  })
+  withr::with_options(new = list(ggplot2.discrete.fill = list(c("#FFFFFF", "#000000"), c("#FF0000", "#00FF00", "#0000FF", "#FF00FF")), ggplot2.discrete.colour = list(c("#FFFFFF", "#000000"), c("#FF0000", "#00FF00", "#0000FF", "#FF00FF"))), code = {
+    .plot("test-scale-discrete.R: discrete scale defaults can be set globally #4", two <- ggplot(df, aes(x, y, colour = two, fill = two)) + geom_point())
+    .plot("test-scale-discrete.R: discrete scale defaults can be set globally #5", four <- ggplot(df, aes(x, y, colour = four, fill = four)) + geom_point())
+  })
 })
 
 corpus_block("test-scale-discrete.R: palettes work for discrete scales", {
