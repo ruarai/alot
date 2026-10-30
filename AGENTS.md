@@ -53,26 +53,13 @@ relevant to your change, e.g.
 Do not run the full corpus without user permission even if your change affects all plots.
 The corpus may be regenerated on a ggplot2 update with `Rscript tools/extract-corpus.R`.
 
-Benchmarks (`inst/bench/`, see `RESULTS.md`) need a release build:
-`pkgload::load_all()` builds debug Rust, so first run
-`pkgbuild::compile_dll(force = TRUE, debug = FALSE)`, then
-`pkgload::load_all(compile = FALSE)`. The suites run in parallel by default,
-which is fine for a quick overview. A new kernel's 1.25× check must run
-sequentially (`ALOT_BENCH_CORES=1`) with ggplot2 and alot reps interleaved.
+Benchmarks: see `.claude/skills/alot-bench/SKILL.md` (release build required).
 
 After changing `#[extendr]` signatures, regenerate `R/extendr-wrappers.R`
 with `rextendr::document()`.
 
 ## Architecture
 
-- `R/build.R` mirrors `ggplot2:::build_ggplot` step by step.
-  `tests/testthat/test-internals.R` snapshots the upstream function body, so
-  a change in ggplot2 fails loudly.
-- `R/registry.R` handles dispatch. `register_kernel(step, class, fn)` in
-  `R/zzz.R` adds a kernel. A kernel runs only when the object's **first
-  class** matches exactly. It returns `NULL` to decline, and ggplot2's own
-  method then runs. `alot_coverage(p)` reports which path each component
-  took.
 - `src/rust/alot-core`: pure Rust algorithms with no R types, tested with
   `cargo test`.
 - `src/rust/alot-r`: extendr glue only. It converts R vectors and calls
