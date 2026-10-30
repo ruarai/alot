@@ -123,7 +123,7 @@ test_that("unsupported layers and coords keep ggplot2's pointsGrob, with a reaso
     "character pch" = base + ggplot2::geom_point(shape = "a"),
     "clip is not \"on\"" = base + ggplot2::geom_point() + ggplot2::coord_cartesian(clip = "off"),
     "coord is not an unreversed coord_cartesian()" = base + ggplot2::geom_point() + ggplot2::coord_flip(),
-    "NA in x, y, size or stroke" = base + ggplot2::geom_point(stroke = NA),
+    "NA in stroke" = base + ggplot2::geom_point(stroke = NA),
     "position scale does not rescale linearly" =
       base + ggplot2::geom_point() + ggplot2::continuous_scale(
         "x", palette = identity, guide = "axis", position = "bottom", super = ggplot2::ScaleContinuousPosition,

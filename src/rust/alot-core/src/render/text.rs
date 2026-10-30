@@ -90,6 +90,13 @@ impl<'a> Font<'a> {
         div_fix((size * 64.0) as i64, self.upem)
     }
 
+    /// Whether every character of `text` (other than line breaks) has a
+    /// glyph and none is right-to-left: a cheap check that ragg would draw
+    /// it from this font alone.
+    pub fn covers(&self, text: &str) -> bool {
+        text.chars().all(|c| c == '\n' || (!is_rtl(c) && self.shaper.glyph_index(c).is_some_and(|g| g.0 != 0)))
+    }
+
     /// textshaping's width of one line, or `None` if a glyph is missing or
     /// the text has right-to-left characters.
     pub fn line_width(&self, line: &str, size: f64) -> Option<f64> {
@@ -297,6 +304,8 @@ mod tests {
         assert!(font.line_width("שלום", 12.0).is_none());
         let mut h = Hinted::new(&font, 12.0).unwrap();
         assert!(string_metrics(&font, &mut h, "漢", 12.0, 14.4).is_none());
+        assert!(font.covers("Two\nlines é"));
+        assert!(!font.covers("漢") && !font.covers("שלום"));
     }
 
     #[test]

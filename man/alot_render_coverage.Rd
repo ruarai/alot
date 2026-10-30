@@ -11,9 +11,11 @@ alot_render_coverage(plot)
 }
 \value{
 A list with `tier`, the tier [alot_png()] would use (`"hybrid"` or
-  `"ggplot2"`), and `layers`, a data frame with one row per layer: its
+  `"ggplot2"`); `layers`, a data frame with one row per layer: its
   `geom`, the `engine` that draws it (`"rust"` or `"ggplot2"`) and, for
-  `"ggplot2"`, the `reason`.
+  `"ggplot2"`, the `reason`; and `full`, a data frame of the
+  `component`, `name` and `reason` for everything that keeps the plot out
+  of the full tier, which is in development (no rows: nothing does).
 }
 \description{
 Report how alot would render a plot

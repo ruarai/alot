@@ -680,7 +680,7 @@ alongside Phase 1's remaining tasks.
 
 ## R3 Render IR (milestone 2.1)
 
-### R3.1 IR extraction
+### R3.1 IR extraction — done
 - **Depends:** R1.1
 - **Touches:** `R/render-ir.R`, `alot-r/src/render.rs`,
   `alot-core/src/render/ir.rs`

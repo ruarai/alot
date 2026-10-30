@@ -97,13 +97,15 @@ render_raster <- function(built, size) {
 #'
 #' @param plot A ggplot or a built plot.
 #' @return A list with `tier`, the tier [alot_png()] would use (`"hybrid"` or
-#'   `"ggplot2"`), and `layers`, a data frame with one row per layer: its
+#'   `"ggplot2"`); `layers`, a data frame with one row per layer: its
 #'   `geom`, the `engine` that draws it (`"rust"` or `"ggplot2"`) and, for
-#'   `"ggplot2"`, the `reason`.
+#'   `"ggplot2"`, the `reason`; and `full`, a data frame of the
+#'   `component`, `name` and `reason` for everything that keeps the plot out
+#'   of the full tier, which is in development (no rows: nothing does).
 #' @export
 alot_render_coverage <- function(plot) {
   built <- if (ggplot2::is_ggplot(plot)) alot_build(plot) else plot
-  render_coverage(built)
+  c(render_coverage(built), list(full = render_ir(built)$support))
 }
 
 render_coverage <- function(built) {
@@ -228,7 +230,7 @@ hybrid_data <- function(layer, data) {
 point_handle_na <- function(layer, data) {
   geom <- layer$geom
   vars <- intersect(c(geom$required_aes, geom$non_missing_aes), names(data))
-  complete <- all(vapply(data[vars], function(v) is.atomic(v) && !anyNA(v), logical(1)))
+  complete <- rs_columns_complete(unclass(data)[vars], render_threads())
   if (complete) data else geom$handle_na(data, layer$computed_geom_params)
 }
 
@@ -260,7 +262,9 @@ hybrid_decline <- function(layer, data, layout) {
   if (!is.null(reason)) {
     return(reason)
   }
-  linear <- vapply(layout$panel_params, function(pp) {
+  # Panels sharing a pair of scales share their ranges.
+  pair <- paste(layout$layout$SCALE_X, layout$layout$SCALE_Y)
+  linear <- vapply(layout$panel_params[!duplicated(pair)], function(pp) {
     !is.null(linear_range(pp$x)) && !is.null(linear_range(pp$y))
   }, logical(1))
   if (!all(linear)) {
@@ -269,7 +273,7 @@ hybrid_decline <- function(layer, data, layout) {
   NULL
 }
 
-is_colour_vector <- function(x) is.character(x) || (is.logical(x) && all(is.na(x)))
+is_colour_vector <- function(x) is.character(x) || rs_all_na_logical(x)
 
 points_decline <- function(data) {
   cols <- c("x", "y", "shape", "colour", "fill", "size", "stroke", "alpha")
@@ -287,8 +291,9 @@ points_decline <- function(data) {
   if (inherits(data$x, "AsIs") || inherits(data$y, "AsIs")) {
     return("x or y is AsIs")
   }
-  if (anyNA(data$x) || anyNA(data$y) || anyNA(data$size) || anyNA(data$stroke)) {
-    return("NA in x, y, size or stroke")
+  # hybrid_data() removed rows with NA x, y or size (Geom$handle_na()).
+  if (!rs_columns_complete(list(data$stroke), render_threads())) {
+    return("NA in stroke")
   }
   if (is.character(data$shape)) {
     return("character pch")

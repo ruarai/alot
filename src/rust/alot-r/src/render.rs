@@ -16,6 +16,7 @@ use std::collections::HashMap;
 extern "C" {
     // R API (Rinternals.h).
     static R_NaString: extendr_api::SEXP;
+    fn STRING_PTR_RO(x: extendr_api::SEXP) -> *const extendr_api::SEXP;
 }
 
 /// A double or integer column recycled to any length: `None` for other
@@ -80,10 +81,77 @@ fn point_colours(colour: Strings, alpha: Robj) -> Robj {
 /// @noRd
 #[extendr(r_name = "rs_point_shapes_supported")]
 fn point_shapes_supported(shape: Robj) -> bool {
-    match recycled(&shape, shape.len()) {
-        Some(v) => v.iter().all(|&s| s.fract() == 0.0 && points::supported_shape(s as i32)),
+    // Scanned in place and in parallel: a 1e6-row layer's shapes are
+    // checked in the IR.
+    if let Some(v) = shape.as_integer_slice() {
+        return par_all(v.len(), 0, |lo, hi| v[lo..hi].iter().all(|&s| s != i32::MIN && points::supported_shape(s)));
+    }
+    match shape.as_real_slice() {
+        Some(v) => par_all(v.len(), 0, |lo, hi| v[lo..hi].iter().all(|&s| (s as i32) as f64 == s && points::supported_shape(s as i32))),
         None => false,
     }
+}
+
+/// Whether `f(lo, hi)` holds for every chunk of `0..n`, chunks checked on up
+/// to `threads` threads (0: the default).
+fn par_all(n: usize, threads: i32, f: impl Fn(usize, usize) -> bool + Sync) -> bool {
+    let threads = if threads > 0 { threads as usize } else { raster::default_threads() };
+    let chunk = n.div_ceil(threads).max(1 << 16);
+    if n <= chunk {
+        return f(0, n);
+    }
+    std::thread::scope(|s| {
+        let f = &f;
+        let handles: Vec<_> = (0..n.div_ceil(chunk)).map(|k| s.spawn(move || f(k * chunk, ((k + 1) * chunk).min(n)))).collect();
+        handles.into_iter().all(|h| h.join().unwrap_or(false))
+    })
+}
+
+/// Whether no column of `cols` (a list of atomic vectors) has an NA (or
+/// NaN), scanned in parallel on up to `threads` threads (0: the default).
+/// `FALSE` for any other column type. The per-row NA checks of a layer's
+/// support (`Geom$handle_na()`'s fast path, `points_decline()`) use it.
+/// @noRd
+#[extendr(r_name = "rs_columns_complete")]
+fn columns_complete(cols: List, threads: i32) -> bool {
+    let na_str = unsafe { R_NaString } as usize;
+    enum Col<'a> {
+        Real(&'a [f64]),
+        Int(&'a [i32]),
+        Str(&'a [usize]),
+    }
+    let robjs: Vec<Robj> = cols.values().collect();
+    let mut parts = Vec::new();
+    for c in &robjs {
+        if let Some(v) = c.as_real_slice() {
+            parts.push(Col::Real(v));
+        } else if let Some(v) = c.as_integer_slice() {
+            parts.push(Col::Int(v));
+        } else if let Some(v) = c.as_logical_slice() {
+            parts.push(Col::Int(unsafe { std::slice::from_raw_parts(v.as_ptr() as *const i32, v.len()) }));
+        } else if c.is_string() {
+            // STRSXP elements are CHARSXP pointers; NA is R_NaString.
+            let v = unsafe { std::slice::from_raw_parts(STRING_PTR_RO(c.get()) as *const usize, c.len()) };
+            parts.push(Col::Str(v));
+        } else {
+            return false;
+        }
+    }
+    let n = parts.iter().map(|c| match c { Col::Real(v) => v.len(), Col::Int(v) => v.len(), Col::Str(v) => v.len() }).max().unwrap_or(0);
+    let ok = |c: &Col, lo: usize, hi: usize| match c {
+        Col::Real(v) => v[lo.min(v.len())..hi.min(v.len())].iter().all(|x| !x.is_nan()),
+        Col::Int(v) => v[lo.min(v.len())..hi.min(v.len())].iter().all(|&x| x != i32::MIN),
+        Col::Str(v) => v[lo.min(v.len())..hi.min(v.len())].iter().all(|&x| x != na_str),
+    };
+    par_all(n, threads, |lo, hi| parts.iter().all(|c| ok(c, lo, hi)))
+}
+
+/// Whether `x` is a logical vector of NAs only (an NA colour column),
+/// without allocating as `all(is.na(x))` does.
+/// @noRd
+#[extendr(r_name = "rs_all_na_logical")]
+fn all_na_logical(x: Robj) -> bool {
+    x.as_logical_slice().is_some_and(|v| v.iter().all(|l| l.is_na()))
 }
 
 /// Renders rows `rows` (1-based) of a point layer, one panel's, to a nativeRaster
@@ -419,6 +487,8 @@ extendr_module! {
     fn write_png;
     fn point_colours;
     fn point_shapes_supported;
+    fn all_na_logical;
+    fn columns_complete;
     fn render_points;
     fn render_rects;
     fn render_paths;

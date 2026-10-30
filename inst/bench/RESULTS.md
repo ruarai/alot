@@ -864,3 +864,28 @@ On the real README plot (hybrid tier, release), encoding alone takes
 8 ms at 1600 × 1000 (1.6 MB) and 19 ms on the 7 × 7 in, 300 dpi page
 (3.7 MB). In the render suite the encode step (including ragg's capture
 readback) is 10 ms and 25 ms, against ragg's 111 ms and 386 ms.
+
+## R3.1: render IR extraction (2026-10-30)
+
+`inst/bench/render-ir.R`, release build, R functions byte-compiled as in an
+installed package; median of 60 runs of `render_ir()` on a built plot.
+
+| Case | render_ir() (ms) | theme only (ms) | Budget |
+|---|---:|---:|---:|
+| README (1e6 points, 6 panels) | 8.0 | 2.0 | < 10 |
+| facets_400 (2e4 points, 400 panels) | 6.0 | 2.0 | < 50 |
+
+- Theme: `calc_element()` on all 160 elements of the element tree costs
+  about 53 ms, mostly S7 property validation. `resolve_theme()` resolves
+  the tree once, memoised per (element, skip_blank), on plain property
+  lists; it equals `calc_element()` on every theme tested.
+- Panel params, axis guides and the layers' linear-scale check are taken
+  per distinct (SCALE_X, SCALE_Y) pair, so 400 fixed-scale panels cost one
+  (59 ms before).
+- The README layer's per-row support checks (NA scans and point shapes over
+  1e6 rows) went from about 10 ms of separate R passes to one parallel Rust
+  scan each (`rs_columns_complete()`, `rs_point_shapes_supported()`), about
+  1.5 ms.
+- Without byte compilation (`pkgload::load_all()`) the times are the same
+  (README 8 ms; theme 3 ms). An earlier draft defined the resolver's helpers
+  as closures inside it, which R's JIT recompiled on every call.

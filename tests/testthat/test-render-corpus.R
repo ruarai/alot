@@ -21,6 +21,7 @@ if (nzchar(render_filter)) {
 render_counts <- new.env()
 render_counts$tier <- character()
 render_counts$reasons <- character()
+render_counts$ir <- character()
 
 # Looser tolerances where many marks overplot: ragg rounds to 8 bits on
 # every blend, alot accumulates in f32 (PHASE2.md, Canvas). Faint points
@@ -35,6 +36,13 @@ render_corpus_check <- function(id, p) {
   b <- suppressWarnings(suppressMessages(ggplot2::ggplot_build(p)))
   cov <- render_coverage(b)
   render_counts$tier <- c(render_counts$tier, cov$tier)
+  # Every plot's render IR builds (R3.1); its support table gives the
+  # reasons the full tier would decline.
+  ir <- tryCatch(render_ir(b), error = function(e) e)
+  if (inherits(ir, "error")) {
+    return(fail(sprintf("%s: render_ir() failed: %s", id, conditionMessage(ir))))
+  }
+  render_counts$ir <- c(render_counts$ir, if (nrow(ir$support)) unique(paste0(ir$support$component, ": ", ir$support$reason)) else "full")
   if (cov$tier == "ggplot2") {
     render_counts$reasons <- c(render_counts$reasons, unique(cov$layers$reason))
     return(succeed())
@@ -88,4 +96,8 @@ message(sprintf(
   length(render_counts$tier),
   paste(sprintf("%d %s", table(render_counts$tier), names(table(render_counts$tier))), collapse = ", "),
   paste(sprintf("%s (%d)", names(table(render_counts$reasons)), table(render_counts$reasons)), collapse = ", ")
+))
+message(sprintf(
+  "Render IR built for every plot; full-tier support: %s.",
+  paste(sprintf("%s (%d)", names(table(render_counts$ir)), table(render_counts$ir)), collapse = ", ")
 ))

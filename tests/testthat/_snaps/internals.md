@@ -2023,3 +2023,170 @@
           }
       }
 
+# upstream theme and label resolution match what the render IR mirrors
+
+    Code
+      print(body(ggplot2::calc_element))
+    Output
+      {
+          if (verbose) 
+              cli::cli_inform(paste0(element, " --> "))
+          el_out <- theme[[element]]
+          if (is_theme_element(el_out, "blank")) {
+              if (isTRUE(skip_blank)) {
+                  el_out <- NULL
+              }
+              else {
+                  if (verbose) 
+                      cli::cli_inform("{.fn element_blank} (no inheritance)")
+                  return(el_out)
+              }
+          }
+          element_tree <- get_element_tree()
+          if (!is.null(el_out)) {
+              class <- element_tree[[element]]$class
+              if (inherits(class, "S7_class")) {
+                  old_s3_inherit <- inherits(el_out, class@name)
+                  if (!S7::S7_inherits(el_out, class) && !old_s3_inherit) {
+                      cli::cli_abort("Theme element {.var {element}} must have class {.cls {class@name}}.", 
+                        call = call)
+                  }
+              }
+              else {
+                  if (!inherits(el_out, class)) {
+                      cli::cli_abort("Theme element {.var {element}} must have class {.cls {ggplot_global$element_tree[[element]]$class}}.", 
+                        call = call)
+                  }
+              }
+          }
+          pnames <- element_tree[[element]]$inherit
+          if (is.null(pnames)) {
+              if (verbose) 
+                  cli::cli_inform("nothing (top level)")
+              if (is_theme_element(el_out)) {
+                  nullprops <- lengths(S7::props(el_out)) == 0
+              }
+              else {
+                  nullprops <- vapply(el_out, is.null, logical(1))
+              }
+              if (!any(nullprops)) {
+                  return(el_out)
+              }
+              el_out <- combine_elements(el_out, ggplot_global$theme_default[[element]])
+              if (is_theme_element(el_out)) {
+                  nullprops <- lengths(S7::props(el_out)) == 0
+              }
+              else {
+                  nullprops <- vapply(el_out, is.null, logical(1))
+              }
+              if (is_theme_element(el_out, "geom")) {
+                  nullprops[c("colour", "fill")] <- FALSE
+              }
+              if (!any(nullprops)) {
+                  return(el_out)
+              }
+              cli::cli_abort("Theme element {.var {element}} has {.code NULL} property without default: {.field {names(nullprops)[nullprops]}}.", 
+                  call = call)
+          }
+          if (verbose) 
+              cli::cli_inform("{pnames}")
+          skip_blank <- skip_blank || (!is.null(el_out) && !isTRUE(try_prop(el_out, 
+              "inherit.blank")))
+          parents <- lapply(pnames, calc_element, theme, verbose = verbose, 
+              skip_blank = skip_blank, call = call)
+          Reduce(combine_elements, parents, el_out)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("combine_elements", "ggplot2")))
+    Output
+      {
+          if (is.null(e2) || is_theme_element(e1, "blank")) {
+              return(e1)
+          }
+          if (is.null(e1)) {
+              return(e2)
+          }
+          if (is_rel(e1)) {
+              if (is_rel(e2)) {
+                  return(rel(unclass(e1) * unclass(e2)))
+              }
+              if (is.numeric(e2) || is.unit(e2)) {
+                  return(unclass(e1) * e2)
+              }
+              return(e1)
+          }
+          if (is_margin(e1) && is_margin(e2)) {
+              if (anyNA(e2)) {
+                  e2[is.na(e2)] <- unit(0, "pt")
+              }
+              if (anyNA(e1)) {
+                  e1[is.na(e1)] <- e2[is.na(e1)]
+              }
+          }
+          is_old_element <- !S7::S7_inherits(e1) && inherits(e1, "element")
+          if (is_old_element && (is_theme_element(e2) || inherits(e2, 
+              "element"))) {
+              return(combine_s3_elements(e1, e2))
+          }
+          if (!is_theme_element(e1) && !is_theme_element(e2)) {
+              return(e1)
+          }
+          if (is_theme_element(e2, "blank")) {
+              if (isTRUE(try_prop(e1, "inherit.blank"))) {
+                  return(e2)
+              }
+              else {
+                  return(e1)
+              }
+          }
+          parent_props <- if (S7::S7_inherits(e2)) 
+              S7::props(e2)
+          else unclass(e2)
+          n <- S7::prop_names(e1)[lengths(S7::props(e1)) == 0]
+          S7::props(e1)[n] <- parent_props[n]
+          if (is_rel(try_prop(e1, "size"))) {
+              e1@size <- parent_props$size * unclass(e1@size)
+          }
+          if (is_rel(try_prop(e1, "linewidth"))) {
+              e1@linewidth <- parent_props$linewidth * unclass(e1@linewidth)
+          }
+          if (is_theme_element(e1, "text")) {
+              e1@margin <- combine_elements(e1@margin, parent_props$margin)
+          }
+          is_subclass <- !any(inherits(e2, class(e1), which = TRUE) == 
+              0)
+          is_subclass <- is_subclass && length(setdiff(class(e2), class(e1))) > 
+              0
+          if (is_subclass) {
+              new <- defaults(S7::props(e1), S7::props(e2))
+              S7::props(e2)[names(new)] <- new
+              return(e2)
+          }
+          e1
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Layout$render)$f))
+    Output
+      {
+          panels <- self$facet$draw_panel_content(panels, self$layout, 
+              self$panel_scales_x, self$panel_scales_y, self$panel_params, 
+              self$coord, data, theme, self$facet_params)
+          plot_table <- self$facet$draw_panels(panels, self$layout, 
+              self$panel_scales_x, self$panel_scales_y, self$panel_params, 
+              self$coord, data, theme, self$facet_params)
+          plot_table <- self$facet$set_panel_size(plot_table, theme)
+          labels <- self$coord$labels(list(x = self$resolve_label(self$panel_scales_x[[1]], 
+              labels), y = self$resolve_label(self$panel_scales_y[[1]], 
+              labels)), self$panel_params[[1]])
+          labels <- self$render_labels(labels, theme)
+          self$facet$draw_labels(plot_table, self$layout, self$panel_scales_x, 
+              self$panel_scales_y, self$panel_params, self$coord, data, 
+              theme, labels, self$params)
+      }
+

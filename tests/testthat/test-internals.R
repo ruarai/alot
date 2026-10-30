@@ -181,3 +181,12 @@ test_that("upstream path drawing matches what the hybrid tier mirrors", {
   expect_snapshot(print(body(environment(ggplot2::GeomPath$handle_na)$f)))
   expect_snapshot(print(body(environment(ggplot2::GeomPolygon$draw_panel)$f)))
 })
+
+test_that("upstream theme and label resolution match what the render IR mirrors", {
+  # resolve_theme() (R/render-ir.R) mirrors calc_element() and
+  # combine_elements(); ir_labels() mirrors Layout$render()'s axis titles.
+  # If these fail, update the mirror, then the snapshots.
+  expect_snapshot(print(body(ggplot2::calc_element)))
+  expect_snapshot(print(body(utils::getFromNamespace("combine_elements", "ggplot2"))))
+  expect_snapshot(print(body(environment(ggplot2::Layout$render)$f)))
+})

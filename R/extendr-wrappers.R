@@ -188,6 +188,18 @@ rs_point_colours <- function(colour, alpha) .Call(wrap__point_colours, colour, a
 #' @noRd
 rs_point_shapes_supported <- function(shape) .Call(wrap__point_shapes_supported, shape)
 
+#' Whether `x` is a logical vector of NAs only (an NA colour column),
+#' without allocating as `all(is.na(x))` does.
+#' @noRd
+rs_all_na_logical <- function(x) .Call(wrap__all_na_logical, x)
+
+#' Whether no column of `cols` (a list of atomic vectors) has an NA (or
+#' NaN), scanned in parallel on up to `threads` threads (0: the default).
+#' `FALSE` for any other column type. The per-row NA checks of a layer's
+#' support (`Geom$handle_na()`'s fast path, `points_decline()`) use it.
+#' @noRd
+rs_columns_complete <- function(cols, threads) .Call(wrap__columns_complete, cols, threads)
+
 #' Renders rows `rows` (1-based) of a point layer, one panel's, to a nativeRaster
 #' of `dims` (width, height) pixels. `rect` is the panel's (left, top,
 #' width, height) in canvas pixels, which also clips each point; positions are rescaled from
@@ -239,5 +251,12 @@ rs_render_paths <- function(x, y, rows, path, ring, colour, fill, lwd, lty, styl
 #' glyph the font lacks (ragg would use a fallback font).
 #' @noRd
 rs_text_metrics <- function(text, font, path, index, size, line) .Call(wrap__text_metrics, text, font, path, index, size, line)
+
+#' Whether each string `text[i]` can be drawn from font file `path` (face
+#' `index`) alone: every character has a glyph and none is right-to-left.
+#' All `FALSE` if the font can't be read or isn't one alot mirrors; NA
+#' strings are `TRUE`.
+#' @noRd
+rs_text_covered <- function(text, path, index) .Call(wrap__text_covered, text, path, index)
 
 # nolint end

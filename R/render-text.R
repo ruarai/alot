@@ -8,21 +8,29 @@
 # variations (textshaping would apply them). Faces 2 and 4 are bold, 3 and 4
 # italic.
 text_fonts <- function(family, face) {
-  style <- vctrs::vec_unique(data.frame(family = family, face = as.integer(face)))
-  ok <- !is.na(style$family) & style$face %in% 1:4
-  font <- data.frame(path = rep(NA_character_, nrow(style)), index = NA_integer_)
+  face <- as.integer(face)
+  n <- max(length(family), length(face))
+  family <- rep_len(family, n)
+  face <- rep_len(face, n)
+  key <- paste(family, face, sep = "\r")
+  first <- !duplicated(key)
+  fam <- family[first]
+  fac <- face[first]
+  ok <- !is.na(fam) & fac %in% 1:4
+  path <- rep(NA_character_, length(fam))
+  index <- rep(NA_integer_, length(fam))
   if (any(ok)) {
-    s <- style[ok, ]
     m <- systemfonts::match_fonts(
-      s$family,
-      italic = s$face %in% c(3L, 4L),
-      weight = ifelse(s$face %in% c(2L, 4L), "bold", "normal")
+      fam[ok],
+      italic = fac[ok] %in% c(3L, 4L),
+      weight = ifelse(fac[ok] %in% c(2L, 4L), "bold", "normal")
     )
     plain <- lengths(m$features) == 0 & lengths(m$variations) == 0
-    font$path[ok] <- ifelse(plain, m$path, NA_character_)
-    font$index[ok] <- m$index
+    path[ok] <- ifelse(plain, m$path, NA_character_)
+    index[ok] <- m$index
   }
-  font[vctrs::vec_match(data.frame(family = family, face = as.integer(face)), style), ]
+  at <- match(key, key[first])
+  list2DF(list(path = path[at], index = index[at]))
 }
 
 # Metrics in device pixels of each string, as GEStrWidth(), GEStrMetric()

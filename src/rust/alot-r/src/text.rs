@@ -61,7 +61,20 @@ fn text_metrics(text: Strings, font: &[i32], path: Strings, index: &[i32], size:
     List::from_names_and_values(["width", "ascent", "descent", "height"], [col(0), col(1), col(2), col(3)]).unwrap()
 }
 
+/// Whether each string `text[i]` can be drawn from font file `path` (face
+/// `index`) alone: every character has a glyph and none is right-to-left.
+/// All `FALSE` if the font can't be read or isn't one alot mirrors; NA
+/// strings are `TRUE`.
+/// @noRd
+#[extendr(r_name = "rs_text_covered")]
+fn text_covered(text: Strings, path: &str, index: i32) -> Logicals {
+    let data = font_data(path);
+    let font = data.as_ref().and_then(|d| Font::new(d, index.max(0) as u32));
+    Logicals::from_values(text.iter().map(|s| s.is_na() || font.as_ref().is_some_and(|f| f.covers(&s))).collect::<Vec<_>>())
+}
+
 extendr_module! {
     mod text;
     fn text_metrics;
+    fn text_covered;
 }
