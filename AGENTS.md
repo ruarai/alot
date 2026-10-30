@@ -31,6 +31,20 @@ NOT_CRAN=true Rscript -e 'pkgload::load_all(); testthat::test_dir("tests/testtha
 NOT_CRAN=true Rscript -e 'pkgload::load_all(); testthat::test_file("tests/testthat/test-scale-train.R", load_package = "none")'
 ```
 
+Run independent test files in parallel where it saves time, e.g. the corpus
+subset alongside the other files, or a long file such as `test-corpus.R` on
+its own. Build once first (`pkgload::load_all()`), then start each process
+with `pkgload::load_all(compile = FALSE)` so they don't race to rebuild the
+Rust crates, and pick files with `test_dir(..., filter = )`:
+
+```sh
+# $1: filter regex on test names (file names without `test-`), $2: invert
+run() { NOT_CRAN=true Rscript -e "pkgload::load_all(compile = FALSE); testthat::test_dir('tests/testthat', filter = '$1', invert = $2, load_package = 'none')"; }
+ALOT_CORPUS='...' run '^corpus$' FALSE > corpus.log 2>&1 &
+run '^corpus$' TRUE > rest.log 2>&1 &
+wait
+```
+
 The full corpus (`test-corpus.R`, about 2,000 plots) is slow. Unless the
 user asks for the full corpus, limit it with `ALOT_CORPUS`, a regex on the
 file names in `tests/testthat/corpus/`, to a small subset (around ten files)
