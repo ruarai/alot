@@ -50,6 +50,7 @@ user asks for the full corpus, limit it with `ALOT_CORPUS`, a regex on the
 file names in `tests/testthat/corpus/`, to a small subset (around ten files)
 relevant to your change, e.g.
 `ALOT_CORPUS='^(man-geom_point|man-geom_histogram|test-geom-bar|test-scales)\.R$'`.
+Do not run the full corpus without user permission even if your change affects all plots.
 The corpus may be regenerated on a ggplot2 update with `Rscript tools/extract-corpus.R`.
 
 Benchmarks (`inst/bench/`, see `RESULTS.md`) need a release build:
