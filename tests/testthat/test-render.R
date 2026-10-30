@@ -293,3 +293,28 @@ test_that("alot_png() restores the current device", {
     withr::local_tempfile(fileext = ".png"), width = 2, height = 2, dpi = 50))
   expect_equal(grDevices::dev.cur(), dev)
 })
+
+test_that("render_threads() follows alot.threads, ALOT_THREADS and the check limit", {
+  withr::local_options(alot.threads = NULL)
+  withr::local_envvar(ALOT_THREADS = "", "_R_CHECK_LIMIT_CORES_" = "")
+  expect_equal(render_threads(), 0L)
+  withr::local_envvar("_R_CHECK_LIMIT_CORES_" = "TRUE")
+  expect_equal(render_threads(), 2L)
+  withr::local_envvar(ALOT_THREADS = "3")
+  expect_equal(render_threads(), 3L)
+  withr::local_options(alot.threads = 5)
+  expect_equal(render_threads(), 5L)
+  withr::local_options(alot.threads = 0)
+  expect_error(render_threads(), "positive integer")
+})
+
+test_that("the thread count doesn't change the hybrid's pixels", {
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y, colour = c)) + ggplot2::geom_point(size = 3, alpha = 0.4)
+  b <- ggplot2::ggplot_build(p)
+  draw <- function(threads) {
+    withr::local_options(alot.threads = threads)
+    render_raster(b, render_size)$raster
+  }
+  expect_identical(draw(1), draw(8))
+  expect_render_close(b, tier = "hybrid")
+})

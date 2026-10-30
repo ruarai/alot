@@ -729,3 +729,31 @@ Reading these:
   README plot with 10 rows, and nearly 10 s for 400 panels, where drawing
   adds 2 s. Only the full tier removes it.
 - **Encoding** is 4–23 ms in Rust against 34–384 ms for ragg's libpng.
+
+## R1.1: display list and band executor (2026-10-30)
+
+`cargo run --release -p alot-core --example points_bench`: a white
+background plus 1e6 points (the README plot's shapes, size and alpha) on a
+1600 × 1000 page, 64-row bands, medians of 7:
+
+| threads | place | execute |
+|---:|---:|---:|
+| 1 | 6 ms | 304 ms |
+| 2 | — | 168 ms |
+| 4 | — | 95 ms |
+| 8 | — | 55 ms |
+
+The blend scales 5.6× from 1 to 8 threads. Placement is serial (R1.2
+parallelises it); right after multi-threaded runs it measured 30–40 ms
+instead of 6 ms, which looks like cache or memory effects rather than
+work. Streaming a 20 × 20 in page at 300 dpi (6000 × 6000 px, 1e5 points,
+8 threads) took 134 ms and raised peak RSS by 40 MB, within the executor's
+band bound of 59 MB (8 × 64 rows × 6000 px × 20 bytes); a single f32 canvas
+would be 549 MB.
+
+The hybrid now draws each panel's points as a one-item display list. One
+README panel (166,667 points, 470 × 420) takes 17.8 ms, the same as the
+prototype's drawer at the same sprite resolution (17–19 ms). The render
+suite's README draw step read 195 ms (174 ms at R0.3); 8 and 16 threads
+give the same time, and the panel benchmark shows no regression, so this
+is run-to-run variation.

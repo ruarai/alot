@@ -1,0 +1,359 @@
+//! The band executor (PHASE2.md, Architecture 6). The page is split into
+//! row bands drawn in parallel. Each worker draws into an f32 premultiplied
+//! RGBA buffer of one band, reused across bands and calls, so memory is
+//! bounded by `threads * band_rows * width` rather than the page size. Each
+//! band walks the display list in order, skipping items outside its rows,
+//! so overlaps composite as on a device. Finished bands are converted to
+//! non-premultiplied 8-bit RGBA and handed over in row order.
+//!
+//! Clipping mirrors ragg (1.5.2 src/AggDevice.h, `clipRect()`): the clip box
+//! is set fractionally on AGG's rasteriser, so marks are cut at the box's
+//! fractional edges and pixels the edge crosses keep the covered share.
+
+use crate::render::display::{DisplayList, Item, Rect};
+use crate::render::points::Buckets;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
+
+/// How a page is executed.
+#[derive(Clone, Copy, Debug)]
+pub struct Options {
+    /// Worker threads; 0 means `default_threads()`.
+    pub threads: usize,
+    /// Rows per band.
+    pub band_rows: usize,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options { threads: 0, band_rows: 64 }
+    }
+}
+
+impl Options {
+    fn threads(&self) -> usize {
+        if self.threads == 0 { default_threads() } else { self.threads }
+    }
+}
+
+/// Available cores, capped at 8 (PHASE2.md, User API). R's
+/// `_R_CHECK_LIMIT_CORES_` cap is applied by the R side.
+pub fn default_threads() -> usize {
+    std::thread::available_parallelism().map_or(1, |n| n.get()).min(8)
+}
+
+/// Band buffers kept between calls: fresh multi-megabyte buffers cost more
+/// in page faults than drawing into them.
+static POOL: Mutex<Vec<Vec<[f32; 4]>>> = Mutex::new(Vec::new());
+
+/// Bytes the executor holds for its band buffers while drawing a page of
+/// `width` with `opts`: the memory bound.
+pub fn band_memory(width: usize, opts: &Options) -> usize {
+    opts.threads() * opts.band_rows * width * (std::mem::size_of::<[f32; 4]>() + std::mem::size_of::<u32>())
+}
+
+/// Per-item data computed once per page: which points each band draws.
+enum Prepared {
+    None,
+    Points(Buckets),
+}
+
+struct Page<'a> {
+    list: &'a DisplayList,
+    prepared: Vec<Prepared>,
+    width: usize,
+    height: usize,
+    band_rows: usize,
+}
+
+/// Draws `list` on a `width` x `height` page, calling `sink(top, pixels)`
+/// for each band in row order. `pixels` are the band's rows, packed as R's
+/// nativeRaster (`R | G << 8 | B << 16 | A << 24`, non-premultiplied).
+pub fn execute(list: &DisplayList, width: usize, height: usize, opts: &Options, mut sink: impl FnMut(usize, &[u32])) {
+    let threads = opts.threads();
+    let band_rows = opts.band_rows.max(1);
+    let page = prepare(list, width, height, band_rows);
+    let n_bands = height.div_ceil(band_rows);
+    // Bands are drawn in waves of `threads`, each into its own output rows,
+    // and handed over in order once the wave is done.
+    let mut out = vec![0u32; (threads * band_rows * width).min(width * height)];
+    let mut first = 0;
+    while first < n_bands {
+        let last = (first + threads).min(n_bands);
+        let rows = (last * band_rows).min(height) - first * band_rows;
+        let wave = &mut out[..rows * width];
+        draw_bands(&page, first, wave, threads);
+        for b in first..last {
+            let top = b * band_rows;
+            let h = band_rows.min(height - top);
+            let off = (top - first * band_rows) * width;
+            sink(top, &wave[off..off + h * width]);
+        }
+        first = last;
+    }
+}
+
+/// Draws `list` into `out`, which holds `width * height` pixels (see
+/// `execute()` for the format).
+pub fn render_into(list: &DisplayList, width: usize, height: usize, opts: &Options, out: &mut [u32]) {
+    assert_eq!(out.len(), width * height);
+    let band_rows = opts.band_rows.max(1);
+    let page = prepare(list, width, height, band_rows);
+    draw_bands(&page, 0, out, opts.threads());
+}
+
+/// `render_into()` a new buffer.
+pub fn render(list: &DisplayList, width: usize, height: usize, opts: &Options) -> Vec<u32> {
+    let mut out = vec![0u32; width * height];
+    render_into(list, width, height, opts, &mut out);
+    out
+}
+
+fn prepare(list: &DisplayList, width: usize, height: usize, band_rows: usize) -> Page<'_> {
+    let n_bands = height.div_ceil(band_rows);
+    let prepared = list
+        .items
+        .iter()
+        .map(|item| match item {
+            Item::Points(b) => Prepared::Points(b.bucket(band_rows, n_bands)),
+            _ => Prepared::None,
+        })
+        .collect();
+    Page { list, prepared, width, height, band_rows }
+}
+
+/// Draws the bands covering `out`, starting at band `first`, with up to
+/// `threads` workers taking bands in turn.
+fn draw_bands(page: &Page, first: usize, out: &mut [u32], threads: usize) {
+    let width = page.width;
+    if width == 0 || out.is_empty() {
+        return;
+    }
+    let bands: Vec<Mutex<(usize, &mut [u32])>> = out
+        .chunks_mut(page.band_rows * width)
+        .enumerate()
+        .map(|(i, rows)| Mutex::new((first + i, rows)))
+        .collect();
+    let workers = threads.clamp(1, bands.len());
+    let mut buffers: Vec<Vec<[f32; 4]>> = {
+        let mut pool = POOL.lock().unwrap_or_else(|e| e.into_inner());
+        (0..workers).map(|_| pool.pop().unwrap_or_default()).collect()
+    };
+    let next = AtomicUsize::new(0);
+    let work = |buf: &mut Vec<[f32; 4]>| loop {
+        let i = next.fetch_add(1, Ordering::Relaxed);
+        let Some(band) = bands.get(i) else { break };
+        let mut band = band.lock().unwrap();
+        let (b, ref mut rows) = *band;
+        buf.clear();
+        buf.resize(rows.len(), [0.0; 4]);
+        draw_band(page, b, buf);
+        for (d, &[r, g, b, a]) in rows.iter_mut().zip(buf.iter()) {
+            *d = unpremultiply(r, g, b, a);
+        }
+    };
+    if workers == 1 {
+        work(&mut buffers[0]);
+    } else {
+        std::thread::scope(|scope| {
+            for buf in buffers.iter_mut() {
+                let work = &work;
+                scope.spawn(move || work(buf));
+            }
+        });
+    }
+    POOL.lock().unwrap_or_else(|e| e.into_inner()).extend(buffers);
+}
+
+/// Shares of each pixel column and band row inside the current clip.
+pub struct ClipShares {
+    pub cols: Vec<f32>,
+    pub rows: Vec<f32>,
+    /// Columns and band rows with a non-zero share: `[lo, hi)`.
+    pub x: (usize, usize),
+    pub y: (usize, usize),
+}
+
+impl ClipShares {
+    fn new(clip: &Rect, top: usize, width: usize, height: usize) -> Self {
+        let cols: Vec<f32> = (0..width).map(|i| clip.x_share(i)).collect();
+        let rows: Vec<f32> = (0..height).map(|j| clip.y_share(top + j)).collect();
+        let span = |v: &[f32]| match v.iter().position(|&s| s > 0.0) {
+            Some(lo) => (lo, v.len() - v.iter().rev().position(|&s| s > 0.0).unwrap()),
+            None => (0, 0),
+        };
+        ClipShares { x: span(&cols), y: span(&rows), cols, rows }
+    }
+}
+
+fn draw_band(page: &Page, b: usize, buf: &mut [[f32; 4]]) {
+    let width = page.width;
+    let top = b * page.band_rows;
+    let h = buf.len() / width;
+    let full = Rect { x0: 0.0, y0: 0.0, x1: width as f64, y1: page.height as f64 };
+    let mut stack = vec![full];
+    let mut shares = ClipShares::new(&full, top, width, h);
+    for (item, prep) in page.list.items.iter().zip(&page.prepared) {
+        if let Some((y0, y1)) = item.rows() {
+            if y1 <= top as i64 || y0 >= (top + h) as i64 {
+                continue;
+            }
+        }
+        match (item, prep) {
+            (Item::Clear(rgba), _) => {
+                let c = premultiply(*rgba);
+                buf.fill(c);
+            }
+            (Item::PushClip(r), _) => {
+                let clip = stack.last().unwrap().intersect(r);
+                stack.push(clip);
+                shares = ClipShares::new(&clip, top, width, h);
+            }
+            (Item::PopClip, _) => {
+                if stack.len() > 1 {
+                    stack.pop();
+                }
+                shares = ClipShares::new(stack.last().unwrap(), top, width, h);
+            }
+            (Item::Points(batch), Prepared::Points(buckets)) => {
+                batch.draw(buf, top, width, buckets.band(b), &shares);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn premultiply([r, g, b, a]: [u8; 4]) -> [f32; 4] {
+    let a = a as f32 / 255.0;
+    [r as f32 / 255.0 * a, g as f32 / 255.0 * a, b as f32 / 255.0 * a, a]
+}
+
+fn unpremultiply(r: f32, g: f32, b: f32, a: f32) -> u32 {
+    if a <= 0.0 {
+        return 0;
+    }
+    let byte = |v: f32| (v * 255.0).round().clamp(0.0, 255.0) as u32;
+    byte(r / a) | byte(g / a) << 8 | byte(b / a) << 16 | byte(a) << 24
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::render::points::{Point, PointBatch};
+
+    fn opts(threads: usize, band_rows: usize) -> Options {
+        Options { threads, band_rows }
+    }
+
+    fn square(x: f64, y: f64, rgba: [u8; 4]) -> Point {
+        Point { x, y, shape: 15, size: 16.0 / (2.0 * 0.375), lwd: 1.0, rgba }
+    }
+
+    #[test]
+    fn clear_fills_every_pixel_exactly() {
+        let mut list = DisplayList::new();
+        list.push(Item::PushClip(Rect { x0: 2.0, y0: 2.0, x1: 3.0, y1: 3.0 }));
+        list.push(Item::Clear([10, 20, 30, 255]));
+        let img = render(&list, 7, 5, &opts(2, 2));
+        assert!(img.iter().all(|&p| p == 0xFF_1E_14_0A));
+    }
+
+    #[test]
+    fn bands_and_threads_do_not_change_pixels() {
+        let mut list = DisplayList::new();
+        list.push(Item::Clear([255, 255, 255, 255]));
+        let pts: Vec<Point> = (0..500)
+            .map(|i| square((i * 37 % 200) as f64 + 0.3, (i * 53 % 150) as f64 + 0.6, [(i % 255) as u8, 40, 200, 90]))
+            .collect();
+        list.push(Item::Points(PointBatch::new(pts)));
+        let reference = render(&list, 200, 150, &opts(1, 1000));
+        for (threads, band) in [(1, 1), (3, 7), (8, 64), (16, 5)] {
+            assert_eq!(render(&list, 200, 150, &opts(threads, band)), reference);
+        }
+        let mut streamed = Vec::new();
+        let mut tops = Vec::new();
+        execute(&list, 200, 150, &opts(4, 16), |top, px| {
+            tops.push(top);
+            streamed.extend_from_slice(px);
+        });
+        assert_eq!(streamed, reference);
+        assert_eq!(tops, (0..150).step_by(16).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn clip_cuts_at_fractional_edges() {
+        // A 16 px opaque square centred at (10, 10) covers [2, 18).
+        let mut list = DisplayList::new();
+        list.push(Item::PushClip(Rect { x0: 5.25, y0: 0.0, x1: 12.5, y1: 20.0 }));
+        list.push(Item::Points(PointBatch::new([square(10.0, 10.0, [0, 0, 0, 255])])));
+        list.push(Item::PopClip);
+        list.push(Item::Points(PointBatch::new([square(10.0, 30.0, [0, 0, 0, 255])])));
+        let img = render(&list, 20, 40, &opts(2, 8));
+        let a = |x: usize, y: usize| img[y * 20 + x] >> 24;
+        assert_eq!(a(4, 10), 0);
+        assert_eq!(a(5, 10), 191); // 0.75 of the pixel is inside
+        assert_eq!(a(6, 10), 255);
+        assert_eq!(a(12, 10), 128); // 0.5
+        assert_eq!(a(13, 10), 0);
+        // After PopClip, the page clip again.
+        assert_eq!(a(3, 30), 255);
+        assert_eq!(a(16, 30), 255);
+    }
+
+    #[test]
+    fn background_plus_points_matches_the_hybrid_composite() {
+        // The hybrid renders points on a transparent panel raster that
+        // ragg then blends over the white page; the full tier draws both in
+        // one list. They agree to rounding.
+        let mut seed = 7u64;
+        let mut rnd = || {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (seed >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let shapes = [16, 17, 15, 3, 19, 1];
+        let pts: Vec<Point> = (0..20_000)
+            .map(|_| Point {
+                x: rnd() * 300.0,
+                y: rnd() * 200.0,
+                shape: shapes[(rnd() * 6.0) as usize],
+                size: [4.0, 5.5, 7.0][(rnd() * 3.0) as usize],
+                lwd: 1.4,
+                rgba: [(rnd() * 255.0) as u8, (rnd() * 255.0) as u8, 50, 76],
+            })
+            .collect();
+        let hybrid = crate::render::points::render(300, 200, pts.iter().copied());
+        let mut list = DisplayList::new();
+        list.push(Item::Clear([255, 255, 255, 255]));
+        list.push(Item::Points(PointBatch::new(pts)));
+        let page = render(&list, 300, 200, &opts(8, 16));
+        for (&h, &p) in hybrid.iter().zip(&page) {
+            let a = (h >> 24) as f64 / 255.0;
+            for c in 0..3 {
+                let src = ((h >> (8 * c)) & 255) as f64;
+                let over = src * a + 255.0 * (1.0 - a);
+                let got = ((p >> (8 * c)) & 255) as f64;
+                assert!((over - got).abs() <= 1.0, "{over} vs {got}");
+            }
+            assert_eq!(p >> 24, 255);
+        }
+    }
+
+    #[test]
+    fn memory_is_bounded_by_bands() {
+        // 20 x 20 in at 300 dpi.
+        let (w, h) = (6000, 6000);
+        let o = opts(8, 64);
+        let bound = band_memory(w, &o);
+        assert!(bound < 64 << 20, "{bound}");
+        let mut list = DisplayList::new();
+        list.push(Item::Clear([255, 255, 255, 255]));
+        list.push(Item::Points(PointBatch::new((0..1000).map(|i| square((i * 6) as f64, (i * 6) as f64, [0, 0, 0, 255])))));
+        let mut rows = 0;
+        execute(&list, w, h, &o, |_, px| {
+            rows += px.len() / w;
+        });
+        assert_eq!(rows, h);
+        let held: usize = POOL.lock().unwrap().iter().map(|b| b.capacity() * 16).sum();
+        assert!(held <= bound, "{held} > {bound}");
+    }
+}

@@ -580,7 +580,7 @@ alongside Phase 1's remaining tasks.
 
 ## R1 Raster engine (milestone 2.0)
 
-### R1.1 Display list and band executor
+### R1.1 Display list and band executor — done
 - **Depends:** R0.1
 - **Touches:** `alot-core/src/render/{display,raster}.rs`
 - **Do:**

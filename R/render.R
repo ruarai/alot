@@ -257,6 +257,22 @@ point_colours <- function(colour, alpha) {
   out
 }
 
+# Worker threads for Rust rendering (PHASE2.md, User API):
+# options(alot.threads), then ALOT_THREADS, else the available cores capped
+# at 8 (0, resolved in Rust), or 2 under R CMD check's _R_CHECK_LIMIT_CORES_.
+render_threads <- function() {
+  n <- getOption("alot.threads", Sys.getenv("ALOT_THREADS"))
+  if (is.character(n) && !nzchar(n)) {
+    limit <- Sys.getenv("_R_CHECK_LIMIT_CORES_")
+    return(if (nzchar(limit) && !identical(toupper(limit), "FALSE")) 2L else 0L)
+  }
+  n <- suppressWarnings(as.integer(n))
+  if (length(n) != 1 || is.na(n) || n < 1) {
+    cli::cli_abort("{.code alot.threads} / {.envvar ALOT_THREADS} must be a positive integer.")
+  }
+  n
+}
+
 # Pixels per inch of the current device if it is a ragg raster device.
 raster_device_res <- function() {
   if (!startsWith(names(grDevices::dev.cur()), "agg_")) {
@@ -305,7 +321,8 @@ drawDetails.alot_hybrid_points <- function(x, recording) {
     s$x, s$y, s$panel, x$panel, x_range, y_range,
     c(left - x0, top - y0, right - left, bottom - top), as.integer(c(w, h)),
     s$shape, s$size, s$stroke, s$colour,
-    c(ggplot2::.pt, ggplot2::.stroke, res)
+    c(ggplot2::.pt, ggplot2::.stroke, res),
+    render_threads()
   )
   if (is.null(img)) {
     return(grid::grid.draw(points_fallback_grob(x)))

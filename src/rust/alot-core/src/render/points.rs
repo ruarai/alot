@@ -10,10 +10,12 @@
 //!
 //! A sprite holds the coverage of each part for one (shape, size, lwd) at
 //! one of SUB x SUB subpixel offsets, so drawing a point is a masked blend
-//! with no geometry. The canvas is split into row bands drawn in parallel;
-//! each band visits points in data order, so overlaps composite as they do
-//! on a device.
+//! with no geometry. A `PointBatch` is a display-list item; the band
+//! executor (`raster`) draws it, each band visiting its points in data
+//! order, so overlaps composite as they do on a device.
 
+use crate::render::display::{DisplayList, Item};
+use crate::render::raster::{self, ClipShares};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -336,106 +338,154 @@ fn place(p: &Point, sprites: &mut Sprites) -> Option<Placed> {
     Some(Placed { ix, iy, set: u16::try_from(set).ok()?, sub: (sy * SUB + sx) as u16, rgba: p.rgba })
 }
 
-/// Buffers reused across calls: fresh multi-megabyte allocations cost more
-/// in page faults than placing and blending the points.
-struct Scratch {
+/// Placement buffers kept between batches: fresh multi-megabyte
+/// allocations cost more in page faults than placing the points.
+static PLACED_POOL: Mutex<Vec<Vec<Placed>>> = Mutex::new(Vec::new());
+
+/// A display-list point batch (`display::Item::Points`): points snapped to
+/// their sprites, drawn in data order.
+pub struct PointBatch {
     placed: Vec<Placed>,
-    canvas: Vec<[f32; 4]>,
+    sets: Vec<Arc<SpriteSet>>,
+    /// Rows any mask reaches relative to its point, so bands can skip
+    /// points without touching their sprites.
+    reach: (i32, i32),
+    rows: (i64, i64),
 }
 
-static SCRATCH: Mutex<Scratch> = Mutex::new(Scratch { placed: Vec::new(), canvas: Vec::new() });
+impl Drop for PointBatch {
+    fn drop(&mut self) {
+        let mut placed = std::mem::take(&mut self.placed);
+        placed.clear();
+        PLACED_POOL.lock().unwrap_or_else(|e| e.into_inner()).push(placed);
+    }
+}
 
-/// Draws `points` in order on a transparent `width` x `height` canvas.
-/// Returns non-premultiplied RGBA packed as R's nativeRaster (`R | G << 8 |
-/// B << 16 | A << 24`), row-major from the top-left. Points with
-/// unsupported shapes or non-finite positions are skipped; callers check
-/// `supported_shape()` first.
+/// For each band, the indices of the points that reach it, in data order.
+pub struct Buckets {
+    starts: Vec<usize>,
+    index: Vec<u32>,
+}
+
+impl Buckets {
+    pub fn band(&self, b: usize) -> &[u32] {
+        &self.index[self.starts[b]..self.starts[b + 1]]
+    }
+}
+
+impl PointBatch {
+    /// Points with unsupported shapes, zero alpha or non-finite positions
+    /// are dropped; callers check `supported_shape()` first.
+    pub fn new(points: impl IntoIterator<Item = Point>) -> Self {
+        let mut sprites = Sprites::new();
+        let mut placed = PLACED_POOL.lock().unwrap_or_else(|e| e.into_inner()).pop().unwrap_or_default();
+        placed.extend(points.into_iter().filter_map(|p| place(&p, &mut sprites)));
+        let sets = sprites.sets;
+        let masks = || sets.iter().flat_map(|set| set.iter().flatten());
+        let reach = (masks().map(|m| m.y0).min().unwrap_or(0), masks().map(|m| m.y0 + m.h as i32).max().unwrap_or(0));
+        let (lo, hi) = placed.iter().fold((i32::MAX, i32::MIN), |(lo, hi), p| (lo.min(p.iy), hi.max(p.iy)));
+        let rows = if lo > hi { (0, 0) } else { (lo as i64 + reach.0 as i64, hi as i64 + reach.1 as i64) };
+        PointBatch { placed, sets, reach, rows }
+    }
+
+    /// Pixel rows `[top, bottom)` the batch can touch.
+    pub fn rows(&self) -> (i64, i64) {
+        self.rows
+    }
+
+    /// Splits the points by the `n_bands` bands of `band_rows` rows they
+    /// reach (a point spanning two bands is in both), keeping data order.
+    pub fn bucket(&self, band_rows: usize, n_bands: usize) -> Buckets {
+        let band_rows = band_rows as i64;
+        let span = |p: &Placed| {
+            let lo = ((p.iy as i64 + self.reach.0 as i64).div_euclid(band_rows)).max(0);
+            let hi = ((p.iy as i64 + self.reach.1 as i64 - 1).div_euclid(band_rows)).min(n_bands as i64 - 1);
+            (lo, hi)
+        };
+        let mut starts = vec![0usize; n_bands + 1];
+        for p in &self.placed {
+            let (lo, hi) = span(p);
+            for b in lo..=hi {
+                starts[b as usize + 1] += 1;
+            }
+        }
+        for b in 0..n_bands {
+            starts[b + 1] += starts[b];
+        }
+        let mut fill = starts.clone();
+        let mut index = vec![0u32; starts[n_bands]];
+        for (i, p) in self.placed.iter().enumerate() {
+            let (lo, hi) = span(p);
+            for b in lo..=hi {
+                index[fill[b as usize]] = i as u32;
+                fill[b as usize] += 1;
+            }
+        }
+        Buckets { starts, index }
+    }
+
+    /// Blends the points `idx` into a band's premultiplied rows (`buf`,
+    /// starting at page row `top`), scaled by the clip's pixel shares.
+    pub fn draw(&self, buf: &mut [[f32; 4]], top: usize, width: usize, idx: &[u32], clip: &ClipShares) {
+        let h = (buf.len() / width) as i32;
+        let top = top as i32;
+        let (cx0, cx1) = (clip.x.0 as i32, clip.x.1 as i32);
+        let (cy0, cy1) = (clip.y.0 as i32, clip.y.1 as i32);
+        for &i in idx {
+            let p = &self.placed[i as usize];
+            let masks = &self.sets[p.set as usize][p.sub as usize];
+            let a = p.rgba[3] as f32 / 255.0;
+            let colour = [p.rgba[0] as f32 / 255.0 * a, p.rgba[1] as f32 / 255.0 * a, p.rgba[2] as f32 / 255.0 * a, a];
+            for m in masks {
+                let y0 = p.iy + m.y0 - top;
+                let y1 = y0 + m.h as i32;
+                let (j0, j1) = (y0.max(cy0), y1.min(cy1).min(h));
+                if j0 >= j1 {
+                    continue;
+                }
+                let x0 = p.ix + m.x0;
+                let (i0, i1) = ((cx0 - x0).max(0), (cx1 - x0).min(m.w as i32));
+                if i0 >= i1 {
+                    continue;
+                }
+                for j in j0..j1 {
+                    let ry = clip.rows[j as usize];
+                    let mrow = &m.cov[(j - y0) as usize * m.w..][..m.w];
+                    let crow = &mut buf[j as usize * width..][..width];
+                    for i in i0..i1 {
+                        let mut k = mrow[i as usize];
+                        if k == 0.0 {
+                            continue;
+                        }
+                        let x = (x0 + i) as usize;
+                        k *= ry * clip.cols[x];
+                        let d = &mut crow[x];
+                        let inv = 1.0 - a * k;
+                        for c in 0..4 {
+                            d[c] = colour[c] * k + d[c] * inv;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Draws `points` in order on a transparent `width` x `height` canvas, as
+/// a one-item display list. Returns non-premultiplied RGBA packed as R's
+/// nativeRaster (`R | G << 8 | B << 16 | A << 24`), row-major from the
+/// top-left.
 pub fn render(width: usize, height: usize, points: impl IntoIterator<Item = Point>) -> Vec<u32> {
     let mut out = vec![0u32; width * height];
-    render_into(width, height, points, &mut out);
+    render_into(width, height, points, &raster::Options::default(), &mut out);
     out
 }
 
 /// `render()` into `out`, which must hold `width * height` pixels.
-pub fn render_into(width: usize, height: usize, points: impl IntoIterator<Item = Point>, out: &mut [u32]) {
-    assert_eq!(out.len(), width * height);
-    let mut scratch = SCRATCH.lock().unwrap_or_else(|e| e.into_inner());
-    let Scratch { placed, canvas } = &mut *scratch;
-    let mut sprites = Sprites::new();
-    placed.clear();
-    placed.extend(points.into_iter().filter_map(|p| place(&p, &mut sprites)));
-    let sprites = &sprites.sets;
-    if width == 0 || height == 0 {
-        return;
-    }
-    canvas.clear();
-    canvas.resize(width * height, [0.0; 4]);
-
-    // Rows any mask reaches relative to its point, so bands can skip points
-    // without touching their sprites.
-    let masks = || sprites.iter().flat_map(|set| set.iter().flatten());
-    let reach = (masks().map(|m| m.y0).min().unwrap_or(0), masks().map(|m| m.y0 + m.h as i32).max().unwrap_or(0));
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(32);
-    let band = height.div_ceil(threads * 2).max(8);
-    let placed = &placed[..];
-    std::thread::scope(|scope| {
-        for (b, (rows, dst)) in canvas.chunks_mut(band * width).zip(out.chunks_mut(band * width)).enumerate() {
-            scope.spawn(move || {
-                draw_band(rows, b * band, width, placed, sprites, reach);
-                for (d, &[r, g, b, a]) in dst.iter_mut().zip(rows.iter()) {
-                    *d = unpremultiply(r, g, b, a);
-                }
-            });
-        }
-    });
-}
-
-fn draw_band(rows: &mut [[f32; 4]], top: usize, width: usize, placed: &[Placed], sprites: &[Arc<SpriteSet>], reach: (i32, i32)) {
-    let h = (rows.len() / width) as i32;
-    let (top, w) = (top as i32, width as i32);
-    for p in placed {
-        if p.iy + reach.1 <= top || p.iy + reach.0 >= top + h {
-            continue;
-        }
-        let masks = &sprites[p.set as usize][p.sub as usize];
-        let a = p.rgba[3] as f32 / 255.0;
-        let colour = [p.rgba[0] as f32 / 255.0 * a, p.rgba[1] as f32 / 255.0 * a, p.rgba[2] as f32 / 255.0 * a, a];
-        for m in masks {
-            let y0 = p.iy + m.y0 - top;
-            let y1 = y0 + m.h as i32;
-            if y1 <= 0 || y0 >= h {
-                continue;
-            }
-            let x0 = p.ix + m.x0;
-            let (i0, i1) = ((-x0).max(0), (w - x0).min(m.w as i32));
-            if i0 >= i1 {
-                continue;
-            }
-            for j in y0.max(0)..y1.min(h) {
-                let mrow = &m.cov[(j - y0) as usize * m.w..][..m.w];
-                let crow = &mut rows[j as usize * width..][..width];
-                for i in i0..i1 {
-                    let k = mrow[i as usize];
-                    if k == 0.0 {
-                        continue;
-                    }
-                    let d = &mut crow[(x0 + i) as usize];
-                    let inv = 1.0 - a * k;
-                    for c in 0..4 {
-                        d[c] = colour[c] * k + d[c] * inv;
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn unpremultiply(r: f32, g: f32, b: f32, a: f32) -> u32 {
-    if a <= 0.0 {
-        return 0;
-    }
-    let byte = |v: f32| (v * 255.0).round().clamp(0.0, 255.0) as u32;
-    byte(r / a) | byte(g / a) << 8 | byte(b / a) << 16 | byte(a) << 24
+pub fn render_into(width: usize, height: usize, points: impl IntoIterator<Item = Point>, opts: &raster::Options, out: &mut [u32]) {
+    let mut list = DisplayList::new();
+    list.push(Item::Points(PointBatch::new(points)));
+    raster::render_into(&list, width, height, opts, out);
 }
 
 #[cfg(test)]

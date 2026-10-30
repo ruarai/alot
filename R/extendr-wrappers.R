@@ -191,9 +191,10 @@ rs_point_shapes_supported <- function(shape) .Call(wrap__point_shapes_supported,
 #' as `CoordCartesian$transform()` does. `size` and `stroke` follow
 #' `gg_par()`: symbol size (size * pt + stroke * stroke_scale / 2) pt, line
 #' width stroke * stroke_scale / 2 lwd, converted at `res` pixels per inch.
-#' `colour` comes from `rs_point_colours()`. `NULL` (decline) for
-#' unsupported inputs.
+#' `colour` comes from `rs_point_colours()`. `threads` is the band
+#' executor's worker count (0: available cores, capped at 8). `NULL`
+#' (decline) for unsupported inputs.
 #' @noRd
-rs_render_points <- function(x, y, panel, panel_id, x_range, y_range, rect, dims, shape, size, stroke, colour, consts) .Call(wrap__render_points, x, y, panel, panel_id, x_range, y_range, rect, dims, shape, size, stroke, colour, consts)
+rs_render_points <- function(x, y, panel, panel_id, x_range, y_range, rect, dims, shape, size, stroke, colour, consts, threads) .Call(wrap__render_points, x, y, panel, panel_id, x_range, y_range, rect, dims, shape, size, stroke, colour, consts, threads)
 
 # nolint end

@@ -3,6 +3,7 @@
 use crate::convert::{self, Column, ColumnData};
 use alot_core::colour::hex;
 use alot_core::render::points::{self, Point};
+use alot_core::render::raster;
 use extendr_api::prelude::*;
 use std::collections::HashMap;
 
@@ -72,8 +73,9 @@ fn point_shapes_supported(shape: Robj) -> bool {
 /// as `CoordCartesian$transform()` does. `size` and `stroke` follow
 /// `gg_par()`: symbol size (size * pt + stroke * stroke_scale / 2) pt, line
 /// width stroke * stroke_scale / 2 lwd, converted at `res` pixels per inch.
-/// `colour` comes from `rs_point_colours()`. `NULL` (decline) for
-/// unsupported inputs.
+/// `colour` comes from `rs_point_colours()`. `threads` is the band
+/// executor's worker count (0: available cores, capped at 8). `NULL`
+/// (decline) for unsupported inputs.
 /// @noRd
 #[extendr(r_name = "rs_render_points")]
 #[allow(clippy::too_many_arguments)]
@@ -91,6 +93,7 @@ fn render_points(
     stroke: Robj,
     colour: &[i32],
     consts: &[f64],
+    threads: i32,
 ) -> Robj {
     let n = x.len();
     let (Some(shape), Some(size), Some(stroke)) = (recycled(&shape, n), recycled(&size, n), recycled(&stroke, n)) else {
@@ -128,7 +131,8 @@ fn render_points(
     let ints = out.as_integer_slice_mut().unwrap();
     // nativeRaster ints are the packed pixels bit for bit.
     let pixels = unsafe { std::slice::from_raw_parts_mut(ints.as_mut_ptr() as *mut u32, ints.len()) };
-    points::render_into(w, h, pts, pixels);
+    let opts = raster::Options { threads: threads.max(0) as usize, ..Default::default() };
+    points::render_into(w, h, pts, &opts, pixels);
     let (w, h) = (w as i32, h as i32);
     out.set_attrib("dim", Integers::from_values([h, w])).unwrap();
     out.set_attrib("class", "nativeRaster").unwrap();
