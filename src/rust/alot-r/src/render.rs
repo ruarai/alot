@@ -2,6 +2,7 @@
 
 use crate::convert::{self, Column, ColumnData};
 use alot_core::colour::hex;
+use alot_core::colour::parse::{parse_colour, Colour};
 use alot_core::render::points::{self, Point};
 use alot_core::render::agg::{Cap, Join, Rule};
 use alot_core::render::paths::{PathBatch, PathSpec, Stroke};
@@ -35,13 +36,15 @@ fn at(v: &[f64], i: usize) -> f64 {
     if v.len() == 1 { v[0] } else { v[i] }
 }
 
-/// Colours of a point layer as `scales::alpha(colour, alpha)` would give
-/// them, packed as nativeRaster ints (`R | G << 8 | B << 16 | A << 24`).
-/// `alpha` is double (length 1 or `n`) or all-NA logical (keep the
-/// colour's alpha); an NA among doubles also keeps it. An NA colour stays
-/// NA in `alpha()` and draws nothing, so it packs as 0 (transparent).
-/// `NULL` (decline) if any other colour is not `#RRGGBB(AA)` hex, or for
-/// other `alpha` types.
+/// Colours of a layer as `scales::alpha(colour, alpha)` would give them,
+/// packed as nativeRaster ints (`R | G << 8 | B << 16 | A << 24`), equal to
+/// `col2rgb(alpha(colour, alpha), alpha = TRUE)`. Colour strings are
+/// decoded as farver does (`alot_core::colour::parse`: hex, R's colour
+/// names, "transparent"). `alpha` is double (length 1 or `n`) or all-NA
+/// logical (keep the colour's alpha); an NA among doubles also keeps it. An
+/// NA colour (or "NA") stays NA in `alpha()`, which `col2rgb()` reads as
+/// transparent white. `NULL` (decline) if a colour is a numeric palette
+/// index or something farver rejects, or for other `alpha` types.
 /// @noRd
 #[extendr(r_name = "rs_point_colours")]
 fn point_colours(colour: Strings, alpha: Robj) -> Robj {
@@ -52,21 +55,25 @@ fn point_colours(colour: Strings, alpha: Robj) -> Robj {
         _ => return Robj::from(()),
     };
     // R caches CHARSXPs, so parse each distinct pointer once.
-    let mut cache: HashMap<extendr_api::SEXP, Option<[u8; 4]>> = HashMap::new();
+    let mut cache: HashMap<extendr_api::SEXP, Option<Colour>> = HashMap::new();
     let mut out = Vec::with_capacity(n);
     let na = unsafe { R_NaString };
+    // col2rgb(NA): transparent white.
+    const NA: i32 = 0x00FF_FFFF;
     // Runs of one colour skip the map.
-    let mut last: (extendr_api::SEXP, Option<[u8; 4]>) = (na, None);
+    let mut last: (extendr_api::SEXP, Option<Colour>) = (na, Some(Colour::Na));
     for (i, &p) in convert::str_ptrs(&colour).iter().enumerate() {
-        if p == na {
-            out.push(0);
-            continue;
-        }
         if p != last.0 {
-            last = (p, *cache.entry(p).or_insert_with(|| hex::parse_hex(colour.elt(i).as_bytes())));
+            last = (p, *cache.entry(p).or_insert_with(|| if p == na { Some(Colour::Na) } else { parse_colour(colour.elt(i).as_bytes()) }));
         }
-        let rgba = last.1;
-        let Some([r, g, b, mut a]) = rgba else { return Robj::from(()) };
+        let [r, g, b, mut a] = match last.1 {
+            Some(Colour::Rgba(v)) => v,
+            Some(Colour::Na) => {
+                out.push(NA);
+                continue;
+            }
+            None => return Robj::from(()),
+        };
         let al = at(&alpha, i);
         if !al.is_nan() {
             a = hex::double2int(al * 255.0).clamp(0, 255) as u8;

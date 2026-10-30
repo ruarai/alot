@@ -695,7 +695,7 @@ alongside Phase 1's remaining tasks.
 - **Done when:** extraction takes under 10 ms on the README plot and under
   50 ms on 400 panels, and covers every corpus plot within scope.
 
-### R3.2 Colours
+### R3.2 Colours — done
 - **Depends:** R3.1
 - **Touches:** `alot-core/src/colour/`, `alot-r/src/render.rs`
 - **Do:**

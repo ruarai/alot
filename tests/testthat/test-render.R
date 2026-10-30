@@ -489,3 +489,31 @@ test_that("lty_code() gives the graphics engine's line type codes", {
   expect_null(lty_code("0F"))
   expect_null(lty_code(7))
 })
+
+# Unpacks nativeRaster ints (R | G << 8 | B << 16 | A << 24) to a 4-row
+# integer matrix; 0x80000000 (opaque-black-at-128 bits) reads as NA in R.
+unpack_rgba <- function(v) {
+  v <- ifelse(is.na(v), 2^31, ifelse(v < 0, v + 2^32, v))
+  m <- rbind(v %% 256, (v %/% 256) %% 256, (v %/% 65536) %% 256, v %/% 16777216)
+  storage.mode(m) <- "integer"
+  m
+}
+
+test_that("layer colours equal col2rgb(alpha(colour, alpha))", {
+  cols <- c(
+    grDevices::colors(), toupper(grDevices::colors()), "Light Blue", "transparent",
+    "Transparent", NA, "NA", "#abc", "#ABCD", "#a1b2c3", "#a1b2c3d4", "#00000000",
+    "1", "2", "8", "9", "0"
+  )
+  set.seed(1)
+  for (a in list(NA, 0.5, 0, 1, stats::runif(length(cols)), c(NA, 0.3), 1 / 3, NaN, 2, -1)) {
+    a <- rep_len(a, length(cols))
+    want <- grDevices::col2rgb(scales::alpha(cols, a), alpha = TRUE)
+    dimnames(want) <- NULL
+    expect_identical(unpack_rgba(point_colours(cols, a)), want)
+  }
+  # Names and hex decode in Rust; numeric palette indices decline to R.
+  expect_false(is.null(rs_point_colours(c(grDevices::colors(), "#abc", NA), NA)))
+  expect_null(rs_point_colours(c("red", "1"), NA))
+  expect_error(point_colours(c("red", "bogus"), NA), "bogus")
+})

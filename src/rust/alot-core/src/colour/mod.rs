@@ -10,4 +10,6 @@
 
 pub mod hex;
 pub mod lab;
+pub mod names;
+pub mod parse;
 pub mod ramp;

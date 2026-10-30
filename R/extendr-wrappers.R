@@ -173,13 +173,15 @@ rs_grouped_test_position <- function(df, col) .Call(wrap__grouped_test_position,
 #' @noRd
 rs_write_png <- function(raster, path, bg, dpi) .Call(wrap__write_png, raster, path, bg, dpi)
 
-#' Colours of a point layer as `scales::alpha(colour, alpha)` would give
-#' them, packed as nativeRaster ints (`R | G << 8 | B << 16 | A << 24`).
-#' `alpha` is double (length 1 or `n`) or all-NA logical (keep the
-#' colour's alpha); an NA among doubles also keeps it. An NA colour stays
-#' NA in `alpha()` and draws nothing, so it packs as 0 (transparent).
-#' `NULL` (decline) if any other colour is not `#RRGGBB(AA)` hex, or for
-#' other `alpha` types.
+#' Colours of a layer as `scales::alpha(colour, alpha)` would give them,
+#' packed as nativeRaster ints (`R | G << 8 | B << 16 | A << 24`), equal to
+#' `col2rgb(alpha(colour, alpha), alpha = TRUE)`. Colour strings are
+#' decoded as farver does (`alot_core::colour::parse`: hex, R's colour
+#' names, "transparent"). `alpha` is double (length 1 or `n`) or all-NA
+#' logical (keep the colour's alpha); an NA among doubles also keeps it. An
+#' NA colour (or "NA") stays NA in `alpha()`, which `col2rgb()` reads as
+#' transparent white. `NULL` (decline) if a colour is a numeric palette
+#' index or something farver rejects, or for other `alpha` types.
 #' @noRd
 rs_point_colours <- function(colour, alpha) .Call(wrap__point_colours, colour, alpha)
 

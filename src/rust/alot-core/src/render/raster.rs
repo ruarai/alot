@@ -468,7 +468,9 @@ mod tests {
             rows += px.len() / w;
         });
         assert_eq!(rows, h);
-        let held: usize = POOL.lock().unwrap().iter().map(|b| b.capacity() * 16).sum();
+        // Other tests share the pool in parallel with narrower pages; count
+        // only this page's band buffers.
+        let held: usize = POOL.lock().unwrap().iter().filter(|b| b.capacity() >= w * 64).map(|b| b.capacity() * 16).sum();
         assert!(held <= bound, "{held} > {bound}");
     }
 }

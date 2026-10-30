@@ -637,16 +637,17 @@ draw_polygons_layer <- function(data, layout, layer) {
   path_grobs("polygons", shared, data, layout, "geom_polygon")
 }
 
-# Packed RGBA for rs_render_points(), as scales::alpha(colour, alpha). Rust
-# parses hex; other colour specs (names) go through col2rgb() once per
-# distinct value. NA stays NA, which Rust packs as transparent.
+# Packed RGBA for the Rust drawers, as col2rgb(scales::alpha(colour, alpha),
+# alpha = TRUE). Rust decodes colours as farver does (hex, names,
+# "transparent", NA); what it declines (farver's numeric palette indices,
+# or a colour farver rejects, which errors here as in ggplot2) goes
+# through scales::alpha() once per distinct value. alpha(u) keeps each
+# colour's own alpha, so applying `alpha` to its hex gives the same result.
 point_colours <- function(colour, alpha) {
   out <- rs_point_colours(colour, alpha)
   if (is.null(out)) {
     u <- unique(colour[!is.na(colour)])
-    rgba <- grDevices::col2rgb(u, alpha = TRUE)
-    hex <- grDevices::rgb(rgba[1, ], rgba[2, ], rgba[3, ], rgba[4, ], maxColorValue = 255)
-    out <- rs_point_colours(hex[match(colour, u)], alpha)
+    out <- rs_point_colours(scales::alpha(u)[match(colour, u)], alpha)
   }
   out
 }
