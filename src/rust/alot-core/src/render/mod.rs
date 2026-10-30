@@ -9,3 +9,4 @@ pub mod png;
 pub mod points;
 pub mod raster;
 pub mod rects;
+pub mod text;

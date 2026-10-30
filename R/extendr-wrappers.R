@@ -230,4 +230,14 @@ rs_render_rects <- function(xmin, xmax, ymin, ymax, rows, x_range, y_range, rect
 #' @noRd
 rs_render_paths <- function(x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads) .Call(wrap__render_paths, x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads)
 
+#' Metrics in device pixels of each UTF-8 string `text[i]` in font
+#' `font[i]` (1-based into the files `path` with face `index`) at `size[i]`
+#' pixels and line height `line[i]` pixels: a list of `width`, `ascent`,
+#' `descent` and `height` (`GEStrWidth()`, `GEStrMetric()`,
+#' `GEStrHeight()` on a ragg device). Entries are NA where alot doesn't
+#' mirror ragg: an NA string, an unreadable or unsupported font, or a
+#' glyph the font lacks (ragg would use a fallback font).
+#' @noRd
+rs_text_metrics <- function(text, font, path, index, size, line) .Call(wrap__text_metrics, text, font, path, index, size, line)
+
 # nolint end

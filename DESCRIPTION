@@ -21,6 +21,7 @@ Imports:
     ragg (< 1.6.0),
     labeling,
     scales,
+    systemfonts (>= 1.2.0),
     rlang,
     utils,
     vctrs

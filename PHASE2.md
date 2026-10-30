@@ -132,8 +132,11 @@ alot_render_coverage(plot)                       # which tier, and why
    title, caption and tag placement. It outputs boxes in device pixels, with
    a debug export for layout tests.
 4. **Text, in pure Rust.** `ttf-parser` loads the files R resolved, and
-   `rustybuzz` shapes text for widths, ascent and descent. Sizes follow
-   grid's fontsize × lineheight rules. Glyphs are drawn unhinted from
+   `rustybuzz` shapes text for widths (textshaping's unhinted advances).
+   Ascent and descent are ragg's hinted glyph bounds, so `skrifa`'s
+   TrueType interpreter hints the outline as FreeType does before AGG's
+   rasteriser finds its rows. Sizes follow grid's fontsize × lineheight
+   rules. Glyphs are drawn unhinted from
    outlines, with coverage cached per font, size and subpixel offset;
    rotated text uses outlines directly. ragg hints with FreeType, so glyph
    pixels differ slightly; layout must still match. ragg's font fallback is

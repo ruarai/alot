@@ -390,6 +390,56 @@ pub fn clip_contours(contours: &[Vec<[f64; 2]>], x0: f64, y0: f64, x1: f64, y1: 
         .collect()
 }
 
+/// Appends the vertices `conv_curve` emits for a quadratic Bézier from
+/// `p1` (already emitted) through control `p2` to `p3`: `curve3_div` with
+/// approximation scale 1 and no angle tolerance (agg_curves.cpp), so the
+/// interior points of the subdivision followed by `p3`.
+pub fn curve3(p1: [f64; 2], p2: [f64; 2], p3: [f64; 2], out: &mut Vec<[f64; 2]>) {
+    const DISTANCE_TOLERANCE_SQUARE: f64 = 0.5 * 0.5;
+    fn rec(out: &mut Vec<[f64; 2]>, [x1, y1]: [f64; 2], [x2, y2]: [f64; 2], [x3, y3]: [f64; 2], level: u32) {
+        if level > 32 {
+            return;
+        }
+        let (x12, y12) = ((x1 + x2) / 2.0, (y1 + y2) / 2.0);
+        let (x23, y23) = ((x2 + x3) / 2.0, (y2 + y3) / 2.0);
+        let (x123, y123) = ((x12 + x23) / 2.0, (y12 + y23) / 2.0);
+        let (dx, dy) = (x3 - x1, y3 - y1);
+        let mut d = ((x2 - x3) * dy - (y2 - y3) * dx).abs();
+        if d > 1e-30 {
+            if d * d <= DISTANCE_TOLERANCE_SQUARE * (dx * dx + dy * dy) {
+                out.push([x123, y123]);
+                return;
+            }
+        } else {
+            let da = dx * dx + dy * dy;
+            let sq = |ax: f64, ay: f64, bx: f64, by: f64| (bx - ax) * (bx - ax) + (by - ay) * (by - ay);
+            if da == 0.0 {
+                d = sq(x1, y1, x2, y2);
+            } else {
+                d = ((x2 - x1) * dx + (y2 - y1) * dy) / da;
+                if d > 0.0 && d < 1.0 {
+                    return;
+                }
+                d = if d <= 0.0 {
+                    sq(x2, y2, x1, y1)
+                } else if d >= 1.0 {
+                    sq(x2, y2, x3, y3)
+                } else {
+                    sq(x2, y2, x1 + d * dx, y1 + d * dy)
+                };
+            }
+            if d < DISTANCE_TOLERANCE_SQUARE {
+                out.push([x2, y2]);
+                return;
+            }
+        }
+        rec(out, [x1, y1], [x12, y12], [x123, y123], level + 1);
+        rec(out, [x123, y123], [x23, y23], [x3, y3], level + 1);
+    }
+    rec(out, p1, p2, p3, 0);
+    out.push(p3);
+}
+
 /// `agg::ellipse` vertices for a circle with `n` steps, from angle 0
 /// counter-clockwise in device space (y down).
 pub fn ellipse(x: f64, y: f64, r: f64, n: usize) -> Vec<[f64; 2]> {

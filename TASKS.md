@@ -653,7 +653,7 @@ alongside Phase 1's remaining tasks.
 
 ## R2 Text (milestone 2.1)
 
-### R2.1 Font resolution and metrics
+### R2.1 Font resolution and metrics — done
 - **Depends:** R0.2
 - **Touches:** `R/render-text.R`, `alot-core/src/render/text.rs`
 - **Do:** Resolve family and face to font files in R with

@@ -1,6 +1,7 @@
 pub mod convert;
 pub mod grouped;
 pub mod render;
+pub mod text;
 
 use alot_core::colour::ramp::{self, Approx, Ramp};
 use alot_core::breaks::{extended, fmod};
@@ -768,6 +769,7 @@ fn build_profile() -> &'static str {
 extendr_module! {
     mod alot;
     use render;
+    use text;
     fn build_profile;
     fn facet_panels;
     fn facet_distinct_rows;
