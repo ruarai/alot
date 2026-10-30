@@ -30,11 +30,17 @@ render_reference <- function(built, size = render_size) {
   cap(native = TRUE)
 }
 
+# Per-pixel largest channel difference between two nativeRasters.
+render_px_diff <- function(a, b) {
+  apply(abs(raster_channels(a) - raster_channels(b)), 2, max)
+}
+
 # Compares alot's drawing of `p` (a ggplot or a built plot) in `tier` with
 # ggplot2 + ragg at the same size. Passes if no channel differs by more than
 # `max` (of 255) and at most `share` of pixels differ by more than 8. Fails
 # if alot raised a fallback warning or used another tier. On failure writes
-# reference, result and diff PNGs to a temporary directory. `label` names
+# reference, result and diff PNGs to a temporary directory (under
+# ALOT_RENDER_DIFF_DIR if set). `label` names
 # the plot in failure messages.
 expect_render_close <- function(p, ..., max = 32, share = 0.01, tier = "full", label = NULL) {
   size <- utils::modifyList(render_size, list(...))
@@ -63,13 +69,27 @@ expect_render_close <- function(p, ..., max = 32, share = 0.01, tier = "full", l
       paste(rev(dim(out$raster)), collapse = " x "), paste(rev(dim(ref)), collapse = " x ")
     )))
   }
-  d <- abs(raster_channels(out$raster) - raster_channels(ref))
-  px <- apply(d, 2, max)
+  px <- render_px_diff(out$raster, ref)
   ok <- max(px) <= max && mean(px > 8) <= share
+  if (!ok) {
+    # ggplot2 + ragg's own layout occasionally comes out differently on a
+    # fresh device in a session that alternates resolutions (seen as a
+    # whole-plot shift in the reference only; alot's result and an isolated
+    # reference agree). Compare once more against a second reference; alot's
+    # result is not redrawn, so a wrong result still fails.
+    ref2 <- render_reference(p, size)
+    px2 <- render_px_diff(out$raster, ref2)
+    if (sum(px2 > 8) < sum(px > 8)) {
+      ref <- ref2
+      px <- px2
+      ok <- max(px) <= max && mean(px > 8) <= share
+    }
+  }
   msg <- ""
   if (!ok) {
-    dir <- tempfile("alot-render-")
-    dir.create(dir)
+    # ALOT_RENDER_DIFF_DIR keeps the images after the R session ends.
+    dir <- tempfile("alot-render-", tmpdir = Sys.getenv("ALOT_RENDER_DIFF_DIR", tempdir()))
+    dir.create(dir, recursive = TRUE)
     diff <- ref
     diff[] <- bitwOr(as.integer(pmin(px * 4L, 255L)) * 65793L, -16777216L)
     write_png(ref, file.path(dir, "reference.png"))

@@ -41,7 +41,7 @@ panel_children <- function(g) {
 # alot_render_coverage() agrees.
 uses_rust <- function(p) {
   b <- ggplot2::ggplot_build(p)
-  rust <- any(vapply(panel_children(hybrid_gtable(b)), inherits, logical(1), "alot_hybrid_points"))
+  rust <- any(vapply(panel_children(hybrid_gtable(b)), inherits, logical(1), "alot_hybrid_layer"))
   cov <- alot_render_coverage(b)
   expect_equal(cov$tier, if (rust) "hybrid" else "ggplot2")
   expect_equal(cov$layers$engine == "rust", rust)
@@ -350,4 +350,64 @@ test_that("the thread count doesn't change the hybrid's pixels", {
   }
   expect_identical(draw(1), draw(8))
   expect_render_close(b, tier = "hybrid")
+})
+
+# Rect layers (R1.3): GeomRect's draw_panel, inherited by GeomTile, GeomBar
+# and GeomCol.
+
+test_that("tiles, bars and rects render like ragg", {
+  set.seed(2)
+  tiles <- expand.grid(x = 1:25, y = 1:15)
+  tiles$z <- runif(nrow(tiles))
+  tiles$z[3] <- NA
+  plots <- list(
+    ggplot2::ggplot(tiles, ggplot2::aes(x, y, fill = z)) + ggplot2::geom_tile(),
+    ggplot2::ggplot(tiles, ggplot2::aes(x, y, fill = z)) + ggplot2::geom_tile(alpha = 0.5, width = 0.7, height = 0.6),
+    ggplot2::ggplot(tiles, ggplot2::aes(x, y, fill = z)) + ggplot2::geom_tile(colour = "white", linewidth = 0.8),
+    ggplot2::ggplot(mtcars, ggplot2::aes(factor(cyl), fill = factor(gear))) + ggplot2::geom_bar(),
+    ggplot2::ggplot(mtcars, ggplot2::aes(factor(cyl), fill = factor(gear))) +
+      ggplot2::geom_bar(position = "dodge", colour = "black") + ggplot2::facet_wrap(~am),
+    ggplot2::ggplot(mtcars, ggplot2::aes(mpg)) + ggplot2::geom_histogram(bins = 12, colour = "grey30", fill = NA),
+    ggplot2::ggplot(mtcars, ggplot2::aes(factor(cyl), mpg)) + ggplot2::geom_col(linewidth = 2, colour = "blue", linejoin = "round"),
+    ggplot2::ggplot(mtcars, ggplot2::aes(factor(cyl), mpg)) + ggplot2::geom_col(linewidth = 2, colour = "blue", linejoin = "bevel", alpha = 0.4),
+    ggplot2::ggplot(d, ggplot2::aes(x, y)) +
+      ggplot2::annotate("rect", xmin = -Inf, xmax = 0.4, ymin = 0.2, ymax = Inf, fill = "red", alpha = 0.3) +
+      ggplot2::geom_rect(ggplot2::aes(xmin = x, xmax = x + 0.05, ymin = y, ymax = y + 0.03), data = d[1:20, ], linewidth = 0.3, colour = "black")
+  )
+  for (i in seq_along(plots)) {
+    p <- plots[[i]]
+    expect_true(all(alot_render_coverage(p)$layers$engine == "rust"))
+    expect_render_close(p, tier = "hybrid", label = paste("plot", i))
+    expect_render_close(p, width = 300, height = 250, res = 150, tier = "hybrid", label = paste("plot", i, "at 150 dpi"))
+  }
+})
+
+test_that("a 1000 x 1000 geom_tile renders like ragg", {
+  set.seed(42)
+  tiles <- expand.grid(x = 1:1000, y = 1:1000)
+  tiles$z <- runif(nrow(tiles))
+  p <- ggplot2::ggplot(tiles, ggplot2::aes(x, y, fill = z)) + ggplot2::geom_tile() +
+    ggplot2::theme_void() + ggplot2::theme(legend.position = "none")
+  expect_render_close(p, width = 600, height = 400, res = 96, tier = "hybrid")
+})
+
+test_that("unsupported rect layers keep ggplot2's rectGrob, with a reason", {
+  base <- ggplot2::ggplot(mtcars, ggplot2::aes(factor(cyl)))
+  cases <- list(
+    "linetype is not solid or blank" = base + ggplot2::geom_bar(colour = "black", linetype = "dashed"),
+    "coord is not an unreversed coord_cartesian()" = base + ggplot2::geom_bar() + ggplot2::coord_flip(),
+    "clip is not \"on\"" = base + ggplot2::geom_bar() + ggplot2::coord_cartesian(clip = "off"),
+    "no Rust drawer for this geom" = ggplot2::ggplot(ggplot2::faithfuld, ggplot2::aes(waiting, eruptions, fill = density)) + ggplot2::geom_raster()
+  )
+  for (reason in names(cases)) {
+    p <- cases[[reason]]
+    expect_equal(alot_render_coverage(p)$layers$reason, reason)
+    expect_false(any(vapply(panel_children(hybrid_gtable(ggplot2::ggplot_build(p))), inherits, logical(1), "alot_hybrid_layer")))
+  }
+})
+
+test_that("blank line types draw no outline", {
+  p <- ggplot2::ggplot(mtcars, ggplot2::aes(factor(cyl))) + ggplot2::geom_bar(colour = "black", linetype = "blank")
+  expect_equal(alot_render_coverage(p)$layers$engine, "rust")
+  expect_render_close(p, tier = "hybrid")
 })

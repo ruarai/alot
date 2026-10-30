@@ -617,7 +617,7 @@ alongside Phase 1's remaining tasks.
   sizes, strokes, alphas and dpis, and a plot mapping `size` to 1e4
   distinct values is no slower than ragg.
 
-### R1.3 Rect batches
+### R1.3 Rect batches — done
 - **Depends:** R1.1
 - **Touches:** `alot-core/src/render/rects.rs`
 - **Do:** Draw axis-aligned rects: fill-only with ragg's `snap_rect`

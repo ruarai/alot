@@ -1842,3 +1842,76 @@
           df
       }
 
+# upstream rect drawing matches what the hybrid tier mirrors
+
+    Code
+      print(body(environment(ggplot2::GeomRect$draw_panel)$f))
+    Output
+      {
+          data <- fix_linewidth(data, snake_class(self))
+          if (!coord$is_linear()) {
+              aesthetics <- setdiff(names(data), c("x", "y", "xmin", 
+                  "xmax", "ymin", "ymax"))
+              index <- rep(seq_len(nrow(data)), each = 4)
+              new <- data[index, aesthetics, drop = FALSE]
+              new$x <- vec_interleave(data$xmin, data$xmax, data$xmax, 
+                  data$xmin)
+              new$y <- vec_interleave(data$ymax, data$ymax, data$ymin, 
+                  data$ymin)
+              new$group <- index
+              ggname("geom_rect", GeomPolygon$draw_panel(new, panel_params, 
+                  coord, lineend = lineend, linejoin = linejoin))
+          }
+          else {
+              coords <- coord$transform(data, panel_params)
+              ggname("geom_rect", rectGrob(coords$xmin, coords$ymax, 
+                  width = coords$xmax - coords$xmin, height = coords$ymax - 
+                      coords$ymin, default.units = "native", just = c("left", 
+                      "top"), gp = gg_par(col = coords$colour, fill = fill_alpha(coords$fill, 
+                      coords$alpha), lwd = coords$linewidth, lty = coords$linetype, 
+                      linejoin = linejoin, lineend = lineend)))
+          }
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::ScaleContinuous$rescale)$f))
+    Output
+      {
+          self$rescaler(x, from = range)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::ScaleDiscretePosition$rescale)$f))
+    Output
+      {
+          rescale(self$map(x, limits = limits), from = range)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::ScaleDiscretePosition$map)$f))
+    Output
+      {
+          if (inherits(x, "AsIs")) {
+              return(x)
+          }
+          if (is_discrete(x)) {
+              values <- self$palette(length(limits))
+              if (!is.numeric(values)) {
+                  cli::cli_abort("The {.arg palette} function must return a {.cls numeric} vector.", 
+                      call = self$call)
+              }
+              if (length(values) < length(limits)) {
+                  cli::cli_abort("The {.arg palette} function must return at least \\\n            {length(limits)} values.", 
+                      call = self$call)
+              }
+              x <- values[match(as.character(x), limits)]
+          }
+          mapped_discrete(x)
+      }
+

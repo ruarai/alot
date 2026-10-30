@@ -11,7 +11,6 @@
 //! fractional edges and pixels the edge crosses keep the covered share.
 
 use crate::render::display::{DisplayList, Item, Rect};
-use crate::render::points::Buckets;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
@@ -52,10 +51,95 @@ pub fn band_memory(width: usize, opts: &Options) -> usize {
     opts.threads() * opts.band_rows * width * (std::mem::size_of::<[f32; 4]>() + std::mem::size_of::<u32>())
 }
 
-/// Per-item data computed once per page: which points each band draws.
+/// For each band, the indices of an item's marks that reach it, in data
+/// order.
+pub struct Buckets {
+    starts: Vec<usize>,
+    index: Vec<u32>,
+}
+
+impl Buckets {
+    /// Splits marks `0..n` by the `n_bands` bands of `band_rows` rows their
+    /// rows `[top, bottom)` reach (`None`: draws nothing); a mark spanning
+    /// two bands is in both. Chunks of marks are counted and filled in
+    /// parallel, each into its own ranges of the index.
+    pub fn new(n: usize, band_rows: usize, n_bands: usize, rows: impl Fn(usize) -> Option<(i64, i64)> + Sync) -> Self {
+        let band_rows = band_rows as i64;
+        let span = |i: usize| match rows(i) {
+            Some((top, bottom)) if bottom > top => {
+                let lo = top.div_euclid(band_rows).max(0);
+                let hi = (bottom - 1).div_euclid(band_rows).min(n_bands as i64 - 1);
+                (lo, hi)
+            }
+            _ => (0, -1),
+        };
+        let chunk = n.div_ceil(default_threads()).max(1 << 16);
+        let chunks: Vec<(usize, usize)> = (0..n).step_by(chunk.max(1)).map(|a| (a, (a + chunk).min(n))).collect();
+        let span = &span;
+        let counts: Vec<Vec<usize>> = std::thread::scope(|scope| {
+            let handles: Vec<_> = chunks
+                .iter()
+                .map(|&(a, b)| {
+                    scope.spawn(move || {
+                        let mut c = vec![0usize; n_bands];
+                        for i in a..b {
+                            let (lo, hi) = span(i);
+                            for band in lo..=hi {
+                                c[band as usize] += 1;
+                            }
+                        }
+                        c
+                    })
+                })
+                .collect();
+            handles.into_iter().map(|h| h.join().unwrap()).collect()
+        });
+        // Each band's run of the index holds its marks chunk by chunk, so
+        // data order is kept.
+        let mut starts = vec![0usize; n_bands + 1];
+        let mut offsets = vec![vec![0usize; n_bands]; chunks.len()];
+        let mut at = 0;
+        for band in 0..n_bands {
+            starts[band] = at;
+            for (c, counts) in counts.iter().enumerate() {
+                offsets[c][band] = at;
+                at += counts[band];
+            }
+        }
+        starts[n_bands] = at;
+        let mut index = vec![0u32; at];
+        struct Out(*mut u32);
+        unsafe impl Sync for Out {}
+        let out = Out(index.as_mut_ptr());
+        let out = &out;
+        std::thread::scope(|scope| {
+            for (&(a, b), offsets) in chunks.iter().zip(offsets) {
+                scope.spawn(move || {
+                    let mut offsets = offsets;
+                    for i in a..b {
+                        let (lo, hi) = span(i);
+                        for band in lo..=hi {
+                            // SAFETY: (chunk, band) ranges are disjoint and
+                            // within `index`, by construction above.
+                            unsafe { *out.0.add(offsets[band as usize]) = i as u32 };
+                            offsets[band as usize] += 1;
+                        }
+                    }
+                });
+            }
+        });
+        Buckets { starts, index }
+    }
+
+    pub fn band(&self, b: usize) -> &[u32] {
+        &self.index[self.starts[b]..self.starts[b + 1]]
+    }
+}
+
+/// Per-item data computed once per page: which marks each band draws.
 enum Prepared {
     None,
-    Points(Buckets),
+    Marks(Buckets),
 }
 
 struct Page<'a> {
@@ -115,7 +199,8 @@ fn prepare(list: &DisplayList, width: usize, height: usize, band_rows: usize) ->
         .items
         .iter()
         .map(|item| match item {
-            Item::Points(b) => Prepared::Points(b.bucket(band_rows, n_bands)),
+            Item::Points(b) => Prepared::Marks(b.bucket(band_rows, n_bands)),
+            Item::Rects(b) => Prepared::Marks(b.bucket(band_rows, n_bands)),
             _ => Prepared::None,
         })
         .collect();
@@ -235,7 +320,10 @@ fn draw_band(page: &Page, b: usize, buf: &mut [[f32; 4]]) {
                 }
                 shares = ClipShares::new(stack.last().unwrap(), top, width, h);
             }
-            (Item::Points(batch), Prepared::Points(buckets)) => {
+            (Item::Points(batch), Prepared::Marks(buckets)) => {
+                batch.draw(buf, top, width, buckets.band(b), &shares);
+            }
+            (Item::Rects(batch), Prepared::Marks(buckets)) => {
                 batch.draw(buf, top, width, buckets.band(b), &shares);
             }
             _ => {}

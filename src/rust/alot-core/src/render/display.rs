@@ -3,6 +3,7 @@
 //! drawing order. `raster` executes it band by band.
 
 use crate::render::points::PointBatch;
+use crate::render::rects::RectBatch;
 
 /// An axis-aligned box in device pixels; edges may be fractional.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -44,6 +45,7 @@ pub enum Item {
     PushClip(Rect),
     PopClip,
     Points(PointBatch),
+    Rects(RectBatch),
 }
 
 impl Item {
@@ -53,6 +55,7 @@ impl Item {
         match self {
             Item::Clear(_) | Item::PushClip(_) | Item::PopClip => None,
             Item::Points(b) => Some(b.rows()),
+            Item::Rects(b) => Some(b.rows()),
         }
     }
 }

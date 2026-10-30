@@ -1,4 +1,4 @@
-S3method(grid::drawDetails, alot_hybrid_points)
+S3method(grid::drawDetails, alot_hybrid_layer)
 export(alot_build)
 export(alot_coverage)
 export(alot_ggsave)

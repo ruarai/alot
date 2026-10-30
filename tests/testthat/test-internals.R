@@ -163,3 +163,13 @@ test_that("upstream point drawing matches what the hybrid tier mirrors", {
   expect_snapshot(print(body(utils::getFromNamespace("translate_shape_string", "ggplot2"))))
   expect_snapshot(print(body(utils::getFromNamespace("remove_missing", "ggplot2"))))
 })
+
+test_that("upstream rect drawing matches what the hybrid tier mirrors", {
+  # draw_rects_layer() (R/render.R) mirrors GeomRect$draw_panel for linear
+  # coords; linear_range() relies on the position scales' rescale and map.
+  # If these fail, update the mirror, then the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::GeomRect$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::ScaleContinuous$rescale)$f)))
+  expect_snapshot(print(body(environment(ggplot2::ScaleDiscretePosition$rescale)$f)))
+  expect_snapshot(print(body(environment(ggplot2::ScaleDiscretePosition$map)$f)))
+})

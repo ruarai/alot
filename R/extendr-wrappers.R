@@ -199,4 +199,16 @@ rs_point_shapes_supported <- function(shape) .Call(wrap__point_shapes_supported,
 #' @noRd
 rs_render_points <- function(x, y, rows, x_range, y_range, rect, dims, shape, size, stroke, colour, fill, consts, threads) .Call(wrap__render_points, x, y, rows, x_range, y_range, rect, dims, shape, size, stroke, colour, fill, consts, threads)
 
+#' Renders rows `rows` (1-based) of a rect layer, one panel's, to a
+#' nativeRaster of `dims` (width, height) pixels, as `GeomRect$draw_panel`'s
+#' rectGrob draws them on ragg. `rect` is the panel's (left, top, width,
+#' height) in canvas pixels: positions are rescaled from `x_range` /
+#' `y_range` to it, infinite values squished to its edges, and each rect is
+#' clipped to it. `colour` and `fill` come from `rs_point_colours()`; `lwd`
+#' is grid's lwd (linewidth * .pt, 0 for blank line types), converted at
+#' `res` pixels per inch. `join` is 0 (mitre), 1 (round) or 2 (bevel), with
+#' grid's mitre limit of 10. `NULL` (decline) for unsupported inputs.
+#' @noRd
+rs_render_rects <- function(xmin, xmax, ymin, ymax, rows, x_range, y_range, rect, dims, colour, fill, lwd, join, res, threads) .Call(wrap__render_rects, xmin, xmax, ymin, ymax, rows, x_range, y_range, rect, dims, colour, fill, lwd, join, res, threads)
+
 # nolint end

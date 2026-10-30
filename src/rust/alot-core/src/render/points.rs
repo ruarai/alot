@@ -20,7 +20,7 @@
 
 use crate::render::agg::{self, Cap, Join};
 use crate::render::display::{DisplayList, Item, Rect};
-use crate::render::raster::{self, ClipShares};
+use crate::render::raster::{self, Buckets, ClipShares};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -420,18 +420,6 @@ impl Drop for PointBatch {
     }
 }
 
-/// For each band, the indices of the points that reach it, in data order.
-pub struct Buckets {
-    starts: Vec<usize>,
-    index: Vec<u32>,
-}
-
-impl Buckets {
-    pub fn band(&self, b: usize) -> &[u32] {
-        &self.index[self.starts[b]..self.starts[b + 1]]
-    }
-}
-
 impl PointBatch {
     /// Places `points` with up to `threads` workers (0: the default).
     /// Points with unsupported shapes, no visible colour or non-finite
@@ -503,36 +491,14 @@ impl PointBatch {
     /// Splits the points by the `n_bands` bands of `band_rows` rows they
     /// reach (a point spanning two bands is in both), keeping data order.
     pub fn bucket(&self, band_rows: usize, n_bands: usize) -> Buckets {
-        let band_rows = band_rows as i64;
-        let span = |p: &Placed| {
+        Buckets::new(self.placed.len(), band_rows, n_bands, |i| {
+            let p = &self.placed[i];
             if p.set == NONE {
-                return (0, -1);
+                return None;
             }
             let r = self.sets[p.set as usize].reach;
-            let lo = ((p.iy as i64 + r.0 as i64).div_euclid(band_rows)).max(0);
-            let hi = ((p.iy as i64 + r.1 as i64 - 1).div_euclid(band_rows)).min(n_bands as i64 - 1);
-            (lo, hi)
-        };
-        let mut starts = vec![0usize; n_bands + 1];
-        for p in &self.placed {
-            let (lo, hi) = span(p);
-            for b in lo..=hi {
-                starts[b as usize + 1] += 1;
-            }
-        }
-        for b in 0..n_bands {
-            starts[b + 1] += starts[b];
-        }
-        let mut fill = starts.clone();
-        let mut index = vec![0u32; starts[n_bands]];
-        for (i, p) in self.placed.iter().enumerate() {
-            let (lo, hi) = span(p);
-            for b in lo..=hi {
-                index[fill[b as usize]] = i as u32;
-                fill[b as usize] += 1;
-            }
-        }
-        Buckets { starts, index }
+            Some((p.iy as i64 + r.0 as i64, p.iy as i64 + r.1 as i64))
+        })
     }
 
     /// Blends the points `idx` into a band's premultiplied rows (`buf`,

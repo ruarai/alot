@@ -789,3 +789,24 @@ Fidelity: every pch 0–25 passes `expect_render_close()` at the default
 tolerance across four size/stroke/alpha/dpi combinations, and the render
 corpus passes at the default max for all 864 hybrid plots except three
 documented overplotting cases (8-bit per-blend rounding in ragg).
+
+## R1.3: rect batches (2026-10-30)
+
+`GeomRect`'s `draw_panel` (and so `geom_tile`, `geom_bar`, `geom_col`,
+`geom_histogram`, `annotate("rect")`) draws in Rust in the hybrid tier.
+Fill-only rects snap like ragg's `snap_rect`; fills use AGG's coverage
+for axis-aligned rects analytically; outlines use the AGG stroker.
+
+Render suite, release build (ms):
+
+| case | ggplot2 draw | hybrid draw | ggplot2 render | hybrid render |
+|---|---:|---:|---:|---:|
+| tile_1000 (1e6 tiles) | 960 | 62 | 1516 | 330 |
+| readme | 2430 | 154 | 3297 | 399 |
+| point_1e6 | 6462 | 131 | 6908 | 204 |
+| size_1e4 | 240 | 57 | 489 | 112 |
+
+The 1000 × 1000 tile layer draws 15.5× faster than ragg (done-when: 10×)
+and is pixel-identical to ragg at 400 × 300 and 1600 × 1000. Rust alone
+(`cargo run --release -p alot-core --example rects_bench`): about 48 ms on
+8 threads, of which about 37 ms is building the batch.

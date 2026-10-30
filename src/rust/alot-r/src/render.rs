@@ -3,7 +3,9 @@
 use crate::convert::{self, Column, ColumnData};
 use alot_core::colour::hex;
 use alot_core::render::points::{self, Point};
-use alot_core::render::display::Rect;
+use alot_core::render::agg::Join;
+use alot_core::render::display::{DisplayList, Item, Rect};
+use alot_core::render::rects::{RectBatch, RectSpec, RectStyle};
 use alot_core::render::raster;
 use extendr_api::prelude::*;
 use std::collections::HashMap;
@@ -167,6 +169,110 @@ fn render_points(
     out
 }
 
+/// A nativeRaster of `w` x `h` pixels and its pixels as packed `u32`s.
+fn native_raster(w: usize, h: usize) -> (Robj, *mut u32) {
+    let mut out: Robj = Integers::new(w * h).into();
+    let ints = out.as_integer_slice_mut().unwrap();
+    let ptr = ints.as_mut_ptr() as *mut u32;
+    out.set_attrib("dim", Integers::from_values([h as i32, w as i32])).unwrap();
+    out.set_attrib("class", "nativeRaster").unwrap();
+    out.set_attrib("channels", 4).unwrap();
+    (out, ptr)
+}
+
+/// Renders rows `rows` (1-based) of a rect layer, one panel's, to a
+/// nativeRaster of `dims` (width, height) pixels, as `GeomRect$draw_panel`'s
+/// rectGrob draws them on ragg. `rect` is the panel's (left, top, width,
+/// height) in canvas pixels: positions are rescaled from `x_range` /
+/// `y_range` to it, infinite values squished to its edges, and each rect is
+/// clipped to it. `colour` and `fill` come from `rs_point_colours()`; `lwd`
+/// is grid's lwd (linewidth * .pt, 0 for blank line types), converted at
+/// `res` pixels per inch. `join` is 0 (mitre), 1 (round) or 2 (bevel), with
+/// grid's mitre limit of 10. `NULL` (decline) for unsupported inputs.
+/// @noRd
+#[extendr(r_name = "rs_render_rects")]
+#[allow(clippy::too_many_arguments)]
+fn render_rects(
+    xmin: &[f64],
+    xmax: &[f64],
+    ymin: &[f64],
+    ymax: &[f64],
+    rows: &[i32],
+    x_range: &[f64],
+    y_range: &[f64],
+    rect: &[f64],
+    dims: &[i32],
+    colour: &[i32],
+    fill: &[i32],
+    lwd: &[f64],
+    join: i32,
+    res: f64,
+    threads: i32,
+) -> Robj {
+    let n = xmin.len();
+    let [left, top, pw, ph] = rect else { return Robj::from(()) };
+    let &[w, h] = dims else { return Robj::from(()) };
+    let lens_ok = [xmax.len(), ymin.len(), ymax.len(), colour.len(), fill.len(), lwd.len()].iter().all(|&l| l == n);
+    let rows_ok = rows.iter().all(|&r| r >= 1 && r as usize <= n);
+    let join = match join {
+        0 => Join::Miter,
+        1 => Join::Round,
+        2 => Join::Bevel,
+        _ => return Robj::from(()),
+    };
+    if !lens_ok || !rows_ok || x_range.len() != 2 || y_range.len() != 2 {
+        return Robj::from(());
+    }
+    let npc = |v: f64, r: &[f64]| {
+        if v == f64::INFINITY {
+            1.0
+        } else if v == f64::NEG_INFINITY {
+            0.0
+        } else {
+            (v - r[0]) / (r[1] - r[0])
+        }
+    };
+    let bytes = |c: i32| {
+        let c = c as u32;
+        [c as u8, (c >> 8) as u8, (c >> 16) as u8, (c >> 24) as u8]
+    };
+    let spec = |r: i32| {
+        let i = r as usize - 1;
+        RectSpec {
+            x0: left + npc(xmin[i], x_range) * pw,
+            y0: top + (1.0 - npc(ymin[i], y_range)) * ph,
+            x1: left + npc(xmax[i], x_range) * pw,
+            y1: top + (1.0 - npc(ymax[i], y_range)) * ph,
+            fill: bytes(fill[i]),
+            col: bytes(colour[i]),
+            lwd: lwd[i] * res / 96.0,
+        }
+    };
+    // Built in parallel chunks: a 1000 x 1000 tile layer has 1e6 rects.
+    let chunk = rows.len().div_ceil(raster::default_threads()).max(1 << 15);
+    let spec = &spec;
+    let blank = RectSpec { x0: f64::NAN, y0: 0.0, x1: 0.0, y1: 0.0, fill: [0; 4], col: [0; 4], lwd: 0.0 };
+    let mut specs = vec![blank; rows.len()];
+    std::thread::scope(|scope| {
+        for (src, dst) in rows.chunks(chunk.max(1)).zip(specs.chunks_mut(chunk.max(1))) {
+            scope.spawn(move || {
+                for (&r, d) in src.iter().zip(dst.iter_mut()) {
+                    *d = spec(r);
+                }
+            });
+        }
+    });
+    let (w, h) = (w as usize, h as usize);
+    let (out, ptr) = native_raster(w, h);
+    let pixels = unsafe { std::slice::from_raw_parts_mut(ptr, w * h) };
+    let mut list = DisplayList::new();
+    list.push(Item::PushClip(Rect { x0: *left, y0: *top, x1: left + pw, y1: top + ph }));
+    list.push(Item::Rects(RectBatch::new(specs, RectStyle { join, mitre: 10.0, snap: true })));
+    let opts = raster::Options { threads: threads.max(0) as usize, ..Default::default() };
+    raster::render_into(&list, w, h, &opts, pixels);
+    out
+}
+
 /// Writes a nativeRaster (`dim` = height, width) to `path` as PNG: RGBA if
 /// `alpha`, else RGB; with a `pHYs` chunk if `dpi` is positive.
 /// @noRd
@@ -187,4 +293,5 @@ extendr_module! {
     fn point_colours;
     fn point_shapes_supported;
     fn render_points;
+    fn render_rects;
 }

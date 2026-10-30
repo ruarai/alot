@@ -6,11 +6,12 @@
 #   to a pixel-aligned raster in Rust. The PNG is encoded in Rust.
 # - ggplot2: ggplot_gtable() drawn on ragg::agg_png(), unchanged.
 #
-# hybrid_gtable() swaps each supported layer's draw_geom for one that
-# returns a lazy "alot_hybrid_points" grob per panel instead of a
-# pointsGrob. The grob holds the layer's columns; at draw time, on a raster
-# (ragg) device, it renders the panel's points at device resolution. On any
-# other device it draws ggplot2's own pointsGrob.
+# hybrid_gtable() swaps each supported layer's draw_geom (GeomPoint, and
+# GeomRect and the geoms inheriting its draw_panel) for one that returns a
+# lazy "alot_hybrid_layer" grob per panel. The grob holds the layer's
+# columns; at draw time, on a raster (ragg) device, it renders the panel's
+# marks at device resolution. On any other device it draws ggplot2's own
+# grob.
 
 #' Render a plot to PNG with alot (experimental)
 #'
@@ -165,27 +166,50 @@ hybrid_gtable <- function(data) {
 }
 
 hybrid_layer <- function(layer) {
-  if (!identical(layer$geom, ggplot2::GeomPoint)) {
+  draw <- switch(hybrid_kind(layer) %||% "",
+    points = draw_points_layer,
+    rects = draw_rects_layer,
+    NULL
+  )
+  if (is.null(draw)) {
     return(layer)
   }
   ggplot2::ggproto(NULL, layer,
-    draw_geom = function(self, data, layout) draw_points_layer(data, layout, layer)
+    draw_geom = function(self, data, layout) draw(data, layout, layer)
   )
+}
+
+# Which Rust drawer a layer's geom has: GeomPoint's draw_panel, or
+# GeomRect's (inherited by GeomTile, GeomBar and GeomCol).
+hybrid_kind <- function(layer) {
+  geom <- layer$geom
+  if (identical(geom, ggplot2::GeomPoint)) {
+    return("points")
+  }
+  rect_geoms <- c("GeomRect", "GeomTile", "GeomBar", "GeomCol")
+  same_draw <- identical(environment(geom$draw_panel)$f, environment(ggplot2::GeomRect$draw_panel)$f)
+  if (class(geom)[1] %in% rect_geoms && same_draw) {
+    return("rects")
+  }
+  NULL
 }
 
 # A layer's data as its geom draws it: Layer$draw_geom() removes missing
 # values first (ggplot2 R/layer.R), and GeomPoint$draw_panel() translates
 # shape names (R/geom-point.R).
 hybrid_data <- function(layer, data) {
-  if (!identical(layer$geom, ggplot2::GeomPoint) || gg_empty(data)) {
+  kind <- hybrid_kind(layer)
+  if (is.null(kind) || gg_empty(data)) {
     return(data)
   }
   data <- point_handle_na(layer, data)
-  data$shape <- gg_translate_shape_string(data$shape)
+  if (kind == "points") {
+    data$shape <- gg_translate_shape_string(data$shape)
+  }
   data
 }
 
-# GeomPoint$handle_na(), skipped when nothing is missing: remove_missing()
+# Geom$handle_na(), skipped when nothing is missing: remove_missing()
 # (ggplot2 R/utilities.R) then returns the data unchanged, and scanning 1e6
 # rows for it costs more than drawing them.
 point_handle_na <- function(layer, data) {
@@ -199,11 +223,11 @@ point_handle_na <- function(layer, data) {
 # given the layer's data from hybrid_data(). draw_points_layer() makes the
 # same check, so coverage and drawing agree.
 hybrid_decline <- function(layer, data, layout) {
-  if (!identical(layer$geom, ggplot2::GeomPoint)) {
+  kind <- hybrid_kind(layer)
+  if (is.null(kind)) {
     return("no Rust drawer for this geom")
   }
   coord <- layout$coord
-  cols <- c("x", "y", "shape", "colour", "fill", "size", "stroke", "alpha")
   if (!identical(class(coord), class(ggplot2::coord_cartesian())) ||
     !identical(coord$reverse %||% "none", "none")) {
     return("coord is not an unreversed coord_cartesian()")
@@ -214,13 +238,33 @@ hybrid_decline <- function(layer, data, layout) {
   if (nrow(data) == 0) {
     return("no rows")
   }
+  reason <- switch(kind,
+    points = points_decline(data),
+    rects = rects_decline(data, layer$computed_geom_params)
+  )
+  if (!is.null(reason)) {
+    return(reason)
+  }
+  linear <- vapply(layout$panel_params, function(pp) {
+    !is.null(linear_range(pp$x)) && !is.null(linear_range(pp$y))
+  }, logical(1))
+  if (!all(linear)) {
+    return("position scale does not rescale linearly")
+  }
+  NULL
+}
+
+is_colour_vector <- function(x) is.character(x) || (is.logical(x) && all(is.na(x)))
+
+points_decline <- function(data) {
+  cols <- c("x", "y", "shape", "colour", "fill", "size", "stroke", "alpha")
   if (!all(cols %in% names(data))) {
     return("missing point aesthetics")
   }
   if (!is.double(data$x) || !is.double(data$y) || !is.character(data$colour)) {
     return("x, y or colour has an unsupported type")
   }
-  if (!is.character(data$fill) && !(is.logical(data$fill) && all(is.na(data$fill)))) {
+  if (!is_colour_vector(data$fill)) {
     return("fill is not a colour vector")
   }
   # Coord$transform() leaves AsIs positions untransformed (transform_position
@@ -237,11 +281,39 @@ hybrid_decline <- function(layer, data, layout) {
   if (!rs_point_shapes_supported(data$shape)) {
     return("unsupported shape")
   }
-  linear <- vapply(layout$panel_params, function(pp) {
-    !is.null(linear_range(pp$x)) && !is.null(linear_range(pp$y))
-  }, logical(1))
-  if (!all(linear)) {
-    return("position scale does not rescale linearly")
+  NULL
+}
+
+# Line types the rect drawer handles: solid, and blank (no stroke).
+rect_linetype <- function(lty) {
+  solid <- (is.numeric(lty) & lty %in% 1) | (is.character(lty) & lty %in% c("solid", "1"))
+  blank <- is.na(lty) | (is.numeric(lty) & lty %in% 0) | (is.character(lty) & lty %in% c("blank", "0"))
+  if (all(solid | blank)) !blank
+}
+
+rects_decline <- function(data, params) {
+  cols <- c("xmin", "xmax", "ymin", "ymax", "colour", "fill", "linewidth", "linetype", "alpha")
+  if (!all(cols %in% names(data))) {
+    return("missing rect aesthetics")
+  }
+  pos <- data[c("xmin", "xmax", "ymin", "ymax")]
+  if (!all(vapply(pos, is.double, logical(1)))) {
+    return("xmin, xmax, ymin or ymax is not double")
+  }
+  if (any(vapply(pos, inherits, logical(1), "AsIs"))) {
+    return("x or y is AsIs")
+  }
+  if (!is_colour_vector(data$colour) || !is_colour_vector(data$fill)) {
+    return("colour or fill is not a colour vector")
+  }
+  if (!is.numeric(data$linewidth) || anyNA(data$linewidth)) {
+    return("linewidth is NA or not numeric")
+  }
+  if (is.null(rect_linetype(data$linetype))) {
+    return("linetype is not solid or blank")
+  }
+  if (!(params$linejoin %||% "mitre") %in% c("mitre", "round", "bevel")) {
+    return("unsupported linejoin")
   }
   NULL
 }
@@ -275,10 +347,55 @@ draw_points_layer <- function(data, layout, layer) {
     if (counts[i] == 0) {
       return(ggplot2::zeroGrob())
     }
-    grid::grob(
-      shared = shared, panel = i, panel_params = layout$panel_params[[i]],
-      name = grid::grobName(prefix = "geom_point"), cl = "alot_hybrid_points"
-    )
+    hybrid_grob("points", shared, i, layout$panel_params[[i]], "geom_point")
+  })
+}
+
+# A lazy grob drawing one panel of a layer in Rust at draw time (see
+# drawDetails.alot_hybrid_layer).
+hybrid_grob <- function(kind, shared, panel, panel_params, prefix) {
+  grid::grob(
+    kind = kind, shared = shared, panel = panel, panel_params = panel_params,
+    name = grid::grobName(prefix = prefix), cl = "alot_hybrid_layer"
+  )
+}
+
+# Mirrors Layer$draw_geom, Geom$draw_layer and GeomRect$draw_panel (ggplot2
+# R/layer.R, R/geom-.R, R/geom-rect.R) for coord_cartesian: one lazy grob
+# per panel drawing the layer's rectGrob in Rust.
+draw_rects_layer <- function(data, layout, layer) {
+  if (gg_empty(data)) {
+    return(layer$draw_geom(data, layout))
+  }
+  data <- point_handle_na(layer, data)
+  params <- layer$computed_geom_params
+  ok <- is.null(hybrid_decline(layer, data, layout))
+  # rectGrob(col = colour, fill = fill_alpha(fill, alpha)): the outline
+  # keeps its colour's own alpha.
+  colour <- if (ok) point_colours(as.character(data$colour), NA)
+  fill <- if (!is.null(colour)) point_colours(as.character(data$fill), data$alpha)
+  if (is.null(fill)) {
+    return(layer$geom$draw_layer(data, params, layout, layout$coord))
+  }
+
+  n_panels <- nlevels(as.factor(data$PANEL))
+  panel <- as.integer(data$PANEL)
+  counts <- tabulate(panel, n_panels)
+  # gg_par(lwd = linewidth) is linewidth * .pt; blank line types draw no
+  # stroke.
+  lwd <- data$linewidth * ggplot2::.pt * rect_linetype(data$linetype)
+  shared <- list(
+    xmin = data$xmin, xmax = data$xmax, ymin = data$ymin, ymax = data$ymax,
+    panel = panel, rows = split(seq_len(nrow(data)), factor(panel, levels = seq_len(n_panels))),
+    colour = colour, fill = fill, lwd = as.double(lwd),
+    join = match(params$linejoin %||% "mitre", c("mitre", "round", "bevel")) - 1L,
+    data = data, coord = layout$coord, geom = layer$geom, params = params
+  )
+  lapply(seq_len(n_panels), function(i) {
+    if (counts[i] == 0) {
+      return(ggplot2::zeroGrob())
+    }
+    hybrid_grob("rects", shared, i, layout$panel_params[[i]], "geom_rect")
   })
 }
 
@@ -320,25 +437,34 @@ raster_device_res <- function() {
   grDevices::dev.size("px")[1] / grDevices::dev.size("in")[1]
 }
 
-# Range a view scale rescales from, if it rescales linearly with
-# scales::rescale (ScaleContinuous$rescale, ggplot2 R/scale-.R).
+# Range a view scale rescales from, if it rescales positions linearly with
+# scales::rescale: ScaleContinuous$rescale with the default rescaler, or
+# ScaleDiscretePosition$rescale, whose map() passes mapped (numeric)
+# positions through (ggplot2 R/scale-.R, R/scale-discrete-.R).
 linear_range <- function(view) {
   range <- view$continuous_range
-  ok <- inherits(view$scale, c("ScaleContinuousPosition", "ScaleDiscretePosition")) &&
-    # `$` wraps ggproto fields that are functions; compare the inner one.
-    identical(environment(view$scale$rescaler)$f, scales::rescale) &&
+  scale <- view$scale
+  # `$` wraps ggproto fields that are functions; compare the inner one.
+  inner <- function(f) environment(f)$f
+  continuous <- inherits(scale, "ScaleContinuousPosition") &&
+    identical(inner(scale$rescale), inner(ggplot2::ScaleContinuous$rescale)) &&
+    identical(inner(scale$rescaler), scales::rescale)
+  discrete <- inherits(scale, "ScaleDiscretePosition") &&
+    identical(inner(scale$rescale), inner(ggplot2::ScaleDiscretePosition$rescale)) &&
+    identical(inner(scale$map), inner(ggplot2::ScaleDiscretePosition$map))
+  ok <- (continuous || discrete) &&
     is.numeric(range) && length(range) == 2 && all(is.finite(range)) && range[1] != range[2]
   if (ok) range
 }
 
 #' @exportS3Method grid::drawDetails
-drawDetails.alot_hybrid_points <- function(x, recording) {
+drawDetails.alot_hybrid_layer <- function(x, recording) {
   res <- raster_device_res()
   tr <- grid::current.transform()
   x_range <- linear_range(x$panel_params$x)
   y_range <- linear_range(x$panel_params$y)
   if (is.null(res) || tr[1, 2] != 0 || tr[2, 1] != 0 || is.null(x_range) || is.null(y_range)) {
-    return(grid::grid.draw(points_fallback_grob(x)))
+    return(grid::grid.draw(hybrid_fallback_grob(x)))
   }
 
   # Panel corners in device pixels, from the top-left.
@@ -354,20 +480,28 @@ drawDetails.alot_hybrid_points <- function(x, recording) {
   y0 <- floor(top)
   w <- ceiling(right) - x0
   h <- ceiling(bottom) - y0
+  rect <- c(left - x0, top - y0, right - left, bottom - top)
+  dims <- as.integer(c(w, h))
 
   s <- x$shared
-  img <- rs_render_points(
-    s$x, s$y, s$rows[[x$panel]], x_range, y_range,
-    c(left - x0, top - y0, right - left, bottom - top), as.integer(c(w, h)),
-    s$shape, s$size, s$stroke, s$colour, s$fill,
-    c(ggplot2::.pt, ggplot2::.stroke, res),
-    render_threads()
+  rows <- s$rows[[x$panel]]
+  img <- switch(x$kind,
+    points = rs_render_points(
+      s$x, s$y, rows, x_range, y_range, rect, dims,
+      s$shape, s$size, s$stroke, s$colour, s$fill,
+      c(ggplot2::.pt, ggplot2::.stroke, res),
+      render_threads()
+    ),
+    rects = rs_render_rects(
+      s$xmin, s$xmax, s$ymin, s$ymax, rows, x_range, y_range, rect, dims,
+      s$colour, s$fill, s$lwd, s$join, res, render_threads()
+    )
   )
   if (is.null(img)) {
-    return(grid::grid.draw(points_fallback_grob(x)))
+    return(grid::grid.draw(hybrid_fallback_grob(x)))
   }
-  # Rust clipped each point to the panel, as ragg clips each mark; clipping
-  # the raster again would cut the edge pixels twice.
+  # Rust clipped each mark to the panel, as ragg does; clipping the raster
+  # again would cut the edge pixels twice.
   grid::pushViewport(grid::viewport(clip = "off"))
   on.exit(grid::popViewport())
   grid::grid.raster(
@@ -381,8 +515,16 @@ drawDetails.alot_hybrid_points <- function(x, recording) {
   )
 }
 
-points_fallback_grob <- function(x) {
+# ggplot2's own grob for the panel, for devices and viewports the Rust
+# drawers don't handle.
+hybrid_fallback_grob <- function(x) {
   s <- x$shared
   data <- vctrs::vec_slice(s$data, s$panel == x$panel)
-  ggplot2::GeomPoint$draw_panel(data, x$panel_params, s$coord)
+  switch(x$kind,
+    points = ggplot2::GeomPoint$draw_panel(data, x$panel_params, s$coord),
+    rects = s$geom$draw_panel(
+      data, x$panel_params, s$coord,
+      lineend = s$params$lineend %||% "butt", linejoin = s$params$linejoin %||% "mitre"
+    )
+  )
 }
