@@ -17,6 +17,17 @@ rs_build_profile <- function() .Call(wrap__build_profile)
 #' @noRd
 rs_train_continuous_grouped <- function(x, scale_id, existing) .Call(wrap__train_continuous_grouped, x, scale_id, existing)
 
+#' Rows that train a discrete position scale exactly as its whole slice
+#' does (see `alot_core::scale::discrete`): for factor, character and
+#' logical `x`, the first row of each distinct value per scale; for double
+#' or integer `x` (trained into `range_c`), the rows of the smallest and
+#' largest finite value. `scale_id` holds 1-based scale indices. Returns
+#' `list(rows, offsets)`: 1-based rows, scale `i`'s are
+#' `rows[(offsets[i] + 1):offsets[i + 1]]`. `NULL` (decline) for any other
+#' input, or a factor with codes outside its levels.
+#' @noRd
+rs_train_discrete_rows <- function(x, scale_id, n_scales) .Call(wrap__train_discrete_rows, x, scale_id, n_scales)
+
 #' Round-trips the columns of `df` through the interchange layer, for
 #' tests and benchmarks. With `copy = FALSE` every column passes through;
 #' with `copy = TRUE` each atomic column is rebuilt from its view and given

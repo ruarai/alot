@@ -14,6 +14,8 @@ extern "C" {
     fn Rf_copyMostAttrib(from: SEXP, to: SEXP);
     // R API (Rinternals.h): copies all attributes.
     fn SHALLOW_DUPLICATE_ATTRIB(to: SEXP, from: SEXP);
+    // R API (Rinternals.h).
+    fn STRING_PTR_RO(x: SEXP) -> *const SEXP;
 }
 
 /// Integer view; `NA_integer_` reads as `None`.
@@ -96,6 +98,16 @@ fn nonempty<'a, T>(robj: &Robj, slice: Option<&'a [T]>) -> Option<&'a [T]> {
 /// `Strings::iter()`, which takes a slice and so fails on empty vectors.
 pub fn str_iter(s: &Strings) -> impl ExactSizeIterator<Item = Rstr> + '_ {
     (0..s.len()).map(|i| s.elt(i))
+}
+
+/// The CHARSXP pointers of a character vector. R caches CHARSXPs, so equal
+/// pointers are equal strings (the converse fails only across encodings).
+/// The slice borrows R's memory for as long as `s` holds the vector.
+pub fn str_ptrs(s: &Strings) -> &[SEXP] {
+    if s.len() == 0 {
+        return &[];
+    }
+    unsafe { std::slice::from_raw_parts(STRING_PTR_RO(s.get()), s.len()) }
 }
 
 impl<'a> Column<'a> {

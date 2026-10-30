@@ -2,8 +2,8 @@ pub mod convert;
 pub mod grouped;
 
 use alot_core::group::{Columns, Values};
-use alot_core::scale::range;
-use convert::{ColumnData, ColumnsBuilder, Frame};
+use alot_core::scale::{discrete, range};
+use convert::{Column, ColumnData, ColumnsBuilder, Frame};
 use extendr_api::prelude::*;
 
 /// Train continuous ranges for `n` scales. `x` is a double or integer
@@ -39,6 +39,59 @@ fn train_continuous_grouped(x: Robj, scale_id: &[i32], existing: &[f64]) -> exte
             None => [Rfloat::na(), Rfloat::na()],
         })
         .collect())
+}
+
+/// Rows that train a discrete position scale exactly as its whole slice
+/// does (see `alot_core::scale::discrete`): for factor, character and
+/// logical `x`, the first row of each distinct value per scale; for double
+/// or integer `x` (trained into `range_c`), the rows of the smallest and
+/// largest finite value. `scale_id` holds 1-based scale indices. Returns
+/// `list(rows, offsets)`: 1-based rows, scale `i`'s are
+/// `rows[(offsets[i] + 1):offsets[i + 1]]`. `NULL` (decline) for any other
+/// input, or a factor with codes outside its levels.
+/// @noRd
+#[extendr(r_name = "rs_train_discrete_rows")]
+fn train_discrete_rows(x: Robj, scale_id: &[i32], n_scales: i32) -> extendr_api::Result<Robj> {
+    let n = n_scales as usize;
+    let ids: Vec<usize> = scale_id.iter().map(|&i| (i - 1) as usize).collect();
+    if ids.iter().any(|&i| i >= n) {
+        return Err(Error::Other("scale_id out of range".into()));
+    }
+
+    let rows = match Column::new(&x).data {
+        ColumnData::Factor(f) => {
+            let k = f.levels.len();
+            if f.codes.iter().any(|c| c.is_some_and(|c| c < 1 || c as usize > k)) {
+                return Ok(().into());
+            }
+            let keys = f.codes.iter().map(|c| c.map_or(k, |c| c as usize - 1));
+            discrete::first_occurrences_dense(keys, k + 1, &ids, n)
+        }
+        ColumnData::Logical(v) => {
+            let keys = v.iter().map(|b| b.map_or(2, usize::from));
+            discrete::first_occurrences_dense(keys, 3, &ids, n)
+        }
+        ColumnData::Character(s) => {
+            let keys = convert::str_ptrs(&s).iter().map(|&p| p as usize);
+            discrete::first_occurrences(keys, &ids, n)
+        }
+        ColumnData::Double(v) => discrete::extremes(v.iter().map(|&v| Some(v)), &ids, n),
+        ColumnData::Integer(v) => discrete::extremes(v.iter().map(|v| v.map(f64::from)), &ids, n),
+        ColumnData::Other => return Ok(().into()),
+    };
+
+    let mut offsets = Vec::with_capacity(n + 1);
+    offsets.push(Some(0));
+    let mut total = 0;
+    for r in &rows {
+        total += r.len() as i32;
+        offsets.push(Some(total));
+    }
+    let flat = rows.iter().flatten().map(|&i| Some(i as i32 + 1));
+    let mut out = ColumnsBuilder::new();
+    out.push("rows", convert::integers(flat.collect::<Vec<_>>().into_iter()));
+    out.push("offsets", convert::integers(offsets.into_iter()));
+    Ok(out.finish()?.into())
 }
 
 /// Round-trips the columns of `df` through the interchange layer, for
@@ -162,6 +215,7 @@ extendr_module! {
     mod alot;
     fn build_profile;
     fn train_continuous_grouped;
+    fn train_discrete_rows;
     fn convert_roundtrip;
     fn convert_inspect;
     fn group_index;

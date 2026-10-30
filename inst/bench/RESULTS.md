@@ -250,3 +250,35 @@ is not settled by these numbers.
 | other | 80.2 | 2% | 74.8 | 1.07x |
 | **total** | 3,729.1 | 100% | 3,603.3 | 1.03x |
 
+
+## Kernel 2× checks
+
+### T1.1 Discrete position training (2026-10-30) — kept
+
+`inst/bench/scale-train.R`: the `scale_train` dispatch for one discrete
+column, sequential with interleaved reps (same machine as the baseline).
+
+| input | panels | ggplot2_ms | alot_ms | speedup |
+| --- | --- | ---: | ---: | --- |
+| factor_10 | 1 | 33.0 | 4.0 | 8.2x |
+| factor_10 | 25 | 57.0 | 7.0 | 8.1x |
+| character_10 | 1 | 12.0 | 6.0 | 2.0x |
+| character_10 | 25 | 42.0 | 8.0 | 5.2x |
+| character_1e4 | 1 | 36.0 | 25.0 | 1.4x |
+| character_1e4 | 25 | 538.0 | 479.0 | 1.1x |
+| logical | 1 | 8.0 | 3.0 | 2.7x |
+| logical | 25 | 29.0 | 4.0 | 7.2x |
+| mapped_discrete | 1 | 32.0 | 3.0 | 10.7x |
+| mapped_discrete | 25 | 47.0 | 6.0 | 7.8x |
+
+The kernel is kept: factors, logicals, low-cardinality strings and
+`mapped_discrete` (the second training pass after a stat) all clear 2×.
+High-cardinality strings do not, and cannot. Rust's share is 6 ms (1
+panel) to 18 ms (25 panels). The rest is the locale-aware `sort()` of the
+1e4 unique values per scale, which ggplot2 also does and which must stay
+in R.
+
+Step profile (`step-profile.R`, `ALOT_BENCH_CORES=1`, not interleaved):
+`train_position_1` is 67.7 → 20.3 ms (3.3×) for `boxplot`, and 38.9 → 21.0 ms
+(1.85×) for `bar_dodge`. In `bar_dodge` about 11 ms of that step is
+`match(PANEL, …)` in the `Facet$train_scales` mirror, outside the kernel.

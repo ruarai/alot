@@ -125,7 +125,7 @@ not repeated below:
 
 ## 1.1 Position scales
 
-### T1.1 Discrete position training
+### T1.1 Discrete position training — done
 - **Depends:** T0.3
 - **Touches:** `R/kernels-scale.R`, `alot-core/src/scale/discrete.rs` (new),
   `alot-r/src/lib.rs`, `tests/testthat/test-scale-train.R`

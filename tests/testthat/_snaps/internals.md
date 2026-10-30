@@ -182,3 +182,111 @@
           vec_rbind0(!!!result)
       }
 
+# upstream discrete position training matches what alot relies on
+
+    Code
+      print(body(environment(ggplot2::ScaleDiscretePosition$train)$f))
+    Output
+      {
+          if (is_discrete(x)) {
+              self$range$train(x, drop = self$drop, na.rm = !self$na.translate)
+          }
+          else {
+              self$range_c$train(x)
+          }
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("discrete_range", "scales")))
+    Output
+      {
+          new_is_factor <- is.factor(new)
+          old_is_factor <- is.factor(old) || isTRUE(fct)
+          new <- clevels(new, drop = drop, na.rm = na.rm)
+          if (is.null(old)) {
+              return(new)
+          }
+          if (old_is_factor && !is.factor(old)) {
+              old <- factor(old, old)
+          }
+          if (!is.character(old)) {
+              old <- clevels(old, na.rm = na.rm)
+          }
+          else {
+              old <- sort(old, na.last = if (na.rm) 
+                  NA
+              else TRUE)
+          }
+          if (new_is_factor && !old_is_factor) {
+              tmp <- old
+              old <- new
+              new <- tmp
+              tmp <- old_is_factor
+              old_is_factor <- new_is_factor
+              new_is_factor <- tmp
+          }
+          new_levels <- setdiff(new, old)
+          if (length(new_levels) == 0) {
+              return(old)
+          }
+          range <- c(old, new_levels)
+          if (old_is_factor) {
+              return(range)
+          }
+          sort(range, na.last = if (na.rm) 
+              NA
+          else TRUE)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("clevels", "scales")))
+    Output
+      {
+          if (is.null(x)) {
+              character()
+          }
+          else if (!is.null(levels(x))) {
+              if (drop && !is.character(x)) 
+                  x <- droplevels(x)
+              values <- levels(x)
+              if (na.rm) {
+                  values <- values[!is.na(values)]
+              }
+              else if (any(is.na(x))) {
+                  values <- c(values, NA)
+              }
+              values
+          }
+          else {
+              sort(unique(x), na.last = if (na.rm) 
+                  NA
+              else TRUE)
+          }
+      }
+
+---
+
+    Code
+      print(body(scales::train_continuous))
+    Output
+      {
+          if (is.null(new)) {
+              return(existing)
+          }
+          new <- try_fetch(suppressWarnings(range(new, na.rm = TRUE, 
+              finite = TRUE)), error = function(cnd) new)
+          if (is.factor(new) || !typeof(new) %in% c("integer", "double")) {
+              example <- unique(new)
+              example <- example[seq_len(pmin(length(example), 5))]
+              cli::cli_abort(c("Discrete value supplied to a continuous scale.", 
+                  i = "Example values: {.and {.val {example}}}."), 
+                  call = call)
+          }
+          suppressWarnings(range(existing, as.numeric(new), na.rm = TRUE, 
+              finite = TRUE))
+      }
+
