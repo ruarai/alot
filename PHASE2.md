@@ -176,17 +176,20 @@ internals, so a new ragg version means re-verifying.
 
 ## Performance targets
 
-On the README plot at 1600 × 1000 and 150 dpi, release build, rendering
-only (IR, layout, raster, PNG; not the build):
+On the README plot, release build, rendering only (IR, layout, raster,
+PNG; not the build). Baselines are R0.3's (`inst/bench/render-suite.R`,
+gtable built on the open device):
 
-| Case | ggplot2 + ragg | Hybrid (prototype) | Full tier target |
+| Case | ggplot2 + ragg | Hybrid | Full tier target |
 |---|---:|---:|---:|
-| README plot | ~2950 ms | ~400 ms | < 120 ms |
-| Same plot, 10 rows | ~210 ms | ~210 ms | < 25 ms |
+| README plot, 1600 × 1000 at 150 dpi | ~3300 ms | ~400 ms | < 120 ms |
+| Same plot, 10 rows | ~255 ms | ~210 ms | < 25 ms |
+| README plot, default page (7 × 7 in at 300 dpi) | ~5000 ms | ~460 ms | < 200 ms |
 
-The default page (7 × 7 in at 300 dpi, 2100 × 2100 px) is also tracked. R0.3
-sets its target from the baselines, since symbols at 300 dpi cover about 4×
-the pixels.
+The default page target allows for its 2.8× pixels (2100 × 2100 px) and
+about 4× symbol pixels at 300 dpi: in the hybrid, its draw and encode
+steps took 240 ms against 185 ms at 150 dpi, while the gtable step,
+which the full tier replaces, was the same.
 
 No drawer may be slower than ragg drawing the same marks.
 

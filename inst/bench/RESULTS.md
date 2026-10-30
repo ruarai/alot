@@ -609,3 +609,123 @@ benchmark, release build, 7 interleaved runs: draw 170 → 197 ms, total
 0.002% differ by more than 8. A new sprite set (size 7.3 at 300 dpi) costs
 about 0.37 s to build, 4× the 1/8-px cost; R1.2's lazy per-offset sprites
 should remove most of that.
+
+## Render suite baselines (R0.3, 2026-10-30)
+
+`inst/bench/render-suite.R` replaces the prototype's `render-readme.R`. It
+times each stage from a ggplot to a PNG file for ggplot2 + ragg and for the
+hybrid tier (build, gtable, draw, encode; "render" is gtable + draw +
+encode). Each path uses its own build (`ggplot_build()` / `alot_build()`).
+The device is opened before the gtable is built, as `print.ggplot()` does;
+this makes ggplot2's README gtable step slower than the prototype measured
+(about 780 vs 420 ms: text is measured on ragg, and the measurement is
+now inside the step). Runs are sequential, the two paths interleaved,
+with an untimed warm-up rep per case. Later tasks add the full tier's
+stages (IR, layout, raster, encode).
+
+```sh
+NOT_CRAN=true Rscript -e 'pkgload::load_all(compile = FALSE); source("inst/bench/render-suite.R")'
+```
+
+R version 4.6.1 (2026-06-24); Ubuntu 22.04.5 LTS; ggplot2 4.0.3; ragg 1.5.2; alot 0.0.0.9000; 16 threads available. Medians of interleaved runs, ms.
+
+#### readme (1600 x 1000 px, 150 dpi; 3 reps)
+
+| step | ggplot2 | hybrid | speedup |
+| --- | ---: | ---: | --- |
+| build | 538 | 222.0 | 2.4x |
+| gtable | 780 | 211.0 | 3.7x |
+| draw | 2,442 | 174.0 | 14.0x |
+| encode | 113 | 10.0 | 11.3x |
+| render | 3,320 | 395.0 | 8.4x |
+| total | 3,766 | 617.0 | 6.1x |
+
+#### readme_page (7 x 7 in, 300 dpi; 3 reps)
+
+| step | ggplot2 | hybrid | speedup |
+| --- | ---: | ---: | --- |
+| build | 530 | 216.0 | 2.5x |
+| gtable | 674 | 224.0 | 3.0x |
+| draw | 3,951 | 217.0 | 18.2x |
+| encode | 384 | 23.0 | 16.7x |
+| render | 5,014 | 463.0 | 10.8x |
+| total | 5,532 | 682.0 | 8.1x |
+
+#### readme_10 (1600 x 1000 px, 150 dpi; 7 reps)
+
+| step | ggplot2 | hybrid | speedup |
+| --- | ---: | ---: | --- |
+| build | 29.0 | 30.0 | 1.0x |
+| gtable | 148.0 | 148.0 | 1.0x |
+| draw | 72.0 | 60.0 | 1.2x |
+| encode | 34.0 | 4.0 | 8.5x |
+| render | 255.0 | 211.0 | 1.2x |
+| total | 284.0 | 242.0 | 1.2x |
+
+#### point_1e6 (1600 x 1000 px, 150 dpi; 3 reps)
+
+| step | ggplot2 | hybrid | speedup |
+| --- | ---: | ---: | --- |
+| build | 338.0 | 136.0 | 2.5x |
+| gtable | 302.0 | 49.0 | 6.2x |
+| draw | 6,475.0 | 110.0 | 58.9x |
+| encode | 44.0 | 4.0 | 11.0x |
+| render | 6,821.0 | 164.0 | 41.6x |
+| total | 7,163.0 | 294.0 | 24.4x |
+
+#### tile_1000 (1600 x 1000 px, 150 dpi; 3 reps)
+
+| step | ggplot2 | hybrid | speedup |
+| --- | ---: | ---: | --- |
+| build | 1,217 | 681.0 | 1.8x |
+| gtable | 368 | 403.0 | 0.9x |
+| draw | 935 | 831.0 | 1.1x |
+| encode | 195 | 14.0 | 13.9x |
+| render | 1,498 | 1,307.0 | 1.1x |
+| total | 2,715 | 1,979.0 | 1.4x |
+
+#### line_1e6 (1600 x 1000 px, 150 dpi; 3 reps)
+
+| step | ggplot2 | hybrid | speedup |
+| --- | ---: | ---: | --- |
+| build | 283.0 | 140.0 | 2.0x |
+| gtable | 660.0 | 711.0 | 0.9x |
+| draw | 513.0 | 488.0 | 1.1x |
+| encode | 36.0 | 4.0 | 9.0x |
+| render | 1,228.0 | 1,202.0 | 1.0x |
+| total | 1,521.0 | 1,342.0 | 1.1x |
+
+#### facets_400 (1600 x 1000 px, 150 dpi; 3 reps)
+
+| step | ggplot2 | hybrid | speedup |
+| --- | ---: | ---: | --- |
+| build | 26.0 | 22.0 | 1.2x |
+| gtable | 10,185.0 | 9,741.0 | 1.0x |
+| draw | 2,025.0 | 2,106.0 | 1.0x |
+| encode | 39.0 | 8.0 | 4.9x |
+| render | 12,249.0 | 11,855.0 | 1.0x |
+| total | 12,275.0 | 11,877.0 | 1.0x |
+
+#### Render (gtable + draw + encode)
+
+| case | ggplot2 | hybrid | speedup |
+| --- | ---: | ---: | --- |
+| readme | 3,320 | 395 | 8.4x |
+| readme_page | 5,014 | 463 | 10.8x |
+| readme_10 | 255 | 211 | 1.2x |
+| point_1e6 | 6,821 | 164 | 41.6x |
+| tile_1000 | 1,498 | 1,307 | 1.1x |
+| line_1e6 | 1,228 | 1,202 | 1.0x |
+| facets_400 | 12,249 | 11,855 | 1.0x |
+
+Reading these:
+
+- **Points are where the hybrid wins.** 1e6 points with no axes render
+  42× faster; the README plot 8.4×, and 10.8× on the default page.
+- **Without a Rust drawer the hybrid is ggplot2** plus Rust PNG encoding:
+  tiles (1.1×), lines (1.0×) and 400 panels (1.0×). Rects (R1.3) and paths
+  (R1.4) are what the hybrid gains next.
+- **The fixed cost is ggplot2's gtable.** 148 ms of the 211 ms for the
+  README plot with 10 rows, and nearly 10 s for 400 panels, where drawing
+  adds 2 s. Only the full tier removes it.
+- **Encoding** is 4–23 ms in Rust against 34–384 ms for ragg's libpng.

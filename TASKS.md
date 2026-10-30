@@ -548,7 +548,7 @@ alongside Phase 1's remaining tasks.
   Plots whose layers the hybrid supports pass; the rest are reported as
   fallbacks.
 
-### R0.3 Render benchmarks
+### R0.3 Render benchmarks — done
 - **Depends:** R0.1
 - **Touches:** `inst/bench/render-*.R`, `inst/bench/RESULTS.md`
 - **Do:** Generalise the prototype's `render-readme.R` into a suite. It
