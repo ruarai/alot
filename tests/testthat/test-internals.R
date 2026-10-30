@@ -85,3 +85,13 @@ test_that("upstream continuous colour training and mapping match the versions al
   expect_snapshot(print(body(stats::approxfun)))
   expect_snapshot(print(body(farver::encode_colour)))
 })
+
+test_that("upstream discrete non-position training and mapping match what alot relies on", {
+  # kernel_np_train_discrete and kernel_np_map_discrete (R/kernels-npscale.R)
+  # assume training depends only on the distinct values and that map() is
+  # elementwise in `x`. If these change, check both assumptions still hold,
+  # then update the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::ScaleDiscrete$train)$f)))
+  expect_snapshot(print(body(environment(ggplot2::ScaleDiscrete$map)$f)))
+  expect_snapshot(print(body(scales::train_discrete)))
+})

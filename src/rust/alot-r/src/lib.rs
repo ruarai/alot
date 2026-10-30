@@ -92,15 +92,15 @@ fn train_discrete_rows(x: Robj, scale_id: &[i32], n_scales: i32) -> extendr_api:
                 return Ok(().into());
             }
             let keys = f.codes.iter().map(|c| c.map_or(k, |c| c as usize - 1));
-            discrete::first_occurrences_dense(keys, k + 1, &ids, n)
+            discrete::first_occurrences_dense(keys, k + 1, ids.iter().copied(), n)
         }
         ColumnData::Logical(v) => {
             let keys = v.iter().map(|b| b.map_or(2, usize::from));
-            discrete::first_occurrences_dense(keys, 3, &ids, n)
+            discrete::first_occurrences_dense(keys, 3, ids.iter().copied(), n)
         }
         ColumnData::Character(s) => {
             let keys = convert::str_ptrs(&s).iter().map(|&p| p as usize);
-            discrete::first_occurrences(keys, &ids, n)
+            discrete::first_occurrences(keys, ids.iter().copied(), n)
         }
         ColumnData::Double(v) => discrete::extremes(v.iter().map(|&v| Some(v)), &ids, n),
         ColumnData::Integer(v) => discrete::extremes(v.iter().map(|v| v.map(f64::from)), &ids, n),
@@ -119,6 +119,109 @@ fn train_discrete_rows(x: Robj, scale_id: &[i32], n_scales: i32) -> extendr_api:
     out.push("rows", convert::integers(flat.collect::<Vec<_>>().into_iter()));
     out.push("offsets", convert::integers(offsets.into_iter()));
     Ok(out.finish()?.into())
+}
+
+/// The first row of each distinct value of factor, character or logical
+/// `x`, for training a discrete non-position scale on (see
+/// `alot_core::scale::discrete`): 1-based and ascending. `NULL` (decline)
+/// for any other input, or a factor with codes outside its levels.
+/// @noRd
+#[extendr(r_name = "rs_discrete_first_rows")]
+fn discrete_first_rows(x: Robj) -> extendr_api::Result<Robj> {
+    let col = Column::new(&x);
+    let one = std::iter::repeat(0).take(col.len());
+    let rows = match col.data {
+        ColumnData::Factor(f) => {
+            let k = f.levels.len();
+            if f.codes.iter().any(|c| c.is_some_and(|c| c < 1 || c as usize > k)) {
+                return Ok(().into());
+            }
+            let keys = f.codes.iter().map(|c| c.map_or(k, |c| c as usize - 1));
+            discrete::first_occurrences_dense(keys, k + 1, one, 1)
+        }
+        ColumnData::Logical(v) => {
+            let keys = v.iter().map(|b| b.map_or(2, usize::from));
+            discrete::first_occurrences_dense(keys, 3, one, 1)
+        }
+        ColumnData::Character(s) => {
+            let keys = convert::str_ptrs(&s).iter().map(|&p| p as usize);
+            discrete::first_occurrences(keys, one, 1)
+        }
+        _ => return Ok(().into()),
+    };
+    Ok(convert::integers(rows[0].iter().map(|&i| Some(i as i32 + 1))))
+}
+
+/// `table[k]` for each row key `k`, as a new vector of `table`'s type
+/// (character, double, integer or logical, without attributes). Keys as
+/// for `rs_map_discrete()`: a factor's codes with NA last (`table` must
+/// have its levels plus one elements), a logical's FALSE, TRUE, NA, or the
+/// 1-based codes of `rs_factorize_strings()`. `NULL` (decline) for a key
+/// outside the table or any other input or table type.
+/// @noRd
+#[extendr(r_name = "rs_lookup_discrete")]
+fn lookup_discrete(x: Robj, table: Robj) -> extendr_api::Result<Robj> {
+    let k = table.len();
+    let col = Column::new(&x);
+    let n = col.len();
+    match col.data {
+        ColumnData::Factor(f) => {
+            if f.levels.len() + 1 != k || f.codes.iter().any(|c| c.is_some_and(|c| c < 1 || c as usize >= k)) {
+                return Ok(().into());
+            }
+            gather(f.codes.iter().map(|c| c.map_or(k - 1, |c| c as usize - 1)), n, &table)
+        }
+        ColumnData::Logical(v) => {
+            if k != 3 {
+                return Ok(().into());
+            }
+            gather(v.iter().map(|b| b.map_or(2, usize::from)), n, &table)
+        }
+        ColumnData::Integer(v) => {
+            if v.iter().any(|c| c.map_or(true, |c| c < 1 || c as usize > k)) {
+                return Ok(().into());
+            }
+            gather(v.0.iter().map(|&c| c as usize - 1), n, &table)
+        }
+        _ => Ok(().into()),
+    }
+}
+
+/// `n` values of `table` picked by `keys`, which must index it.
+fn gather(keys: impl Iterator<Item = usize>, n: usize, table: &Robj) -> extendr_api::Result<Robj> {
+    if table.get_attrib("names").is_some() || table.class().is_some() {
+        return Ok(().into());
+    }
+    // R gives empty vectors no slice; see `convert::nonempty`.
+    if n == 0 {
+        return Ok(match table.rtype() {
+            Rtype::Strings => Strings::new(0).into(),
+            Rtype::Doubles => Doubles::new(0).into(),
+            Rtype::Integers => Integers::new(0).into(),
+            Rtype::Logicals => Logicals::new(0).into(),
+            _ => ().into(),
+        });
+    }
+    Ok(match table.rtype() {
+        Rtype::Strings => convert::gathered_strings(&Strings::try_from(table.clone())?, keys, n),
+        Rtype::Doubles => {
+            let t = table.as_real_slice().unwrap();
+            new_doubles(n, |out| discrete::lookup(keys, t, out))
+        }
+        Rtype::Integers => {
+            let t = table.as_integer_slice().unwrap();
+            let mut out: Robj = Integers::new(n).into();
+            discrete::lookup(keys, t, out.as_integer_slice_mut().unwrap());
+            out
+        }
+        Rtype::Logicals => {
+            let t = table.as_logical_slice().unwrap();
+            let mut out = Logicals::new(n);
+            discrete::lookup(keys, t, &mut out);
+            out.into()
+        }
+        _ => ().into(),
+    })
 }
 
 /// 0-based scale per row from 1-based `scale_id`, after checking every id
@@ -526,6 +629,8 @@ extendr_module! {
     fn map_continuous;
     fn factorize_strings;
     fn map_discrete;
+    fn discrete_first_rows;
+    fn lookup_discrete;
     fn map_colour;
     fn transform_values;
     fn encode_lab;

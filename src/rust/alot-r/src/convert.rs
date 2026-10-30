@@ -272,6 +272,21 @@ pub fn coded_ascii_strings<'s>(
     out
 }
 
+/// New character vector of length `n` whose element `i` is `table[k]` for
+/// the `i`th key `k`, sharing `table`'s CHARSXPs. Every key must index
+/// `table`.
+pub fn gathered_strings(table: &Strings, keys: impl Iterator<Item = usize>, n: usize) -> Robj {
+    let ptrs = str_ptrs(table);
+    let mut out: Robj = Strings::new(n).into();
+    unsafe {
+        let sexp = out.get_mut();
+        for (i, k) in keys.enumerate() {
+            SET_STRING_ELT(sexp, i as isize, ptrs[k]);
+        }
+    }
+    out
+}
+
 /// New unordered factor from 1-based codes and levels.
 pub fn factor(codes: impl ExactSizeIterator<Item = Option<i32>>, levels: Strings) -> Result<Robj> {
     let mut out = integers(codes);

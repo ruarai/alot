@@ -876,3 +876,89 @@
           encode_c(colour, alpha, colourspace_match(from), white)
       }
 
+# upstream discrete non-position training and mapping match what alot relies on
+
+    Code
+      print(body(environment(ggplot2::ScaleDiscrete$train)$f))
+    Output
+      {
+          if (length(x) == 0) {
+              return()
+          }
+          self$range$train(x, drop = self$drop, na.rm = !self$na.translate, 
+              call = self$call)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::ScaleDiscrete$map)$f))
+    Output
+      {
+          limits <- vec_slice(limits, !is.na(limits))
+          n <- vec_size(limits)
+          if (n < 1) {
+              return(vec_rep(self$na.value, vec_size(x)))
+          }
+          if (!is.null(self$n.breaks.cache) && self$n.breaks.cache == 
+              n) {
+              pal <- self$palette.cache
+          }
+          else {
+              if (!is.null(self$n.breaks.cache)) {
+                  cli::cli_warn("Cached palette does not match requested.", 
+                      call = self$call)
+              }
+              pal <- self$palette(n)
+              self$palette.cache <- pal
+              self$n.breaks.cache <- n
+          }
+          na_value <- NA
+          if (self$na.translate) {
+              na_value <- self$na.value
+              if (obj_is_list(pal) && !obj_is_list(na_value)) {
+                  na_value <- list(na_value)
+              }
+          }
+          pal_names <- vec_names(pal)
+          if (!is_null(pal_names)) {
+              if (is_null(dim(pal))) {
+                  pal[is.na(match(pal_names, limits))] <- na_value
+              }
+              else {
+                  vec_slice(pal, is.na(match(pal_names, limits))) <- na_value
+              }
+              pal <- vec_set_names(pal, NULL)
+              limits <- pal_names
+          }
+          pal <- if (is.null(dim(pal))) 
+              c(pal, na_value)
+          else vec_c(pal, na_value)
+          pal_match <- vec_slice(pal, match(as.character(x), limits, 
+              nomatch = vec_size(pal)))
+          if (!is.na(na_value)) {
+              vec_slice(pal_match, vec_detect_missing(x)) <- na_value
+          }
+          pal_match
+      }
+
+---
+
+    Code
+      print(body(scales::train_discrete))
+    Output
+      {
+          if (is.null(new)) {
+              return(existing)
+          }
+          if (!is.discrete(new)) {
+              example <- unique(new)
+              example <- example[seq_len(pmin(length(example), 5))]
+              cli::cli_abort(c("Continuous value supplied to a discrete scale.", 
+                  i = "Example values: {.and {.val {example}}}."), 
+                  call = call)
+          }
+          discrete_range(existing, new, drop = drop, na.rm = na.rm, 
+              fct = fct)
+      }
+

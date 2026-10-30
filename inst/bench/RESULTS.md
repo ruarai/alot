@@ -397,3 +397,39 @@ Step profile (`step-profile.R`, `ALOT_BENCH_CORES=1`, not interleaved, 1e6
 rows): for `point_continuous` (the task's target), `npscales_map` is 205.3
 → 106.4 ms (1.93×). The whole build is 435.9 → 220.5 ms (1.98×), counting
 the position kernels.
+
+### T2.4 Discrete non-position scales (2026-10-30) — kept
+
+`inst/bench/npscale-discrete.R`: `npscales_train_df()` and
+`npscales_map_df()` for one aesthetic column of 1e6 values through one
+scale, sequential with interleaved reps and a full gc before each (same
+machine as the baseline). Characters hold 10 distinct values, factors 5
+and logicals 2, each with 1% NA, in random order.
+
+| input | step | ggplot2_ms | alot_ms | speedup |
+| --- | --- | ---: | ---: | --- |
+| hue_character | train | 7.7 | 4.4 | 1.7x |
+| hue_character | map | 30.4 | 11.2 | 2.7x |
+| hue_factor | train | 19.9 | 2.4 | 8.2x |
+| hue_factor | map | 20.3 | 4.5 | 4.5x |
+| brewer_factor | train | 19.9 | 2.5 | 8.1x |
+| brewer_factor | map | 16.4 | 4.5 | 3.7x |
+| manual_named | train | 7.7 | 4.4 | 1.7x |
+| manual_named | map | 17.4 | 7.7 | 2.3x |
+| shape_factor | train | 19.8 | 2.4 | 8.2x |
+| shape_factor | map | 14.3 | 2.2 | 6.4x |
+| linetype_character | train | 7.6 | 4.4 | 1.8x |
+| linetype_character | map | 13.4 | 7.6 | 1.8x |
+| hue_logical | train | 6.4 | 1.6 | 3.9x |
+| hue_logical | map | 18.9 | 3.8 | 5.0x |
+
+- **Both kernels are kept.** Character columns gain least: upstream's
+  `match()` already hashes CHARSXP pointers, and Rust still has to code
+  every row (`rs_factorize_strings()`) before R can map the distinct values,
+  then gather. Factors skip `as.character()` and, in training,
+  `droplevels()`.
+
+Step profile (`step-profile.R`, `ALOT_BENCH_CORES=1`, not interleaved, 1e6
+rows): for `point_discrete` (a 5-level factor colour), `npscales_train` is
+33.0 → 1.7 ms and `npscales_map` 29.5 → 7.4 ms (3.97×). The whole build is
+287.5 → 150.6 ms (1.91×), counting the position kernels.

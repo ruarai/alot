@@ -1,7 +1,8 @@
 library(ggplot2)
 
 # Non-position scale training and mapping (T2.1). The mirror dispatches each
-# scale; kernels-npscale.R adds the continuous kernels (T2.3).
+# scale; kernels-npscale.R adds the continuous (T2.3) and discrete (T2.4)
+# kernels.
 
 np_coverage <- function(p) {
   cov <- alot_coverage(p)
@@ -51,9 +52,8 @@ test_that("coverage lists each non-position scale's train and map steps", {
   expect_equal(sum(cov$step == "np_train"), 4)
   expect_equal(sum(cov$step == "np_map"), 4)
   expect_setequal(unique(cov$class), c("ScaleContinuous", "ScaleDiscrete"))
-  # The continuous colour scale has kernels (T2.3); the shape scale not yet.
-  expect_true(all(cov$path[cov$class == "ScaleContinuous"] == "rust"))
-  expect_true(all(cov$path[cov$class == "ScaleDiscrete"] == "ggplot2"))
+  # Both have kernels: continuous colour (T2.3) and discrete shape (T2.4).
+  expect_true(all(cov$path == "rust"))
 
   # No non-position scales: no steps.
   p <- ggplot(df, aes(x, y)) + geom_point()
@@ -85,7 +85,7 @@ test_that("a registered kernel's result is used", {
   expect_build_equal(p)
   cov <- np_coverage(p)
   expect_equal(cov$path[cov$class == "ScaleContinuous"], c("rust", "rust"))
-  expect_equal(cov$path[cov$class == "ScaleDiscrete"], c("ggplot2", "ggplot2"))
+  expect_equal(cov$path[cov$class == "ScaleDiscrete"], c("rust", "rust"))
   expect_gt(calls, 0)
 
   # A kernel that declines falls back.

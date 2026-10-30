@@ -5,6 +5,8 @@
   register_kernel("scale_map", "ScaleDiscretePosition", kernel_map_discrete)
   register_kernel("np_train", "ScaleContinuous", kernel_np_train_continuous)
   register_kernel("np_map", "ScaleContinuous", kernel_np_map_continuous)
+  register_kernel("np_train", "ScaleDiscrete", kernel_np_train_discrete)
+  register_kernel("np_map", "ScaleDiscrete", kernel_np_map_discrete)
   # Every class whose transform is ggplot2's default_transform.
   for (class in c("ScaleContinuous", "ScaleContinuousPosition", "ScaleContinuousIdentity",
                   "ScaleBinned", "ScaleBinnedPosition")) {

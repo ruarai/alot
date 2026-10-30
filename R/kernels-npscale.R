@@ -2,7 +2,9 @@
 # R/scale-.R) for ScaleContinuous, training through ScaleContinuous$train
 # and mapping through ScaleContinuous$map with a scales::pal_gradient_n()
 # colour palette (gradient, gradient2, gradientn, distiller, viridis_c and
-# the default continuous colour scale).
+# the default continuous colour scale). Discrete non-position scales
+# (ScaleDiscrete: hue, brewer, grey, viridis_d, manual, shape, linetype, ...)
+# train through ScaleDiscrete$train and map through ScaleDiscrete$map.
 
 # The function a (possibly nested) ggproto method wraps. Scale$map_df
 # assigns `self$palette` back, so a palette can be wrapped twice.
@@ -153,4 +155,90 @@ kernel_np_map_continuous <- function(scale, df) {
     rs_map_colour(df[[j]], as.double(limits), oob$code, oob$only_finite, rescale$code, rescale$par,
                   ramp, na_value)
   })
+}
+
+# A plain discrete column: an unclassed character or logical vector, or a
+# factor or ordered factor with no attributes but its levels and class.
+plain_discrete <- function(x) {
+  attrs <- attributes(x)
+  if (is.factor(x)) {
+    (identical(oldClass(x), "factor") || identical(oldClass(x), c("ordered", "factor"))) &&
+      setequal(names(attrs), c("levels", "class")) && length(attrs) == 2
+  } else {
+    typeof(x) %in% c("character", "logical") && is.null(attrs)
+  }
+}
+
+# Discrete training: Scale$train_df -> ScaleDiscrete$train ->
+# DiscreteRange$train -> scales::train_discrete(), per aesthetic. As for
+# discrete position scales (kernel_train_discrete), Rust picks the first row
+# of each distinct value and the scale's own train() runs on just those, so
+# `drop`, `na.translate`, sorting and the range's `factor` flag stay in R.
+kernel_np_train_discrete <- function(scale, df) {
+  if (!identical(environment(scale$train_df)$f, environment(ggplot2::Scale$train_df)$f) ||
+      !identical(environment(scale$train)$f, environment(ggplot2::ScaleDiscrete$train)$f) ||
+      class(scale$range)[1] != "DiscreteRange") return(NULL)
+  if (gg_empty(df)) return(NULL)
+  aesthetics <- intersect(scale$aesthetics, names(df))
+  cols <- df[aesthetics]
+  # Continuous input errors in train_discrete(); ggplot2 raises it.
+  if (!all(vapply(cols, plain_discrete, logical(1)))) return(NULL)
+  rows <- lapply(cols, rs_discrete_first_rows)
+  if (any(vapply(rows, is.null, logical(1)))) return(NULL)
+
+  for (j in seq_along(cols)) {
+    # ScaleDiscrete$train skips empty input.
+    if (length(cols[[j]]) == 0) next
+    scale$train(vctrs::vec_slice(cols[[j]], rows[[j]]))
+  }
+  TRUE
+}
+
+# The distinct values of plain discrete `x` and its rows' keys into them,
+# as rs_lookup_discrete() takes them: a factor's levels then NA, keyed by
+# the factor itself; FALSE, TRUE, NA for a logical; for a character vector
+# its distinct strings in order of appearance, keyed by their codes.
+discrete_values <- function(x) {
+  if (is.factor(x)) {
+    lv <- levels(x)
+    values <- structure(c(seq_along(lv), NA_integer_), levels = lv, class = oldClass(x))
+    list(keys = x, values = values)
+  } else if (is.logical(x)) {
+    list(keys = x, values = c(FALSE, TRUE, NA))
+  } else {
+    f <- rs_factorize_strings(x)
+    list(keys = f$codes, values = x[f$rows])
+  }
+}
+
+# Discrete mapping: Scale$map_df -> ScaleDiscrete$map. map() is
+# elementwise in `x` (match(as.character(x), limits) and
+# vec_detect_missing(x); the palette and limits depend only on the scale),
+# so ggplot2's own map() runs on each column's distinct values (O(levels))
+# and Rust spreads the result over the rows. Named manual `values`,
+# `na.translate`, `na.value` and the palette cache are thereby upstream's.
+# Only atomic results without attributes are handled; a list (patterns) or
+# matrix falls back. The fallback's map() calls then see the palette cache
+# these calls filled for the same number of limits, so the palette runs and
+# its cache warning fires once in total, as upstream.
+kernel_np_map_discrete <- function(scale, df) {
+  if (!identical(environment(scale$map_df)$f, environment(ggplot2::Scale$map_df)$f) ||
+      !identical(environment(scale$map)$f, environment(ggplot2::ScaleDiscrete$map)$f)) {
+    return(NULL)
+  }
+  if (gg_empty(df)) return(NULL)
+  aesthetics <- intersect(scale$aesthetics, names(df))
+  names(aesthetics) <- aesthetics
+  if (length(aesthetics) == 0) return(NULL)
+  if (!all(vapply(df[aesthetics], plain_discrete, logical(1)))) return(NULL)
+
+  scale$palette <- scale$palette %||% gg_fetch_ggproto(scale, "fallback_palette")
+  out <- lapply(aesthetics, function(j) {
+    d <- discrete_values(df[[j]])
+    table <- scale$map(d$values)
+    if (length(table) != length(d$values)) return(NULL)
+    rs_lookup_discrete(d$keys, table)
+  })
+  if (any(vapply(out, is.null, logical(1)))) return(NULL)
+  out
 }

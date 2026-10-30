@@ -57,6 +57,22 @@ rs_factorize_strings <- function(x) .Call(wrap__factorize_strings, x)
 #' @noRd
 rs_map_discrete <- function(x, scale_id, table, n_keys) .Call(wrap__map_discrete, x, scale_id, table, n_keys)
 
+#' The first row of each distinct value of factor, character or logical
+#' `x`, for training a discrete non-position scale on (see
+#' `alot_core::scale::discrete`): 1-based and ascending. `NULL` (decline)
+#' for any other input, or a factor with codes outside its levels.
+#' @noRd
+rs_discrete_first_rows <- function(x) .Call(wrap__discrete_first_rows, x)
+
+#' `table[k]` for each row key `k`, as a new vector of `table`'s type
+#' (character, double, integer or logical, without attributes). Keys as
+#' for `rs_map_discrete()`: a factor's codes with NA last (`table` must
+#' have its levels plus one elements), a logical's FALSE, TRUE, NA, or the
+#' 1-based codes of `rs_factorize_strings()`. `NULL` (decline) for a key
+#' outside the table or any other input or table type.
+#' @noRd
+rs_lookup_discrete <- function(x, table) .Call(wrap__lookup_discrete, x, table)
+
 #' Maps double or integer `x` onto colours through a continuous scale with
 #' a `pal_gradient_n()` palette (see `alot_core::colour::ramp`). `oob` and
 #' `only_finite` as for `rs_map_continuous()`, `limits` the scale's limits;

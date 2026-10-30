@@ -14,6 +14,10 @@
 //!   finite = TRUE)` reduces to the same pair.
 //!
 //! Indices are 0-based and ascending within each scale.
+//!
+//! Discrete non-position mapping (`ScaleDiscrete$map`) is elementwise, so R
+//! maps only the distinct values (see `R/kernels-npscale.R`) and `lookup`
+//! spreads the result over the rows.
 
 use std::collections::HashSet;
 use std::hash::{BuildHasherDefault, Hash, Hasher};
@@ -22,12 +26,15 @@ use std::hash::{BuildHasherDefault, Hash, Hasher};
 pub type ScaleRows = Vec<Vec<usize>>;
 
 /// First occurrence of each distinct key per scale, for keys in
-/// `0..n_keys` (factor codes, logicals). `scale_id[i]` is the 0-based scale
-/// of row `i`.
-pub fn first_occurrences_dense<I>(keys: I, n_keys: usize, scale_id: &[usize], n_scales: usize) -> ScaleRows
+/// `0..n_keys` (factor codes, logicals). The `i`th item of `scale_id` is
+/// the 0-based scale of row `i`.
+pub fn first_occurrences_dense<I, S>(keys: I, n_keys: usize, scale_id: S, n_scales: usize) -> ScaleRows
 where
     I: IntoIterator<Item = usize>,
+    S: IntoIterator<Item = usize>,
+    S::IntoIter: ExactSizeIterator,
 {
+    let scale_id = scale_id.into_iter();
     // A seen-table per scale x key is fastest, but with many scales and
     // many keys it would outgrow the data; hash instead.
     if n_scales.saturating_mul(n_keys) > scale_id.len() + (1 << 16) {
@@ -35,7 +42,7 @@ where
     }
     let mut seen = vec![false; n_scales * n_keys];
     let mut out = vec![Vec::new(); n_scales];
-    for (i, (k, &s)) in keys.into_iter().zip(scale_id).enumerate() {
+    for (i, (k, s)) in keys.into_iter().zip(scale_id).enumerate() {
         let slot = &mut seen[s * n_keys + k];
         if !*slot {
             *slot = true;
@@ -47,15 +54,16 @@ where
 
 /// First occurrence of each distinct key per scale, for arbitrary keys
 /// (e.g. string pointers).
-pub fn first_occurrences<I, K>(keys: I, scale_id: &[usize], n_scales: usize) -> ScaleRows
+pub fn first_occurrences<I, K, S>(keys: I, scale_id: S, n_scales: usize) -> ScaleRows
 where
     I: IntoIterator<Item = K>,
     K: Hash + Eq + Copy,
+    S: IntoIterator<Item = usize>,
 {
     let mut seen: HashSet<(usize, K), BuildHasherDefault<MixHasher>> = HashSet::default();
     let mut out = vec![Vec::new(); n_scales];
     let mut last: Option<(usize, K)> = None;
-    for (i, (k, &s)) in keys.into_iter().zip(scale_id).enumerate() {
+    for (i, (k, s)) in keys.into_iter().zip(scale_id).enumerate() {
         // Runs of equal values are common in layer data; skip the lookup.
         if last == Some((s, k)) {
             continue;
@@ -94,6 +102,17 @@ where
             _ => Vec::new(),
         })
         .collect()
+}
+
+/// `table[k]` for each key `k` into `out`. Keys must index `table`.
+pub fn lookup<K, T>(keys: K, table: &[T], out: &mut [T])
+where
+    K: IntoIterator<Item = usize>,
+    T: Copy,
+{
+    for (o, k) in out.iter_mut().zip(keys) {
+        *o = table[k];
+    }
 }
 
 /// A small multiplicative hasher. SipHash (std's default) dominates the
@@ -136,26 +155,26 @@ mod tests {
 
     #[test]
     fn dense_first_occurrences_per_scale() {
-        let out = first_occurrences_dense([2, 0, 2, 1, 0, 0], 3, &[0, 0, 0, 1, 1, 1], 2);
+        let out = first_occurrences_dense([2, 0, 2, 1, 0, 0], 3, [0, 0, 0, 1, 1, 1], 2);
         assert_eq!(out, vec![vec![0, 1], vec![3, 4]]);
     }
 
     #[test]
     fn dense_falls_back_to_hash_for_large_domains() {
         let keys = [5usize, 100_000, 5, 99_999];
-        let out = first_occurrences_dense(keys, 100_001, &[0, 1, 0, 1], 2);
+        let out = first_occurrences_dense(keys, 100_001, [0, 1, 0, 1], 2);
         assert_eq!(out, vec![vec![0], vec![1, 3]]);
     }
 
     #[test]
     fn hashed_first_occurrences_and_unseen_scales() {
-        let out = first_occurrences(["b", "a", "b", "b", "c"], &[0, 0, 0, 2, 2], 3);
+        let out = first_occurrences(["b", "a", "b", "b", "c"], [0, 0, 0, 2, 2], 3);
         assert_eq!(out, vec![vec![0, 1], vec![], vec![3, 4]]);
     }
 
     #[test]
     fn same_key_in_different_scales_counts_once_per_scale() {
-        let out = first_occurrences([7, 7, 7, 7], &[0, 1, 1, 0], 2);
+        let out = first_occurrences([7, 7, 7, 7], [0, 1, 1, 0], 2);
         assert_eq!(out, vec![vec![0], vec![1]]);
     }
 
@@ -170,6 +189,22 @@ mod tests {
     fn extremes_single_value_and_no_finite_values() {
         let out = extremes([Some(2.0), None, Some(f64::NEG_INFINITY)], &[0, 1, 1], 3);
         assert_eq!(out, vec![vec![0], vec![], vec![]]);
+    }
+
+    #[test]
+    fn lookup_spreads_the_table() {
+        let mut out = [0; 5];
+        lookup([2, 0, 0, 1, 2], &[10, 20, 30], &mut out);
+        assert_eq!(out, [30, 10, 10, 20, 30]);
+        let mut empty: [f64; 0] = [];
+        lookup(std::iter::empty(), &[1.0], &mut empty);
+    }
+
+    #[test]
+    fn single_scale_from_a_repeated_id() {
+        let keys = [1usize, 1, 0, 2, 0];
+        let out = first_occurrences_dense(keys, 3, std::iter::repeat(0).take(keys.len()), 1);
+        assert_eq!(out, vec![vec![0, 2, 3]]);
     }
 
     #[test]

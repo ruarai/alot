@@ -204,7 +204,7 @@ not repeated below:
 - **Done when:** the shared criteria hold. Benchmark target: the `map_df`
   share of the continuous-colour `geom_point` case.
 
-### T2.4 Discrete non-position mapping
+### T2.4 Discrete non-position mapping — done
 - **Depends:** T2.1, T0.3
 - **Touches:** `R/kernels-npscale.R`, `alot-core/src/scale/discrete.rs`
 - **Do:**
