@@ -1,3 +1,44 @@
+# Mirrors Layout$setup (ggplot2 R/layout.R), dispatching
+# facet$compute_layout and, per layer, facet$map_data. A layout whose setup
+# is not Layout's own falls back to it whole.
+layout_setup <- function(layout, data, plot_data, plot_env) {
+  class_setup <- environment(ggplot2::Layout$setup)$f
+  if (!identical(environment(layout$setup)$f, class_setup)) {
+    record_trace("layout_setup", class(layout)[1], "ggplot2")
+    return(layout$setup(data, plot_data, plot_env))
+  }
+  data <- c(list(plot_data), data)
+
+  # Setup facets
+  facet <- layout$facet
+  layout$facet_params <- facet$setup_params(data, facet$params)
+  layout$facet_params$plot_env <- plot_env
+  data <- facet$setup_data(data, layout$facet_params)
+
+  # Setup coords
+  layout$coord_params <- layout$coord$setup_params(data)
+  data <- layout$coord$setup_data(data, layout$coord_params)
+
+  # Generate panel layout
+  params <- layout$facet_params
+  layout$layout <- dispatch(
+    "facet_compute_layout", facet, list(facet = facet, data = data, params = params),
+    function() facet$compute_layout(data, params)
+  )
+  layout$layout <- layout$coord$setup_layout(layout$layout, layout$coord_params)
+  gg_check_layout(layout$layout)
+
+  # Add panel coordinates to the data for each layer
+  panels <- layout$layout
+  lapply(data[-1], function(layer_data) {
+    dispatch(
+      "facet_map_data", facet,
+      list(facet = facet, data = layer_data, layout = panels, params = params),
+      function() facet$map_data(layer_data, layout = panels, params = params)
+    )
+  })
+}
+
 # Mirrors Layout$train_position (ggplot2 R/layout.R).
 layout_train_position <- function(layout, data, x_scale, y_scale) {
   panels <- layout$layout

@@ -337,7 +337,7 @@ All stat kernels use the grouped driver (T0.4) and register under
 
 ## 1.5 Facets and layout setup
 
-### T5.1 Panel assignment for `layout$setup` / `map_data`
+### T5.1 Panel assignment for `layout$setup` / `map_data` — done
 - **Depends:** T0.3
 - **Touches:** `R/layout.R`, `R/kernels-facet.R` (new),
   `alot-core/src/facet/join.rs`

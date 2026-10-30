@@ -433,3 +433,38 @@ Step profile (`step-profile.R`, `ALOT_BENCH_CORES=1`, not interleaved, 1e6
 rows): for `point_discrete` (a 5-level factor colour), `npscales_train` is
 33.0 → 1.7 ms and `npscales_map` 29.5 → 7.4 ms (3.97×). The whole build is
 287.5 → 150.6 ms (1.91×), counting the position kernels.
+
+### T5.1 Facet layout and panel assignment (2026-10-30) — kept
+
+`inst/bench/facet-map.R`: the `layout_setup` step (`Layout$setup`, whose
+`facet$compute_layout` and `facet$map_data` the kernels replace) for one
+layer of 1e6 rows, sequential with interleaved reps and a full gc before
+each (same machine as the baseline). Facet columns hold 9 values (3 × 3 for
+the grid) plus 1% NA, in random order.
+
+| input | ggplot2_ms | alot_ms | speedup |
+| --- | ---: | ---: | --- |
+| wrap_factor | 67.7 | 12.3 | 5.5x |
+| wrap_character | 93.7 | 38.3 | 2.4x |
+| wrap_integer | 82.4 | 33.5 | 2.5x |
+| grid_factor | 190.2 | 22.0 | 8.6x |
+
+- **Both kernels are kept.**
+- **`compute_layout`:** `combine_vars()` spends its time in
+  `unique0(vec_rbind0(...))` over every layer's facet values, including the
+  plot data. Rust first cuts each layer down to the first row of each
+  distinct combination, using an equality at least as strict as vctrs'.
+  R's `unique0()` then runs on a few rows. Hashing every row as a
+  `Vec<u64>` made character and integer columns slower than before; dense
+  per-column codes, combined as `id()` does, fixed that.
+- **`map_data`:** Rust replaces `join_keys()` + `match()`. For factor
+  columns it also skips `addNA()`, which re-codes the whole column through
+  `as.character()` when it holds NA. Character and integer columns still go
+  through upstream's `factor()` in R, which is most of what remains for
+  them.
+
+Step profile (`step-profile.R`, `ALOT_BENCH_CORES=1`, not interleaved):
+for `facet_wrap_point` at 1e6 rows, `layout_setup` is 32.1 → 11.6 ms
+(2.78×) and the whole build 257.8 → 138.7 ms (1.86×), counting the
+position kernels. For `wrap_fixed_point` at 400 panels, `layout_setup`
+is 4.7 → 2.6 ms (1.78×).

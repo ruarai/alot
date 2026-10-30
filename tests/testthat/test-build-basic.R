@@ -24,6 +24,6 @@ test_that("facets, coords and scales match ggplot2", {
 
 test_that("coverage reports every dispatched component", {
   cov <- alot_coverage(ggplot(mtcars, aes(wt, mpg)) + geom_point())
-  expect_setequal(cov$class, c("ScaleContinuousPosition", "StatIdentity", "PositionIdentity"))
+  expect_setequal(cov$class, c("FacetNull", "ScaleContinuousPosition", "StatIdentity", "PositionIdentity"))
   expect_true(all(cov$path %in% c("rust", "ggplot2")))
 })

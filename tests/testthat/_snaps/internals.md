@@ -991,3 +991,306 @@
           invisible(x)
       }
 
+# upstream layout setup and facet panel assignment match the versions alot mirrors
+
+    Code
+      print(body(environment(ggplot2::Layout$setup)$f))
+    Output
+      {
+          data <- c(list(plot_data), data)
+          self$facet_params <- self$facet$setup_params(data, self$facet$params)
+          self$facet_params$plot_env <- plot_env
+          data <- self$facet$setup_data(data, self$facet_params)
+          self$coord_params <- self$coord$setup_params(data)
+          data <- self$coord$setup_data(data, self$coord_params)
+          self$layout <- self$facet$compute_layout(data, self$facet_params)
+          self$layout <- self$coord$setup_layout(self$layout, self$coord_params)
+          check_layout(self$layout)
+          lapply(data[-1], self$facet$map_data, layout = self$layout, 
+              params = self$facet_params)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("map_facet_data", "ggplot2")))
+    Output
+      {
+          if (empty(data)) {
+              return(vec_cbind(data %|W|% NULL, PANEL = integer(0)))
+          }
+          vars <- params$facets %||% c(params$rows, params$cols)
+          if (length(vars) == 0) {
+              data$PANEL <- layout$PANEL
+              return(data)
+          }
+          grid_layout <- all(c("rows", "cols") %in% names(params))
+          layer_layout <- attr(data, "layout")
+          if (identical(layer_layout, "fixed")) {
+              n <- vec_size(data)
+              data <- vec_rep(data, vec_size(layout))
+              data$PANEL <- vec_rep_each(layout$PANEL, n)
+              return(data)
+          }
+          facet_vals <- eval_facets(vars, data, params$.possible_columns)
+          include_margins <- !isFALSE(params$margins %||% FALSE) && 
+              nrow(facet_vals) == nrow(data) && grid_layout
+          if (include_margins) {
+              facet_vals <- reshape_add_margins(vec_cbind(facet_vals, 
+                  .index = seq_len(nrow(facet_vals))), list(intersect(names(params$rows), 
+                  names(facet_vals)), intersect(names(params$cols), 
+                  names(facet_vals))), params$margins %||% FALSE)
+              data <- data[facet_vals$.index, , drop = FALSE]
+              facet_vals$.index <- NULL
+          }
+          if (grid_layout) {
+              if (identical(layer_layout, "fixed_rows")) {
+                  facet_vals <- facet_vals[setdiff(names(facet_vals), 
+                      names(params$cols))]
+              }
+              if (identical(layer_layout, "fixed_cols")) {
+                  facet_vals <- facet_vals[setdiff(names(facet_vals), 
+                      names(params$rows))]
+              }
+          }
+          missing_facets <- setdiff(names(vars), names(facet_vals))
+          if (length(missing_facets) > 0) {
+              to_add <- unique0(layout[missing_facets])
+              data_rep <- rep.int(seq_len(nrow(data)), nrow(to_add))
+              facet_rep <- rep(seq_len(nrow(to_add)), each = nrow(data))
+              data <- unrowname(data[data_rep, , drop = FALSE])
+              facet_vals <- unrowname(vec_cbind(unrowname(facet_vals[data_rep, 
+                  , drop = FALSE]), unrowname(to_add[facet_rep, , drop = FALSE])))
+          }
+          if (nrow(facet_vals) < 1) {
+              data$PANEL <- NO_PANEL
+              return(data)
+          }
+          facet_vals[] <- lapply(facet_vals, as_unordered_factor)
+          facet_vals[] <- lapply(facet_vals, addNA, ifany = TRUE)
+          layout[] <- lapply(layout, as_unordered_factor)
+          keys <- join_keys(facet_vals, layout, by = names(vars))
+          data$PANEL <- layout$PANEL[match(keys$x, keys$y)]
+          if (is_integerish(layer_layout)) {
+              data <- vec_slice(data, data$PANEL %in% layer_layout)
+          }
+          data
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("join_keys", "ggplot2")))
+    Output
+      {
+          joint <- vec_rbind0(x[by], y[by])
+          keys <- id(joint, drop = TRUE)
+          n_x <- nrow(x)
+          n_y <- nrow(y)
+          list(x = keys[seq_len(n_x)], y = keys[n_x + seq_len(n_y)], 
+              n = attr(keys, "n"))
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("id", "ggplot2")))
+    Output
+      {
+          nrows <- NULL
+          if (is.data.frame(.variables)) {
+              nrows <- nrow(.variables)
+              .variables <- unclass(.variables)
+          }
+          lengths <- lengths(.variables)
+          .variables <- .variables[lengths != 0]
+          if (length(.variables) == 0) {
+              n <- nrows %||% 0L
+              id <- seq_len(n)
+              attr(id, "n") <- n
+              return(id)
+          }
+          if (length(.variables) == 1) {
+              return(id_var(.variables[[1]], drop = drop))
+          }
+          ids <- rev(lapply(.variables, id_var, drop = drop))
+          p <- length(ids)
+          ndistinct <- vapply(ids, attr, "n", FUN.VALUE = numeric(1), 
+              USE.NAMES = FALSE)
+          n <- prod(ndistinct)
+          if (n > 2^31) {
+              char_id <- inject(paste(!!!ids, sep = "\r"))
+              res <- match(char_id, unique0(char_id))
+          }
+          else {
+              combs <- c(1, cumprod(ndistinct[-p]))
+              mat <- inject(cbind(!!!ids))
+              res <- c((mat - 1L) %*% combs + 1L)
+          }
+          if (drop) {
+              id_var(res, drop = TRUE)
+          }
+          else {
+              res <- as.integer(res)
+              attr(res, "n") <- n
+              res
+          }
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("id_var", "ggplot2")))
+    Output
+      {
+          if (length(x) == 0) {
+              id <- integer()
+              n <- 0L
+          }
+          else if (!is.null(attr(x, "n")) && !drop) {
+              return(x)
+          }
+          else if (is.factor(x) && !drop) {
+              x <- addNA(x, ifany = TRUE)
+              id <- as.integer(x)
+              n <- nlevels(x)
+          }
+          else {
+              levels <- sort(unique0(x), na.last = TRUE)
+              id <- match(x, levels)
+              n <- max(id)
+          }
+          attr(id, "n") <- n
+          id
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("as_unordered_factor", "ggplot2")))
+    Output
+      {
+          x <- as.factor(x)
+          class(x) <- setdiff(class(x), "ordered")
+          x
+      }
+
+# upstream facet layout computation matches the versions alot mirrors
+
+    Code
+      print(body(environment(ggplot2::FacetWrap$compute_layout)$f))
+    Output
+      {
+          vars <- params$facets
+          if (length(vars) == 0) {
+              return(layout_null())
+          }
+          check_facet_vars(names(vars), name = snake_class(self))
+          base <- combine_vars(data, params$plot_env, vars, drop = params$drop)
+          id <- id(base, drop = TRUE)
+          n <- attr(id, "n")
+          dims <- wrap_dims(n, params$nrow, params$ncol)
+          layout <- wrap_layout(id, dims, params$dir)
+          panels <- vec_cbind(layout, base)
+          panels <- panels[order(panels$PANEL), , drop = FALSE]
+          rownames(panels) <- NULL
+          panels$SCALE_X <- if (params$free$x) 
+              seq_len(n)
+          else 1L
+          panels$SCALE_Y <- if (params$free$y) 
+              seq_len(n)
+          else 1L
+          panels
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::FacetGrid$compute_layout)$f))
+    Output
+      {
+          rows <- params$rows
+          cols <- params$cols
+          check_facet_vars(names(rows), names(cols), name = snake_class(self))
+          dups <- intersect(names(rows), names(cols))
+          if (length(dups) > 0) {
+              cli::cli_abort(c("Faceting variables can only appear in {.arg rows} or {.arg cols}, not both.", 
+                  i = "Duplicated variables: {.val {dups}}"), call = call2(snake_class(self)))
+          }
+          base_rows <- combine_vars(data, params$plot_env, rows, drop = params$drop)
+          if (!params$as.table) {
+              rev_order <- function(x) factor(x, levels = rev(ulevels(x)))
+              base_rows[] <- lapply(base_rows, rev_order)
+          }
+          base_cols <- combine_vars(data, params$plot_env, cols, drop = params$drop)
+          base <- df.grid(base_rows, base_cols)
+          if (nrow(base) == 0) {
+              return(data_frame0(PANEL = factor(1L), ROW = 1L, COL = 1L, 
+                  SCALE_X = 1L, SCALE_Y = 1L))
+          }
+          base <- reshape_add_margins(base, list(names(rows), names(cols)), 
+              params$margins)
+          base <- unique0(base)
+          panel <- id(base, drop = TRUE)
+          panel <- factor(panel, levels = seq_len(attr(panel, "n")))
+          rows <- if (!length(names(rows))) 
+              rep(1L, length(panel))
+          else id(base[names(rows)], drop = TRUE)
+          cols <- if (!length(names(cols))) 
+              rep(1L, length(panel))
+          else id(base[names(cols)], drop = TRUE)
+          panels <- data_frame0(PANEL = panel, ROW = rows, COL = cols, 
+              base)
+          panels <- panels[order(panels$PANEL), , drop = FALSE]
+          rownames(panels) <- NULL
+          panels$SCALE_X <- if (params$free$x) 
+              panels$COL
+          else 1L
+          panels$SCALE_Y <- if (params$free$y) 
+              panels$ROW
+          else 1L
+          panels
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("combine_vars", "ggplot2")))
+    Output
+      {
+          possible_columns <- unique0(unlist(lapply(data, names)))
+          if (length(vars) == 0) 
+              return(data_frame0())
+          values <- compact(lapply(data, eval_facets, facets = vars, 
+              possible_columns = possible_columns))
+          has_all <- unlist(lapply(values, length)) == length(vars)
+          if (!any(has_all)) {
+              missing <- lapply(values, function(x) setdiff(names(vars), 
+                  names(x)))
+              missing_vars <- paste0(c("Plot", paste0("Layer ", seq_len(length(data) - 
+                  1))), " is missing {.var ", missing[seq_along(data)], 
+                  "}")
+              names(missing_vars) <- rep("x", length(data))
+              cli::cli_abort(c("At least one layer must contain all faceting variables: {.var {names(vars)}}", 
+                  missing_vars))
+          }
+          base <- unique0(vec_rbind0(!!!values[has_all]))
+          if (!drop) {
+              base <- unique_combs(base)
+          }
+          for (value in values[!has_all]) {
+              if (empty(value)) 
+                  next
+              old <- base[setdiff(names(base), names(value))]
+              new <- unique0(value[intersect(names(base), names(value))])
+              if (drop) {
+                  new <- unique_combs(new)
+              }
+              base <- unique0(vec_rbind0(base, df.grid(old, new)))
+          }
+          if (empty(base)) {
+              cli::cli_abort("Faceting variables must have at least one value.")
+          }
+          base
+      }
+

@@ -2,5 +2,6 @@
 //! between R vectors and these functions.
 
 pub mod colour;
+pub mod facet;
 pub mod group;
 pub mod scale;

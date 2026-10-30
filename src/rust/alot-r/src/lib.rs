@@ -3,11 +3,12 @@ pub mod grouped;
 
 use alot_core::colour::ramp::{self, Approx, Ramp};
 use alot_core::colour::{hex, lab};
+use alot_core::facet;
 use alot_core::group::{Columns, Values};
 use alot_core::scale::map::{self, Oob, Rescale};
 use alot_core::scale::transform::{self, Transform};
 use alot_core::scale::{discrete, range};
-use convert::{Column, ColumnData, ColumnsBuilder, Frame};
+use convert::{Column, ColumnData, ColumnsBuilder, Frame, IntView};
 use extendr_api::prelude::*;
 
 /// Train continuous ranges for `n` scales. `x` is a double or integer
@@ -612,6 +613,124 @@ fn grouped_test_position(df: List, col: &str) -> extendr_api::Result<Robj> {
     })
 }
 
+/// Rows of the first occurrence of each distinct combination of the columns
+/// of `df` (`n` rows), comparing factor codes, logicals, integers, double
+/// bits and string pointers (see `alot_core::facet::distinct`): 1-based and
+/// ascending. `NULL` (decline) for any other column type, a column not of
+/// length `n`, or a factor with codes outside its levels.
+/// @noRd
+#[extendr(r_name = "rs_facet_distinct_rows")]
+fn facet_distinct_rows(df: List, n: i32) -> extendr_api::Result<Robj> {
+    enum Key<'a> {
+        Codes(IntView<'a>, u64),
+        Lgl(convert::LglView<'a>),
+        Int(IntView<'a>),
+        Dbl(&'a [f64]),
+        Ptr(&'a [extendr_api::SEXP]),
+    }
+    let n = n as usize;
+    let robjs: Vec<Robj> = df.values().collect();
+    let strings: Vec<Option<Strings>> = robjs
+        .iter()
+        .map(|x| match Column::new(x).data {
+            ColumnData::Character(s) => Some(s),
+            _ => None,
+        })
+        .collect();
+    let mut keys = Vec::with_capacity(robjs.len());
+    let mut cards = Vec::with_capacity(robjs.len());
+    for (x, s) in robjs.iter().zip(&strings) {
+        if x.len() != n {
+            return Ok(().into());
+        }
+        let (key, card) = match Column::new(x).data {
+            ColumnData::Factor(f) => {
+                let k = f.levels.len();
+                if f.codes.iter().any(|c| c.is_some_and(|c| c < 1 || c as usize > k)) {
+                    return Ok(().into());
+                }
+                (Key::Codes(f.codes, k as u64), Some(k + 1))
+            }
+            ColumnData::Logical(v) => (Key::Lgl(v), Some(3)),
+            ColumnData::Integer(v) => (Key::Int(v), None),
+            ColumnData::Double(v) => (Key::Dbl(v), None),
+            ColumnData::Character(_) => (Key::Ptr(convert::str_ptrs(s.as_ref().unwrap())), None),
+            ColumnData::Other => return Ok(().into()),
+        };
+        keys.push(key);
+        cards.push(card);
+    }
+
+    let rows = facet::distinct::first_rows(n, &cards, |c, i| match &keys[c] {
+        // NA codes take the slot after the levels.
+        Key::Codes(v, k) => v.get(i).map_or(*k, |c| c as u64 - 1),
+        Key::Lgl(v) => v.get(i).map_or(2, u64::from),
+        Key::Int(v) => v.0[i] as u32 as u64,
+        Key::Dbl(v) => v[i].to_bits(),
+        Key::Ptr(v) => v[i] as usize as u64,
+    });
+    Ok(convert::integers(rows.into_iter().map(|i| Some(i as i32 + 1))))
+}
+
+/// Panel codes for `map_facet_data`'s join (see `alot_core::facet::join`).
+/// `data` holds one factor per facet variable, whose `NA` codes take the
+/// 1-based code `na`; `cards` gives each variable's number of codes.
+/// `layout` holds one integer vector of 1-based codes per variable (`NA`
+/// for none) and `panel` the layout's `PANEL` codes. Returns `panel` at
+/// each row's first matching layout row (`NA` for none), or `NULL`
+/// (decline) for a non-factor column, codes outside the levels, or an
+/// overflowing key space.
+/// @noRd
+#[extendr(r_name = "rs_facet_panels")]
+fn facet_panels(data: List, na: &[i32], cards: &[i32], layout: List, panel: &[i32]) -> extendr_api::Result<Robj> {
+    let n_vars = data.len();
+    if na.len() != n_vars || cards.len() != n_vars || layout.len() != n_vars {
+        return Err(Error::Other("data, na, cards and layout must have one entry per variable".into()));
+    }
+    let n_layout = panel.len();
+    let data_robjs: Vec<Robj> = data.values().collect();
+    let layout_robjs: Vec<Robj> = layout.values().collect();
+    let mut factors = Vec::with_capacity(n_vars);
+    for x in &data_robjs {
+        let ColumnData::Factor(f) = Column::new(x).data else { return Ok(().into()) };
+        let k = f.levels.len() as i32;
+        if f.codes.iter().any(|c| c.is_some_and(|c| c < 1 || c > k)) {
+            return Ok(().into());
+        }
+        factors.push(f.codes);
+    }
+    let mut codes = Vec::with_capacity(n_vars);
+    for x in &layout_robjs {
+        let ColumnData::Integer(v) = Column::new(x).data else {
+            return Err(Error::Other("layout codes must be integer".into()));
+        };
+        if v.len() != n_layout {
+            return Err(Error::Other("layout codes must have one value per layout row".into()));
+        }
+        codes.push(v);
+    }
+    let n = factors.first().map_or(0, |f| f.len());
+    if factors.iter().any(|f| f.len() != n) {
+        return Err(Error::Other("data factors must have the same length".into()));
+    }
+    if na.iter().chain(cards).any(|&c| c < 1) {
+        return Err(Error::Other("na and cards must be positive".into()));
+    }
+
+    // Codes below 1 become `usize::MAX`, out of every range, so they never match.
+    let zero_based = |c: Option<i32>| c.map(|c| if c >= 1 { c as usize - 1 } else { usize::MAX });
+    let cards: Vec<usize> = cards.iter().map(|&c| c as usize).collect();
+    let na: Vec<usize> = na.iter().map(|&c| c as usize - 1).collect();
+    let layout_codes = codes.iter().map(|v| v.iter().map(zero_based)).collect();
+    let Some(join) = facet::join::Join::new(layout_codes, &cards, n_layout, n) else { return Ok(().into()) };
+    let panel = IntView(panel);
+    let rows = (0..n).map(|i| {
+        let row = factors.iter().zip(&na).map(|(f, &na)| Some(f.get(i).map_or(na, |c| c as usize - 1)));
+        join.find(row).and_then(|j| panel.get(j))
+    });
+    Ok(convert::integers(rows))
+}
+
 /// The cargo profile this library was built with: "debug" or "release".
 /// The benchmark suites refuse to time a debug build.
 /// @noRd
@@ -623,6 +742,8 @@ fn build_profile() -> &'static str {
 extendr_module! {
     mod alot;
     fn build_profile;
+    fn facet_panels;
+    fn facet_distinct_rows;
     fn train_continuous_grouped;
     fn train_continuous;
     fn train_discrete_rows;

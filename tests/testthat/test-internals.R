@@ -101,3 +101,25 @@ test_that("upstream print method matches the version alot_print mirrors", {
   # match, then update the snapshot.
   expect_snapshot(print(body(getS3method("print", "ggplot2::ggplot"))))
 })
+
+test_that("upstream layout setup and facet panel assignment match the versions alot mirrors", {
+  # Mirrored by layout_setup() (R/layout.R) and kernel_facet_map_data()
+  # (R/kernels-facet.R), which replaces join_keys() + match() by a join on
+  # factor labels. If these fail, update the mirror and kernel to match,
+  # then update the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::Layout$setup)$f)))
+  expect_snapshot(print(body(utils::getFromNamespace("map_facet_data", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("join_keys", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("id", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("id_var", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("as_unordered_factor", "ggplot2"))))
+})
+
+test_that("upstream facet layout computation matches the versions alot mirrors", {
+  # Mirrored by kernel_facet_wrap_layout(), kernel_facet_grid_layout() and
+  # facet_combine_vars() (R/kernels-facet.R). If these fail, update the
+  # mirrors to match, then update the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::FacetWrap$compute_layout)$f)))
+  expect_snapshot(print(body(environment(ggplot2::FacetGrid$compute_layout)$f)))
+  expect_snapshot(print(body(utils::getFromNamespace("combine_vars", "ggplot2"))))
+})

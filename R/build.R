@@ -39,7 +39,7 @@ build_plot <- function(plot) {
   data <- timed("setup_layer", gg_by_layer(function(l, d) l$setup_layer(d, plot), layers, data, "setting up layer"))
 
   layout <- timed("create_layout", gg_create_layout(plot@facet, plot@coordinates, plot@layout))
-  data <- timed("layout_setup", layout$setup(data, plot@data, plot@plot_env))
+  data <- timed("layout_setup", layout_setup(layout, data, plot@data, plot@plot_env))
 
   data <- timed("compute_aesthetics", gg_by_layer(function(l, d) l$compute_aesthetics(d, plot), layers, data, "computing aesthetics"))
   plot@labels <- timed("setup_plot_labels", gg_setup_plot_labels(plot, layers, data))

@@ -10,6 +10,25 @@ NULL
 #' @noRd
 rs_build_profile <- function() .Call(wrap__build_profile)
 
+#' Panel codes for `map_facet_data`'s join (see `alot_core::facet::join`).
+#' `data` holds one factor per facet variable, whose `NA` codes take the
+#' 1-based code `na`; `cards` gives each variable's number of codes.
+#' `layout` holds one integer vector of 1-based codes per variable (`NA`
+#' for none) and `panel` the layout's `PANEL` codes. Returns `panel` at
+#' each row's first matching layout row (`NA` for none), or `NULL`
+#' (decline) for a non-factor column, codes outside the levels, or an
+#' overflowing key space.
+#' @noRd
+rs_facet_panels <- function(data, na, cards, layout, panel) .Call(wrap__facet_panels, data, na, cards, layout, panel)
+
+#' Rows of the first occurrence of each distinct combination of the columns
+#' of `df` (`n` rows), comparing factor codes, logicals, integers, double
+#' bits and string pointers (see `alot_core::facet::distinct`): 1-based and
+#' ascending. `NULL` (decline) for any other column type, a column not of
+#' length `n`, or a factor with codes outside its levels.
+#' @noRd
+rs_facet_distinct_rows <- function(df, n) .Call(wrap__facet_distinct_rows, df, n)
+
 #' Train continuous ranges for `n` scales. `x` is a double or integer
 #' vector, `scale_id` 1-based scale indices, `existing` a length-2n double
 #' vector of current ranges (NaN pair for untrained). Returns a length-2n

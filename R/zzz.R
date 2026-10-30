@@ -7,6 +7,10 @@
   register_kernel("np_map", "ScaleContinuous", kernel_np_map_continuous)
   register_kernel("np_train", "ScaleDiscrete", kernel_np_train_discrete)
   register_kernel("np_map", "ScaleDiscrete", kernel_np_map_discrete)
+  register_kernel("facet_compute_layout", "FacetWrap", kernel_facet_wrap_layout)
+  register_kernel("facet_compute_layout", "FacetGrid", kernel_facet_grid_layout)
+  register_kernel("facet_map_data", "FacetWrap", kernel_facet_map_data)
+  register_kernel("facet_map_data", "FacetGrid", kernel_facet_map_data)
   # Every class whose transform is ggplot2's default_transform.
   for (class in c("ScaleContinuous", "ScaleContinuousPosition", "ScaleContinuousIdentity",
                   "ScaleBinned", "ScaleBinnedPosition")) {
