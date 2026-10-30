@@ -7,6 +7,10 @@ and the graphics device. Its only input is a built plot, so it doesn't
 depend on Phase 1 ([PLAN.md](PLAN.md)) being finished and can run alongside
 it. Tasks are in [TASKS.md](TASKS.md) under "Phase 2: rendering".
 
+The output is **PNG files only**. Interactive devices, PDF and SVG keep
+ggplot2's normal drawing (`alot_print()` builds with alot and draws with
+grid as before).
+
 ## Goal and fidelity target
 
 - The result should be **visually identical** to ggplot2 drawn with
@@ -67,21 +71,35 @@ six facet panels, 1600 × 1000 at 150 dpi) it cut ggplot + PNG from 3.4 s to
 ## User API
 
 ```r
-alot_png(plot, filename, width = 7, height = 5, units = "in", res = 96, ...)
-alot_render_coverage(plot)  # which tier draws the plot, and why
+alot_png(plot, filename, width = 7, height = 7, units = "in", dpi = 300,
+         bg = NULL, scaling = 1)
+alot_ggsave(filename, plot = last_plot(), ...)  # same signature as ggsave()
+alot_render_coverage(plot)                       # which tier, and why
 ```
 
-`plot` is a `ggplot` (built with `alot_build()` first) or a `ggplot_built`.
-The argument names and defaults are settled in R0.4 (see Open questions).
+- `alot_png()` follows `ggsave()`'s argument names and defaults. `plot` is a
+  `ggplot` (built with `alot_build()` first) or a `ggplot_built`.
+- `alot_ggsave()` is a drop-in for `ggplot2::ggsave()`. `.png` files go
+  through `alot_png()`; any other extension or device is passed to
+  `ggsave()` unchanged.
+- Threads: `options(alot.threads = )` or the `ALOT_THREADS` environment
+  variable. The default is the available cores, capped at 8, and at 2 when
+  `_R_CHECK_LIMIT_CORES_` is set.
 
 ## Architecture
 
 1. **Three tiers, chosen per plot.** `alot_png()` uses the first tier that
    supports the plot. Nothing fails just because alot doesn't support it
-   yet.
+   yet. The hybrid tier is permanent, not a stepping stone: every Rust
+   drawer works both in the full tier's page list and as a lazy grob in the
+   hybrid. If a tier hits an internal error (a Rust panic or an
+   inconsistent IR, as opposed to a declared "unsupported"), `alot_png()`
+   catches it, warns once with the error, and renders with the next tier.
    - **Full:** everything below, in Rust.
    - **Hybrid:** ggplot2's `ggplot_gtable()` and grid, drawn on
-     `ragg::agg_capture()`. Layers with a Rust drawer become lazy grobs. At
+     `ragg::agg_capture()`. This tier is used for plots with extension
+     grobs, plotmath, or text whose glyphs are missing from the resolved
+     font. Layers with a Rust drawer become lazy grobs. At
      draw time, each renders its panel to a pixel-aligned raster in Rust.
      The PNG is encoded in Rust.
    - **ggplot2:** `ggplot_gtable()` and ragg, unchanged, with a one-time
@@ -102,6 +120,10 @@ The argument names and defaults are settled in R0.4 (see Open questions).
 
    The budget is under 10 ms on the README plot. Building the IR also
    decides support per layer, guide and element, which picks the tier.
+   Each geom's `draw_panel`/`draw_group` logic is ported to Rust and emits
+   display-list items directly, so per-row work never returns to R. Each
+   mirrored ggproto method gets a body snapshot in `test-internals.R`, as
+   in Phase 1.
 3. **Rust lays out the page.** A gtable-like solver sizes rows and columns
    in absolute, `null`, summed and text-measured units, plus margins. It
    mirrors the `ggplot_gtable` structure in
@@ -109,10 +131,14 @@ The argument names and defaults are settled in R0.4 (see Open questions).
    along with `Facet$draw_panels`, guide assembly, `table_add_legends`, and
    title, caption and tag placement. It outputs boxes in device pixels, with
    a debug export for layout tests.
-4. **Text.** `ttf-parser` loads the files R resolved, and `rustybuzz`
-   shapes text for widths, ascent and descent. Sizes follow grid's
-   fontsize × lineheight rules. Glyph coverage is cached per font, size and
-   subpixel offset; rotated text uses outlines.
+4. **Text, in pure Rust.** `ttf-parser` loads the files R resolved, and
+   `rustybuzz` shapes text for widths, ascent and descent. Sizes follow
+   grid's fontsize × lineheight rules. Glyphs are drawn unhinted from
+   outlines, with coverage cached per font, size and subpixel offset;
+   rotated text uses outlines directly. ragg hints with FreeType, so glyph
+   pixels differ slightly; layout must still match. ragg's font fallback is
+   not mirrored: a string with a glyph missing from its font sends the plot
+   to the hybrid tier.
 5. **One display list per page.** Rust draws each geom, guide and theme
    element into a flat list of primitives in device pixels and drawing
    order: point batches (shape, size, stroke, colours), rect batches,
@@ -121,10 +147,12 @@ The argument names and defaults are settled in R0.4 (see Open questions).
    entry per layer, panel and style run, not one per mark, so 1e6 points
    stay a few large arrays. The hybrid tier uses the same drawers, through
    one-item lists.
-6. **Raster backend.** One f32 premultiplied page canvas, reused across
-   calls, is split into row bands drawn in parallel. Each band walks the
-   whole list in order, skipping items by y extent, so overlaps composite
-   as on a device and all panels draw at once. Clipping mirrors ragg's
+6. **Raster backend.** The page is drawn in row bands, in parallel. Each
+   band has an f32 premultiplied buffer, reused across calls, so memory is
+   bounded by band size rather than page size (a 20 × 20 in page at 300 dpi
+   would need about 575 MB as one f32 canvas). Each band walks the whole
+   list in order, skipping items by y extent, so overlaps composite as on a
+   device and all panels draw at once. Clipping mirrors ragg's
    fractional `clip_box`. The drawers are:
    - **points:** sprite stamping, with geometry from `GESymbol()` as ragg
      draws it, including ragg's circle polygons;
@@ -134,14 +162,17 @@ The argument names and defaults are settled in R0.4 (see Open questions).
      like ragg) or `tiny-skia`. R1.4 decides by fidelity against ragg and
      speed, and records why;
    - **text:** the cached glyph coverage, blended like a mask.
-7. **PNG output.** The `png` crate in fast mode writes RGB when the page is
+7. **PNG output.** Finished bands are converted to 8-bit and streamed to
+   the `png` crate in row order, in fast mode. It writes RGB when the page is
    opaque, RGBA otherwise, and adds ragg's `pHYs` chunk.
 
 Code lives in `alot-core/src/render/` (`ir`, `layout`, `text`, `display`,
 `raster`, `points`, `rects`, `paths`, `png`), with glue in
 `alot-r/src/render.rs` and R code in `R/render*.R`. New crates: `png` (with
 `fdeflate`), `ttf-parser`, `rustybuzz`, and `tiny-skia` if R1.4 picks it.
-Each must be declared in the licence note for vendored crates.
+Each must be declared in the licence note for vendored crates. ragg moves
+to Imports, pinned to `ragg (>= 1.5.0, < 1.6.0)` like ggplot2: we mirror its
+internals, so a new ragg version means re-verifying.
 
 ## Performance targets
 
@@ -152,6 +183,10 @@ only (IR, layout, raster, PNG; not the build):
 |---|---:|---:|---:|
 | README plot | ~2950 ms | ~400 ms | < 120 ms |
 | Same plot, 10 rows | ~210 ms | ~210 ms | < 25 ms |
+
+The default page (7 × 7 in at 300 dpi, 2100 × 2100 px) is also tracked. R0.3
+sets its target from the baselines, since symbols at 300 dpi cover about 4×
+the pixels.
 
 No drawer may be slower than ragg drawing the same marks.
 
@@ -187,12 +222,13 @@ No drawer may be slower than ragg drawing the same marks.
 | # | Milestone | Done when |
 |---|---|---|
 | 2.0 | **Hybrid tier, display list and raster engine.** The hybrid tier lands; the display list, band executor, point, rect and path drawers, and PNG output. | The hybrid tier renders the README plot. A 1e6-row `geom_point` and a 1000×1000 `geom_tile` panel (no axes or text) render to PNG faster than ggplot2 + ragg. |
-| 2.1 | **Layout engine and text metrics.** | Box positions match grid within 0.5 px across the theme and facet corpus (see Verification). |
-| 2.2 | **Single-panel cartesian plots.** Panel background, grid lines, axes and core geoms. | `geom_point/line/col/text` plots are visually equivalent. |
-| 2.3 | **Facets and strips.** | wrap/grid, free scales, switched strips. |
-| 2.4 | **Legends and colourbars.** All `draw_key` variants and legend positions. | |
-| 2.5 | **Remaining in-scope geoms**, secondary axes, `coord_flip/fixed/transform`. | |
-| 2.6 | **Tier selection, performance pass, docs.** | The targets above are met. |
+| 2.1 | **Layout engine and text metrics.** | Box positions match grid within 0.5 px on single-panel plots (see Verification). |
+| 2.2 | **README vertical slice.** Points, cartesian axes, fixed-scale `facet_wrap`, strips, colourbar and point legend, `theme_grey`. | The README plot renders in the full tier, visually equivalent, and meets the performance targets. |
+| 2.3 | **Core geoms and themes.** line, path, step, col/bar, rect, tile and text; every built-in complete theme. | Their corpus plots are visually equivalent. |
+| 2.4 | **Facets in full.** `facet_grid`, free scales, `space = "free"`, switched strips. | Facet corpus plots pass layout and image checks. |
+| 2.5 | **Legends in full.** All `draw_key` variants, coloursteps and bins, merged legends, all positions. | Legend corpus plots pass. |
+| 2.6 | **Remaining in-scope geoms**, secondary axes, `coord_flip/fixed/transform`. | Their corpus plots pass. |
+| 2.7 | **Tier selection, performance pass, docs.** | Every corpus plot renders through some tier; the targets are met. |
 
 ## Verification
 
@@ -203,8 +239,11 @@ No drawer may be slower than ragg drawing the same marks.
   numeric check that needs no image comparison.
 - **Image tests.** `expect_render_close()` draws each corpus plot with
   `alot_png()` and with ggplot2 on `ragg::agg_capture()`, then compares
-  pixels against the tolerance above. Failing pairs and their diff image are
-  written out for manual review.
+  pixels against the tolerance above. The reference is rendered live on
+  every run; no images are stored in the repo. Corpus plots are kept small
+  so this stays fast. Failing pairs and their diff image are written out
+  for manual review. Tests also check that no fallback warning was
+  raised, so internal errors can't hide behind the fallback.
 - **Geometry unit tests.** Rust tests check each drawer against ragg output
   measured once (symbol extents, line widths, circle coverage), so drift
   shows up without R.
@@ -215,10 +254,23 @@ No drawer may be slower than ragg drawing the same marks.
   + ragg and the hybrid, on the README plot (1e6 rows and 10 rows), 1e6
   points, a dense `geom_tile`, a 1e6-point line and 400 panels.
 
-## Open questions (R0.4)
+## Decisions
 
-1. **Default DPI and scaling.** Should defaults follow `ggsave()` (300 dpi,
-   size taken from the device) or ragg's 72/96 conventions?
-2. **API shape.** Should `alot_png()` take `ggsave()`'s argument names
-   (`dpi`, `bg`, `scaling`) or ragg's (`res`, `background`)? Should there be
-   an `alot_ggsave()`?
+Settled before the Phase 2 tasks start (2026-10-30):
+
+- **Fidelity:** visual, at the tolerance above; it is not pixel-exact.
+- **Output:** PNG files only.
+- **API:** `ggsave()` names and defaults (7 × 7 in, 300 dpi), plus
+  `alot_ggsave()`.
+- **Hybrid tier:** permanent.
+- **Path rasteriser:** R1.4 measures both candidates and picks one.
+- **Text:** pure Rust and unhinted. Missing glyphs drop the plot to the
+  hybrid tier.
+- **Geom logic:** ported to Rust per geom.
+- **Image references:** rendered live with ragg on every run.
+- **ragg:** in Imports, pinned to the 1.5 series.
+- **Canvas:** f32 per band, streamed to the encoder.
+- **Threads:** an option, defaulting to at most 8.
+- **Internal errors:** warn and fall back to the next tier.
+- **Order:** the README plot first, as a vertical slice through the full
+  tier, then breadth.

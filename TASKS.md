@@ -466,27 +466,37 @@ alongside Phase 1's remaining tasks.
   looser case is documented in the test, with the reason.
 - **Layout:** boxes within 0.5 px of grid's (R0.2 layout export), for tasks
   that place things.
+- **Both tiers:** each drawer works in the full tier's page list and as a
+  lazy grob in the hybrid tier, with tests for both.
 - **Fallback:** anything unsupported is reported by
   `alot_render_coverage()` and drops to the next tier, with a test per case.
+  Tests of supported cases also check that no fallback warning was raised
+  (an internal error would otherwise pass as a fallback).
 - **Speed:** each task's benchmark case in `inst/bench/render-*.R` is
   recorded in `RESULTS.md`. No drawer may be slower than ragg drawing the
   same marks.
 - **Rust:** algorithms live in `alot-core` with `cargo test` unit tests,
   including geometry checks against measured ragg output. Only conversion
   code goes in `alot-r`.
-- Each mirrored function cites its ggplot2, ragg or R source.
+- Each mirrored function cites its ggplot2, ragg or R source. Each newly
+  mirrored ggproto method (a geom's `draw_panel`, a facet's `draw_panels`,
+  a guide's drawing) gets a body snapshot in `test-internals.R`.
 
 ## R0 Foundations
 
 ### R0.1 Land the hybrid tier
 - **Depends:** —
 - **Touches:** `R/render.R`, `alot-core/src/render/{points,png}.rs`,
-  `alot-r/src/render.rs`, `tests/testthat/test-render.R`
+  `alot-r/src/render.rs`, `tests/testthat/test-render.R`, `DESCRIPTION`,
+  `AGENTS.md`
 - **Do:** Rebase the prototype (`proto/phase2-points`) onto `main` as the
   hybrid tier. Rename internals to match the layout above. Add
   `alot_render_coverage()` (tier, plus per layer "rust" or "ggplot2" with a
   reason). Make `alot_png()` signal which tier ran. Keep the prototype's
-  fallbacks (shapes, NA, coord, `clip`, device).
+  fallbacks (shapes, NA, coord, `clip`, device). Catch internal errors: warn
+  once with the error and render with ggplot2. Move ragg to Imports as
+  `ragg (>= 1.5.0, < 1.6.0)`, and add the ragg pin to AGENTS.md next to the
+  ggplot2 pin.
 - **Done when:** the README plot renders via the hybrid tier at the
   prototype's speed, and every fallback in `test-render.R` is reported by
   `alot_render_coverage()`.
@@ -496,15 +506,18 @@ alongside Phase 1's remaining tasks.
 - **Touches:** `tests/testthat/helper-render.R`, `tools/render-corpus.R`,
   `tests/testthat/test-render-corpus.R`, `.Rbuildignore`
 - **Do:**
-  - `expect_render_close(p, ..., max = 32, share = 0.001)` draws `p` with
-    ggplot2 + `agg_capture()` and with `alot_png()` (decoded), and compares
-    pixels. On failure it writes reference, result and diff images to a
-    temp directory and prints the path.
+  - `expect_render_close(p, ..., max = 32, share = 0.001, tier = "full")`
+    draws `p` live with ggplot2 + `agg_capture()` and with alot in the given
+    tier, and compares pixels. It fails if alot raised a fallback warning
+    or used a different tier. On failure it writes reference, result and
+    diff images to a temp directory and prints the path. No reference
+    images are stored.
   - A layout export: walk the gtable on a ragg device and record each
     named grob's box in device pixels via `deviceLoc()`. Compare it with
     the Rust layout's debug export (used from R4.1).
   - A render corpus: a subset of the Phase 1 corpus within PHASE2.md's
-    scope, filtered by `ALOT_RENDER_CORPUS` like `ALOT_CORPUS`.
+    scope, drawn at a small size so live references stay fast, and
+    filtered by `ALOT_RENDER_CORPUS` like `ALOT_CORPUS`.
   - Fetch the ragg 1.5.2 and R sources to `../ragg` and `../r-source`, and
     note them in AGENTS.md.
 - **Done when:** the harness runs on the hybrid tier over the render corpus.
@@ -517,24 +530,29 @@ alongside Phase 1's remaining tasks.
 - **Do:** Generalise the prototype's `render-readme.R` into a suite. It
   times each stage (build, IR, layout, raster, encode; or gtable and draw
   for ggplot2 and the hybrid), with interleaved runs, for these cases:
-  - the README plot;
+  - the README plot at 1600 × 1000 and 150 dpi, and at the default page
+    (7 × 7 in, 300 dpi);
   - the README plot with 10 rows (fixed cost);
   - 1e6-row `geom_point`, no axes;
   - a 1000 × 1000 `geom_tile`;
   - a 1e6-point `geom_line`;
   - 400 small facet panels.
 - **Done when:** baselines for ggplot2 + ragg and the hybrid are in
-  `RESULTS.md`.
+  `RESULTS.md`, and PHASE2.md has a target for the default page.
 
-### R0.4 Settle the API and defaults
-- **Depends:** —
-- **Touches:** `PHASE2.md`, `R/render.R`
-- **Do:** Answer PHASE2.md's open questions: default dpi and size
-  (`ggsave()` vs ragg conventions), `alot_png()` argument names, and
-  whether an `alot_ggsave()` wrapper is wanted. Record the answers in
-  PHASE2.md.
-- **Done when:** PHASE2.md has no open questions, and `alot_png()` matches
-  the decision on the hybrid tier.
+### R0.4 API: `alot_png()` and `alot_ggsave()`
+- **Depends:** R0.1
+- **Touches:** `R/render.R`, `R/ggsave.R`, `tests/testthat/test-render.R`
+- **Do:**
+  - Give `alot_png()` `ggsave()`'s names and defaults (`width = 7`,
+    `height = 7`, `units`, `dpi = 300`, `bg`, `scaling`), as in PHASE2.md's
+    User API.
+  - Add `alot_ggsave()` with `ggplot2::ggsave()`'s signature (mirror
+    ggplot2 R/save.R for sizes and units). `.png` files go through
+    `alot_png()`; anything else is passed to `ggsave()` unchanged.
+- **Done when:** `alot_ggsave()` gives the same file size, dimensions and
+  `pHYs` as `ggsave(device = ragg::agg_png)` for PNGs, passes other formats
+  through, and both functions are documented.
 
 ## R1 Raster engine (milestone 2.0)
 
@@ -543,16 +561,21 @@ alongside Phase 1's remaining tasks.
 - **Touches:** `alot-core/src/render/{display,raster}.rs`
 - **Do:**
   - Define the display-list items and clip stack in device pixels.
-  - Build the page canvas (f32 premultiplied, reused across calls) and the
-    executor: split rows into bands, and walk the list in order in each
-    band, skipping items by y extent.
+  - Build the executor: split the page into row bands, each with an f32
+    premultiplied buffer reused across calls, so memory is bounded by band
+    size. Each band walks the list in order, skipping items by y extent.
+    Finished bands are handed over in row order for encoding (R1.5).
+  - Set the thread count from `options(alot.threads)` or `ALOT_THREADS`,
+    defaulting to the available cores capped at 8, and at 2 when
+    `_R_CHECK_LIMIT_CORES_` is set.
   - Mirror ragg's clipping (`clip_box` at fractional panel edges) and
     background fill.
   - Move the prototype's point drawer onto it, so the hybrid's per-panel
     raster is a one-item display list.
 - **Done when:** a background plus a 1e6-point batch renders, matching the
-  hybrid's pixels, and the blend scales with threads. Record 1 vs 16
-  threads.
+  hybrid's pixels, and the blend scales with threads (record 1 vs 8). A
+  20 × 20 in page at 300 dpi renders within a memory bound set by the band
+  size.
 
 ### R1.2 Point batches: all shapes
 - **Depends:** R1.1
@@ -595,10 +618,12 @@ alongside Phase 1's remaining tasks.
 ### R1.5 PNG output
 - **Depends:** R1.1
 - **Touches:** `alot-core/src/render/png.rs`
-- **Do:** Move the prototype's encoder over. Write RGB when the page is
-  opaque and RGBA otherwise, add ragg's `pHYs` chunk from `res`, and handle
-  `bg = "transparent"`. Measure fdeflate's fast mode against parallel
-  deflate on large pages.
+- **Do:** Move the prototype's encoder over and make it stream: take bands
+  in row order as R1.1 finishes them. Choosing RGB or RGBA needs to know
+  whether the page is opaque before the first row; decide it from the
+  background and the display list (`bg = "transparent"` gives RGBA). Add
+  ragg's `pHYs` chunk from `dpi`. Measure fdeflate's fast mode against
+  parallel deflate on large pages.
 - **Done when:** the files decode to the canvas exactly, carry the same
   metadata as ragg's, and encode the README page in about 20 ms or less.
 
@@ -612,17 +637,20 @@ alongside Phase 1's remaining tasks.
   fonts with `ttf-parser` and shape with `rustybuzz`. Mirror
   `textshaping`/ragg string width, ascent and descent, and grid's fontsize ×
   lineheight rules for multi-line text.
+  Check that every glyph exists in the resolved font; if any is missing,
+  the plot goes to the hybrid tier (ragg's font fallback isn't mirrored).
 - **Done when:** widths are within 0.25 px and heights match grid's
   `stringWidth()`/`stringHeight()` on a ragg device, across theme fonts,
-  sizes and dpis.
+  sizes and dpis. Text with missing glyphs (CJK labels with a Latin font,
+  emoji) reports the hybrid tier.
 
 ### R2.2 Glyph drawing
 - **Depends:** R2.1, R1.4
 - **Touches:** `alot-core/src/render/text.rs`
-- **Do:** Draw text runs from cached glyph coverage (per font, size and
-  subpixel offset) with hjust, vjust and rotation. Mirror ragg's hinting
-  and rotation behaviour. Unrotated text uses the cache; other angles use
-  outlines.
+- **Do:** Draw text runs unhinted, from cached glyph coverage (per font,
+  size and subpixel offset), with hjust, vjust and rotation. Unrotated text
+  uses the cache; other angles use outlines. ragg's FreeType hinting is
+  not mirrored, so glyph pixels differ slightly from ragg's.
 - **Done when:** axis labels, rotated axis titles and multi-line titles pass
   `expect_render_close()` (text may get a documented looser tolerance).
 
@@ -656,7 +684,7 @@ alongside Phase 1's remaining tasks.
 - **Done when:** results equal `col2rgb(alpha(colour, a), alpha = TRUE)` on
   every colour R accepts, or decline.
 
-## R4 Layout and single-panel plots (milestones 2.1–2.2)
+## R4 Layout (milestone 2.1)
 
 ### R4.1 Table solver
 - **Depends:** R2.1, R3.1
@@ -676,52 +704,74 @@ alongside Phase 1's remaining tasks.
   border from theme elements. Mirror `guide_axis` drawing: ticks, labels,
   `angle`, `n.dodge`, `check.overlap`, minor ticks and axis lines, for
   positions bottom, left, top and right.
-- **Done when:** blank-layer plots with each built-in complete theme pass
+- **Done when:** blank-layer plots with `theme_grey()` pass
   `expect_render_close()` and the layout check.
 
-### R4.3 First full-tier plots
-- **Depends:** R4.2, R1.2, R1.3, R1.4
-- **Touches:** `R/render.R`, `alot-core/src/render/geoms/`
-- **Do:** Draw `geom_point`, `line`, `path`, `step`, `col`/`bar`, `rect`,
-  `tile` and `text` by mirroring each `draw_panel`/`draw_group`, with
-  `coord_cartesian` (`expand`, `clip`). Switch `alot_png()` to the full
-  tier when supported.
-- **Done when:** these geoms pass across the corpus (milestone 2.2), and
-  the README plot without facets meets the PHASE2.md targets.
+## R5 README vertical slice (milestone 2.2)
 
-## R5 Facets (milestone 2.3)
+The README plot entirely in the full tier, before any breadth. Each task
+covers exactly what the plot needs, and declines (drops a tier) for
+anything else.
 
-### R5.1 Wrap and grid facets
-- **Depends:** R4.3
+### R5.1 Points in the full tier
+- **Depends:** R4.2, R1.2
+- **Touches:** `R/render.R`, `alot-core/src/render/geoms/point.rs`
+- **Do:** Mirror `GeomPoint$draw_panel` in Rust onto point batches, with
+  `coord_cartesian` (`expand`, `clip`) and continuous and log scales. Switch
+  `alot_png()` to the full tier when the whole plot is supported.
+- **Done when:** single-panel `geom_point` plots without legends render in
+  the full tier and pass `expect_render_close()`.
+
+### R5.2 Fixed-scale `facet_wrap` and strips
+- **Depends:** R5.1
 - **Touches:** `alot-core/src/render/facet.rs`
-- **Do:** Mirror `FacetWrap`/`FacetGrid` `draw_panels`: panel tables, fixed
-  and free scales, `space = "free"`, axis placement per panel, strips (all
-  positions, `switch`, `strip.placement`) and spacing.
-- **Done when:** facet corpus plots pass layout and image checks, and the
-  README plot meets both PHASE2.md targets.
+- **Do:** Mirror `FacetWrap$draw_panels` for fixed scales: panel table,
+  axes on outer panels, strips on top with `theme_grey()`'s strip elements,
+  and panel spacing.
+- **Done when:** fixed-scale `facet_wrap` point plots pass layout and image
+  checks.
 
-## R6 Legends (milestone 2.4)
-
-### R6.1 Legend layout and boxes
-- **Depends:** R4.1
-- **Touches:** `alot-core/src/render/legend.rs`
-- **Do:** Mirror guide assembly: titles, label placement, `byrow`, `nrow`
-  and `ncol`, merged legends, the legend box (`legend.box`,
-  justification), and all positions including inside.
-- **Done when:** legend boxes match grid within 0.5 px across the corpus.
-
-### R6.2 Keys and colour guides
-- **Depends:** R6.1, R4.3
+### R5.3 Colourbar and point legend
+- **Depends:** R5.1, R4.1
 - **Touches:** `alot-core/src/render/{legend,keys}.rs`
-- **Do:** Draw `draw_key_*` for every in-scope geom, `guide_colourbar` (as
-  a raster or rect strip, as ggplot2 draws it), `guide_coloursteps` and
-  `guide_bins`.
-- **Done when:** each key and colour guide passes `expect_render_close()`.
+- **Do:** Mirror guide assembly for the right-hand legend box with two
+  guides: `guide_colourbar` (bar raster or rects, ticks, labels) and
+  `guide_legend` with `draw_key_point` keys. Cover titles, spacing and box
+  stacking.
+- **Done when:** the README plot renders in the full tier, passes layout and
+  image checks, and meets both PHASE2.md targets.
 
-## R7 Remaining scope (milestone 2.5)
+## R6 Breadth (milestones 2.3–2.6)
 
-### R7.1 Remaining geoms
-- **Depends:** R4.3
+### R6.1 Core geoms
+- **Depends:** R5.1
+- **Do:** Mirror `draw_panel`/`draw_group` for line, path, step, col/bar,
+  rect, tile and text.
+- **Done when:** each passes `expect_render_close()` across its corpus
+  plots.
+
+### R6.2 Complete themes
+- **Depends:** R4.2
+- **Do:** Cover every built-in complete theme, and the theme elements and
+  options they use.
+- **Done when:** blank and point plots pass in each theme.
+
+### R6.3 Facets in full
+- **Depends:** R5.2
+- **Do:** Add `facet_grid`, free scales, `space = "free"`, axes on every
+  panel where ggplot2 draws them, and strip positions, `switch` and
+  `strip.placement`.
+- **Done when:** facet corpus plots pass layout and image checks.
+
+### R6.4 Legends in full
+- **Depends:** R5.3, R6.1
+- **Do:** Add `draw_key_*` for every in-scope geom, `guide_coloursteps`,
+  `guide_bins`, merged legends, `byrow`, `nrow` and `ncol`, all legend
+  positions including inside, and `legend.box`/justification.
+- **Done when:** legend corpus plots pass layout and image checks.
+
+### R6.5 Remaining geoms
+- **Depends:** R6.1
 - **Do:** Add drawers for the rest of PHASE2.md's geom list (area, ribbon,
   density, boxplot, violin, the ranges, crossbar, segment, curve, the
   reference lines, smooth, label, rug and annotate layers). These can be
@@ -729,43 +779,46 @@ alongside Phase 1's remaining tasks.
 - **Done when:** each passes `expect_render_close()` across its corpus
   plots.
 
-### R7.2 Coords and secondary axes
-- **Depends:** R4.3
+### R6.6 Coords and secondary axes
+- **Depends:** R6.1
 - **Do:** Add `coord_flip`, `coord_fixed`/`aspect.ratio` and
   `coord_transform` (munching mirrored from ggplot2, in Rust where it is per
   row), plus secondary axes.
 - **Done when:** the corpus plots using them pass layout and image checks.
 
-## R8 Integration (milestone 2.6)
+## R7 Integration (milestone 2.7)
 
-### R8.1 Tier selection and messages
-- **Depends:** R4.3
-- **Do:** Finalise automatic tier choice and the one-time message when a
-  plot drops below the full tier. Make sure the hybrid tier covers every
-  layer that has a full-tier drawer.
+### R7.1 Tier selection and messages
+- **Depends:** R5.3
+- **Do:** Finalise automatic tier choice, the one-time message when a plot
+  drops below the full tier, and warn-and-fall-back on internal errors.
+  Make sure the hybrid tier covers every layer that has a full-tier
+  drawer.
 - **Done when:** every corpus plot renders through some tier, and
-  `alot_render_coverage()` explains each non-full one.
+  `alot_render_coverage()` explains each one that isn't full.
 
-### R8.2 Performance pass
-- **Depends:** R5.1, R6.2
+### R7.2 Performance pass
+- **Depends:** R6.3, R6.4
 - **Do:** Profile the render suite end to end. Remove serial stages and
   per-call allocations, and check thread scaling and memory at 300 dpi.
-- **Done when:** the targets above are met and recorded in `RESULTS.md`.
+- **Done when:** the PHASE2.md performance targets are met and recorded in
+  `RESULTS.md`.
 
-### R8.3 Phase 2 exit
+### R7.3 Phase 2 exit
 - **Depends:** everything above
 - **Do:** Verify the render corpus passes, the targets are met, PHASE2.md
-  reflects what shipped, and the README documents `alot_png()`.
+  reflects what shipped, and the README documents `alot_png()` and
+  `alot_ggsave()`.
 - **Done when:** the checklist is recorded in this file.
 
 ## Suggested order (Phase 2)
 
-1. R0.1, R0.2 and R0.4 in parallel, then R0.3.
+1. R0.1 and R0.2 in parallel, then R0.3 and R0.4.
 2. R1.1, then R1.2–R1.5 in parallel. The hybrid tier gains rects and paths
    as they land.
-3. R2.1 and R3.1 in parallel, then R3.2, R2.2 and R4.1.
-4. R4.2 → R4.3. This is the first full-tier plot.
-5. R5.1 and R6.1–R6.2, then R7.x.
-6. R8.1 → R8.2 → R8.3.
+3. R2.1 and R3.1 in parallel, then R3.2, R2.2 and R4.1, then R4.2.
+4. The README vertical slice: R5.1 → R5.2 → R5.3.
+5. Breadth: R6.1–R6.6, mostly in parallel.
+6. R7.1 → R7.2 → R7.3.
 
 The README plot's remaining build time (about 195 ms) is Phase 1's T6.2.
