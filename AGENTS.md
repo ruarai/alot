@@ -92,8 +92,10 @@ with `rextendr::document()`.
    `inst/bench/RESULTS.md`.
 6. **Match ggplot2's types and attributes:** integer vs double, factor
    levels, `mapped_discrete`, and column order. `expect_equal` checks them.
-7. **Pin `ggplot2 (>= 4.0.0, < 4.1.0)`.** Don't add code paths for other
-   ggplot2 versions.
+7. **Pin `ggplot2 (>= 4.0.0, < 4.1.0)` and `ragg (>= 1.5.0, < 1.6.0)`.**
+   Rendering mirrors ragg's internals, so a new ragg version means
+   re-verifying it. Don't add code paths for other ggplot2 or ragg
+   versions.
 
 ## Style
 

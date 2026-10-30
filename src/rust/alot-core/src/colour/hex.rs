@@ -161,3 +161,28 @@ mod tests {
         assert_eq!(encode_rgb([-3.0, 10.5, 11.5], Some(0x0A)).as_str(), "#000A0C0A");
     }
 }
+
+/// Parses `#RRGGBB` or `#RRGGBBAA` (either case) to RGBA bytes, alpha 255
+/// when absent. `None` for anything else, such as colour names.
+pub fn parse_hex(s: &[u8]) -> Option<[u8; 4]> {
+    let digit = |c: u8| (c as char).to_digit(16).map(|d| d as u8);
+    let byte = |i: usize| Some(digit(s[i])? << 4 | digit(s[i + 1])?);
+    match s {
+        [b'#', ..] if s.len() == 7 => Some([byte(1)?, byte(3)?, byte(5)?, 255]),
+        [b'#', ..] if s.len() == 9 => Some([byte(1)?, byte(3)?, byte(5)?, byte(7)?]),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod parse_tests {
+    use super::*;
+
+    #[test]
+    fn parses_hex_with_and_without_alpha() {
+        assert_eq!(parse_hex(b"#440154"), Some([0x44, 0x01, 0x54, 255]));
+        assert_eq!(parse_hex(b"#fde7254c"), Some([0xFD, 0xE7, 0x25, 0x4C]));
+        assert_eq!(parse_hex(b"black"), None);
+        assert_eq!(parse_hex(b"#12345G"), None);
+    }
+}

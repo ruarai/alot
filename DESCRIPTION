@@ -17,13 +17,16 @@ Imports:
     ggplot2 (>= 4.0.0),
     ggplot2 (< 4.1.0),
     grid,
+    ragg (>= 1.5.0),
+    ragg (< 1.6.0),
     labeling,
     scales,
     rlang,
     utils,
     vctrs
 Suggests:
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    withr
 Config/testthat/edition: 3
 Config/rextendr/version: 0.5.0
 SystemRequirements: Cargo (Rust's package manager), rustc >= 1.78.0

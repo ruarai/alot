@@ -508,7 +508,7 @@ alongside Phase 1's remaining tasks.
 
 ## R0 Foundations
 
-### R0.1 Land the hybrid tier
+### R0.1 Land the hybrid tier — done
 - **Depends:** —
 - **Touches:** `R/render.R`, `alot-core/src/render/{points,png}.rs`,
   `alot-r/src/render.rs`, `tests/testthat/test-render.R`, `DESCRIPTION`,

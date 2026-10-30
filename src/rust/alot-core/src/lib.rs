@@ -5,4 +5,5 @@ pub mod breaks;
 pub mod colour;
 pub mod facet;
 pub mod group;
+pub mod render;
 pub mod scale;

@@ -518,3 +518,82 @@ free 722 → 470 ms (1.54×), grid free 572 → 299 ms (1.91×), wrap fixed
 - What remains is mostly ggproto `$` lookups inside ggplot2's own helpers
   (`expand_limits_scale`, `get_breaks_minor`) and the `ggproto()` calls
   per COORD, which must stay to give each panel its own objects.
+
+## Phase 2 prototype: README plot to PNG (2026-10-30)
+
+Experimental (branch `proto/phase2-points`). `inst/bench/render-readme.R`
+times the README example plot (1e6 points, `facet_wrap`, log x, viridis
+colour, four shapes, `alpha = 0.3`) from ggplot to a 1600 × 1000 PNG at
+150 dpi. Medians of 7 interleaved runs:
+
+| step   | ggplot2 | alot   | speedup |
+|--------|--------:|-------:|--------:|
+| build  | 411 ms  | 195 ms | 2.1×    |
+| gtable | 420 ms  | 212 ms | 2.0×    |
+| draw   | 2541 ms | 188 ms | 13.5×   |
+| total  | 3384 ms | 595 ms | 5.7×    |
+
+ggplot2's path is `ggplot_build()`, `ggplot_gtable()`, then grid drawing on
+`ragg::agg_png()`. alot's is `alot_build()`, `alot_gtable()`, then grid
+drawing on `ragg::agg_capture()` with the PNG encoded in Rust (what
+`alot_png()` does). The images match closely: mean |diff| 0.37 of 255, max
+15, and 0.02% of pixels differ by more than 8.
+
+What the prototype does:
+
+- **Points are rasterised in Rust.** `alot_gtable()` gives `GeomPoint`
+  layers a lazy grob per panel. At draw time on a ragg device, it renders
+  the panel's points into a pixel-aligned raster and draws that with
+  `grid.raster()`. Symbols are coverage sprites per (shape, size, lwd) at
+  1/8-px offsets, cached for the process, and are blended in parallel row
+  bands in data order. Circles use ragg's own polygon step counts; with
+  true discs, edges were measurably darker. Anything else falls back to
+  ggplot2's `pointsGrob`: other shapes, NA, non-cartesian coords, `clip =
+  "off"`, or a non-ragg device.
+- **The PNG is encoded in Rust.** libpng at ragg's default zlib level took
+  112 ms for this image; the `png` crate's fast mode with capture readback
+  takes about 20 ms.
+
+Where the draw time went, in ggplot2's path. 97% of the draw step was
+`drawDetails.points`, i.e. ragg rasterising 1e6 point symbols. For alot,
+`GeomPoint$draw_panel` (`alpha()` encode/decode and splitting the data by
+panel) was about 290 ms of the gtable step; the alot point path takes
+17 ms.
+
+Remaining time in alot's 595 ms, roughly:
+
+- **build, 195 ms:** position train and map (T6.2), plus
+  `compute_aesthetics`, `guides_build` and the npscales.
+- **gtable, 212 ms:** about 17 ms for the point layer. The rest is
+  ggplot2's facet render (axes, strips, theme elements, S7 validation,
+  guides), which doesn't depend on the row count: 141 ms on the same plot
+  with 10 rows.
+- **draw, 188 ms:** about 90–115 ms for the Rust point render (six panels,
+  each about 15 ms: about 6 ms blending on 16 threads, the rest placing
+  points serially and per-call overhead). Then about 50 ms for ragg drawing
+  text, axes and backgrounds, and about 20 ms for PNG encoding.
+
+The hybrid's floor (ggplot2's gtable and ragg for everything except points)
+is about 210 ms with no points at all. Removing that floor needs the full
+Phase 2 design: layout and text in Rust, replacing `ggplot_gtable()`, grid
+and ragg. That would leave roughly the build plus the point render (an
+estimate of about 0.3 s, not measured). The cheaper next steps inside the
+hybrid are rendering all panels in one parallel call and placing points in
+parallel (an estimated 50 ms saving).
+
+### R0.1: hybrid tier landed (2026-10-30)
+
+The prototype is now the hybrid tier (`alot_png()`, with
+`alot_render_coverage()`). Same benchmark, release build, medians of 7
+interleaved runs:
+
+| step   | ggplot2 | alot   | speedup |
+|--------|--------:|-------:|--------:|
+| build  | 447 ms  | 189 ms | 2.4×    |
+| gtable | 388 ms  | 207 ms | 1.9×    |
+| draw   | 2531 ms | 170 ms | 14.9×   |
+| total  | 3428 ms | 567 ms | 6.0×    |
+
+Pixels as before (max |diff| 15, 0.018% differ by more than 8).
+`alot_png()` on the built plot takes about 370 ms end to end; the tier
+check (`render_coverage()`) is about 6 ms of that.

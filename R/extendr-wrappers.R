@@ -166,4 +166,33 @@ rs_grouped_test_stat <- function(df, cols) .Call(wrap__grouped_test_stat, df, co
 #' @noRd
 rs_grouped_test_position <- function(df, col) .Call(wrap__grouped_test_position, df, col)
 
+#' Writes a nativeRaster (`dim` = height, width) to `path` as PNG.
+#' @noRd
+rs_write_png <- function(raster, path) .Call(wrap__write_png, raster, path)
+
+#' Colours of a point layer as `scales::alpha(colour, alpha)` would give
+#' them, packed as nativeRaster ints (`R | G << 8 | B << 16 | A << 24`).
+#' `alpha` is double (length 1 or `n`) or all-NA logical (keep the
+#' colour's alpha); an NA among doubles also keeps it. `NULL` (decline) if any
+#' colour is not `#RRGGBB(AA)` hex, or for other `alpha` types.
+#' @noRd
+rs_point_colours <- function(colour, alpha) .Call(wrap__point_colours, colour, alpha)
+
+#' Whether every shape is one the renderer draws (double or integer
+#' codes, no NA).
+#' @noRd
+rs_point_shapes_supported <- function(shape) .Call(wrap__point_shapes_supported, shape)
+
+#' Renders the rows of a point layer in panel `panel_id` to a nativeRaster
+#' of `dims` (width, height) pixels. `rect` is the panel's (left, top,
+#' width, height) in canvas pixels; positions are rescaled from
+#' `x_range`/`y_range` to it, with infinite values squished to the edges
+#' as `CoordCartesian$transform()` does. `size` and `stroke` follow
+#' `gg_par()`: symbol size (size * pt + stroke * stroke_scale / 2) pt, line
+#' width stroke * stroke_scale / 2 lwd, converted at `res` pixels per inch.
+#' `colour` comes from `rs_point_colours()`. `NULL` (decline) for
+#' unsupported inputs.
+#' @noRd
+rs_render_points <- function(x, y, panel, panel_id, x_range, y_range, rect, dims, shape, size, stroke, colour, consts) .Call(wrap__render_points, x, y, panel, panel_id, x_range, y_range, rect, dims, shape, size, stroke, colour, consts)
+
 # nolint end
