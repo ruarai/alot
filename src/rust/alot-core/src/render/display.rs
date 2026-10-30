@@ -2,6 +2,7 @@
 //! device pixels (origin top-left, pixel `i` covers `[i, i + 1)`), in
 //! drawing order. `raster` executes it band by band.
 
+use crate::render::paths::PathBatch;
 use crate::render::points::PointBatch;
 use crate::render::rects::RectBatch;
 
@@ -46,6 +47,7 @@ pub enum Item {
     PopClip,
     Points(PointBatch),
     Rects(RectBatch),
+    Paths(PathBatch),
 }
 
 impl Item {
@@ -56,6 +58,7 @@ impl Item {
             Item::Clear(_) | Item::PushClip(_) | Item::PopClip => None,
             Item::Points(b) => Some(b.rows()),
             Item::Rects(b) => Some(b.rows()),
+            Item::Paths(b) => Some(b.rows()),
         }
     }
 }

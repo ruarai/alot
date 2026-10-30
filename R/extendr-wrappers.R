@@ -211,4 +211,21 @@ rs_render_points <- function(x, y, rows, x_range, y_range, rect, dims, shape, si
 #' @noRd
 rs_render_rects <- function(xmin, xmax, ymin, ymax, rows, x_range, y_range, rect, dims, colour, fill, lwd, join, res, threads) .Call(wrap__render_rects, xmin, xmax, ymin, ymax, rows, x_range, y_range, rect, dims, colour, fill, lwd, join, res, threads)
 
+#' Renders one panel of a path or polygon layer to a nativeRaster of `dims`
+#' (width, height) pixels, as grid's polylineGrob, polygonGrob and pathGrob
+#' draw on ragg. `rows` (1-based) are the panel's rows in drawing order;
+#' `path` gives each row's path (0-based, into the per-path `colour`,
+#' `fill`, `lwd` and `lty`) and `ring` its ring within the path. Open
+#' paths (`closed` false) are polylines, split at non-finite points into
+#' separately drawn runs as grid does; closed ones are polygons filled with
+#' `rule` (0 non-zero, 1 even-odd). `lwd` is grid's lwd, converted at `res`
+#' pixels per inch; `lty` is R's packed line type (0 solid; dashes scaled by
+#' the width). `cap` is 0 round, 1 butt, 2 square; `join` 0 round, 1 mitre,
+#' 2 bevel. `rect` is the panel's (left, top, width, height) in canvas
+#' pixels, positions are rescaled from `x_range`/`y_range` with infinite
+#' values squished to its edges, and each path is clipped to it. `NULL`
+#' (decline) for unsupported inputs.
+#' @noRd
+rs_render_paths <- function(x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads) .Call(wrap__render_paths, x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads)
+
 # nolint end

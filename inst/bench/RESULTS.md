@@ -810,3 +810,30 @@ The 1000 × 1000 tile layer draws 15.5× faster than ragg (done-when: 10×)
 and is pixel-identical to ragg at 400 × 300 and 1600 × 1000. Rust alone
 (`cargo run --release -p alot-core --example rects_bench`): about 48 ms on
 8 threads, of which about 37 ms is building the batch.
+
+## R1.4: paths — AGG port vs tiny-skia (2026-10-30)
+
+R1.4 asked for a choice between an AGG-style exact-area rasteriser and
+tiny-skia. R1.2 had already ported AGG's rasteriser and stroker (the code
+ragg draws with); R1.4 added AGG's dash generator and the even-odd rule.
+A scratch comparison (not in the repo, so tiny-skia never became a
+dependency) stroked a 1e6-segment polyline at 1600 × 1000, lwd 0.74 px:
+
+| case | AGG port | tiny-skia 0.11 | tiny-skia vs AGG |
+|---|---:|---:|---|
+| solid | 213 ms | 1370 ms | max 255, 0.51% of pixels differ by > 8 |
+| dashed (`lty = 2`) | 159 ms | 643 ms | max 255, 0.55% differ by > 8 |
+
+**Decision: the AGG port.** It is ragg's own algorithm, so coverage
+matches ragg exactly (lines, dashes and polygons pass
+`expect_render_close()` at max diffs of 0–2), and it is 4–6× faster here
+because each row band rasterises only the edges reaching it, in parallel.
+tiny-skia differs from ragg on about half a percent of pixels (different
+coverage and stroking geometry) and would need its own dash and join
+handling to match R.
+
+Render suite, release build (ms):
+
+| case | ggplot2 draw | hybrid draw | ggplot2 render | hybrid render |
+|---|---:|---:|---:|---:|
+| line_1e6 (`geom_line`, 1e6 points) | 571 | 245 | 1475 | 431 |

@@ -173,3 +173,11 @@ test_that("upstream rect drawing matches what the hybrid tier mirrors", {
   expect_snapshot(print(body(environment(ggplot2::ScaleDiscretePosition$rescale)$f)))
   expect_snapshot(print(body(environment(ggplot2::ScaleDiscretePosition$map)$f)))
 })
+
+test_that("upstream path drawing matches what the hybrid tier mirrors", {
+  # draw_paths_layer() and draw_polygons_layer() (R/render.R) mirror these.
+  # If they fail, update the mirror, then the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::GeomPath$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomPath$handle_na)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomPolygon$draw_panel)$f)))
+})

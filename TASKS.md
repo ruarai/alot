@@ -627,7 +627,7 @@ alongside Phase 1's remaining tasks.
 - **Done when:** a 1000 × 1000 `geom_tile` matches ragg and draws in under a
   tenth of ragg's time.
 
-### R1.4 Paths: strokes, fills and line types
+### R1.4 Paths: strokes, fills and line types — done
 - **Depends:** R1.1
 - **Touches:** `alot-core/src/render/paths.rs`
 - **Do:**

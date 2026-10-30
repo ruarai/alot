@@ -3,7 +3,8 @@
 use crate::convert::{self, Column, ColumnData};
 use alot_core::colour::hex;
 use alot_core::render::points::{self, Point};
-use alot_core::render::agg::Join;
+use alot_core::render::agg::{Cap, Join, Rule};
+use alot_core::render::paths::{PathBatch, PathSpec, Stroke};
 use alot_core::render::display::{DisplayList, Item, Rect};
 use alot_core::render::rects::{RectBatch, RectSpec, RectStyle};
 use alot_core::render::raster;
@@ -273,6 +274,124 @@ fn render_rects(
     out
 }
 
+/// Renders one panel of a path or polygon layer to a nativeRaster of `dims`
+/// (width, height) pixels, as grid's polylineGrob, polygonGrob and pathGrob
+/// draw on ragg. `rows` (1-based) are the panel's rows in drawing order;
+/// `path` gives each row's path (0-based, into the per-path `colour`,
+/// `fill`, `lwd` and `lty`) and `ring` its ring within the path. Open
+/// paths (`closed` false) are polylines, split at non-finite points into
+/// separately drawn runs as grid does; closed ones are polygons filled with
+/// `rule` (0 non-zero, 1 even-odd). `lwd` is grid's lwd, converted at `res`
+/// pixels per inch; `lty` is R's packed line type (0 solid; dashes scaled by
+/// the width). `cap` is 0 round, 1 butt, 2 square; `join` 0 round, 1 mitre,
+/// 2 bevel. `rect` is the panel's (left, top, width, height) in canvas
+/// pixels, positions are rescaled from `x_range`/`y_range` with infinite
+/// values squished to its edges, and each path is clipped to it. `NULL`
+/// (decline) for unsupported inputs.
+/// @noRd
+#[extendr(r_name = "rs_render_paths")]
+#[allow(clippy::too_many_arguments)]
+fn render_paths(
+    x: &[f64],
+    y: &[f64],
+    rows: &[i32],
+    path: &[i32],
+    ring: &[i32],
+    colour: &[i32],
+    fill: &[i32],
+    lwd: &[f64],
+    lty: &[f64],
+    style: &[i32],
+    mitre: f64,
+    x_range: &[f64],
+    y_range: &[f64],
+    rect: &[f64],
+    dims: &[i32],
+    res: f64,
+    threads: i32,
+) -> Robj {
+    let n = x.len();
+    let np = colour.len();
+    let [left, top, pw, ph] = rect else { return Robj::from(()) };
+    let &[w, h] = dims else { return Robj::from(()) };
+    let &[closed, rule, cap, join] = style else { return Robj::from(()) };
+    let lens_ok = y.len() == n && path.len() == rows.len() && ring.len() == rows.len() && [fill.len(), lwd.len(), lty.len()].iter().all(|&l| l == np);
+    let idx_ok = rows.iter().all(|&r| r >= 1 && r as usize <= n) && path.iter().all(|&p| p >= 0 && (p as usize) < np);
+    let lty_ok = lty.iter().all(|&l| l >= 0.0 && l <= u32::MAX as f64 && l.fract() == 0.0);
+    let (rule, cap, join) = match (rule, cap, join) {
+        (r @ 0..=1, c @ 0..=2, j @ 0..=2) => (
+            if r == 0 { Rule::NonZero } else { Rule::EvenOdd },
+            [Cap::Round, Cap::Butt, Cap::Square][c as usize],
+            [Join::Round, Join::Miter, Join::Bevel][j as usize],
+        ),
+        _ => return Robj::from(()),
+    };
+    if !lens_ok || !idx_ok || !lty_ok || x_range.len() != 2 || y_range.len() != 2 {
+        return Robj::from(());
+    }
+    let npc = |v: f64, r: &[f64]| {
+        if v == f64::INFINITY {
+            1.0
+        } else if v == f64::NEG_INFINITY {
+            0.0
+        } else {
+            (v - r[0]) / (r[1] - r[0])
+        }
+    };
+    let bytes = |c: i32| {
+        let c = c as u32;
+        [c as u8, (c >> 8) as u8, (c >> 16) as u8, (c >> 24) as u8]
+    };
+    let spec = |p: usize, rings: Vec<Vec<[f64; 2]>>| PathSpec {
+        rings,
+        closed: closed != 0,
+        fill: bytes(fill[p]),
+        rule,
+        col: bytes(colour[p]),
+        stroke: Stroke { lwd: lwd[p] * res / 96.0, lty: lty[p] as u32, cap, join, mitre },
+    };
+    let mut specs = Vec::new();
+    let mut k = 0;
+    while k < rows.len() {
+        // One path: consecutive rows with the same `path`.
+        let p = path[k] as usize;
+        let mut rings: Vec<Vec<[f64; 2]>> = Vec::new();
+        let mut last_ring = None;
+        while k < rows.len() && path[k] as usize == p {
+            let i = rows[k] as usize - 1;
+            let pt = [left + npc(x[i], x_range) * pw, top + (1.0 - npc(y[i], y_range)) * ph];
+            let new_ring = last_ring != Some(ring[k]);
+            // Polylines break at NA, as grid draws each run separately.
+            let broken = closed == 0 && !(pt[0].is_finite() && pt[1].is_finite());
+            if broken {
+                rings.push(Vec::new());
+            } else {
+                if new_ring || rings.is_empty() {
+                    rings.push(Vec::new());
+                }
+                rings.last_mut().unwrap().push(pt);
+            }
+            last_ring = Some(ring[k]);
+            k += 1;
+        }
+        rings.retain(|r| !r.is_empty());
+        if closed != 0 {
+            specs.push(spec(p, rings));
+        } else {
+            specs.extend(rings.into_iter().map(|r| spec(p, vec![r])));
+        }
+    }
+    let (w, h) = (w as usize, h as usize);
+    let (out, ptr) = native_raster(w, h);
+    let pixels = unsafe { std::slice::from_raw_parts_mut(ptr, w * h) };
+    let mut list = DisplayList::new();
+    list.push(Item::PushClip(Rect { x0: *left, y0: *top, x1: left + pw, y1: top + ph }));
+    list.push(Item::Paths(PathBatch::new(&specs)));
+    let opts = raster::Options { threads: threads.max(0) as usize, ..Default::default() };
+    raster::render_into(&list, w, h, &opts, pixels);
+    out
+}
+
 /// Writes a nativeRaster (`dim` = height, width) to `path` as PNG: RGBA if
 /// `alpha`, else RGB; with a `pHYs` chunk if `dpi` is positive.
 /// @noRd
@@ -294,4 +413,5 @@ extendr_module! {
     fn point_shapes_supported;
     fn render_points;
     fn render_rects;
+    fn render_paths;
 }

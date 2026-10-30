@@ -59,11 +59,18 @@ impl Cells {
 
     fn add(&mut self, cover: i32, area: i32) {
         let (i, j) = (self.cx - self.x0, self.cy - self.y0);
-        if i >= 0 && j >= 0 && i < self.w && j < self.h {
-            let k = (j * self.w + i) as usize;
-            self.cover[k] += cover;
-            self.area[k] += area;
+        if j < 0 || j >= self.h || i >= self.w {
+            return;
         }
+        if i < 0 {
+            // Left of the box, a cell only adds its cover to the pixels to
+            // its right (its area belongs to its own pixel).
+            self.cover[(j * self.w) as usize] += cover;
+            return;
+        }
+        let k = (j * self.w + i) as usize;
+        self.cover[k] += cover;
+        self.area[k] += area;
     }
 
     fn render_hline(&mut self, ey: i32, x1: i32, y1: i32, x2: i32, y2: i32) {
@@ -208,18 +215,30 @@ impl Cells {
     }
 }
 
-/// `calculate_alpha()` for the non-zero rule with AGG's identity gamma.
-fn calculate_alpha(area: i32) -> u8 {
-    let cover = (area >> (SHIFT * 2 + 1 - 8)).unsigned_abs();
+/// Filling rule (`agg::filling_rule_e`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Rule {
+    NonZero,
+    EvenOdd,
+}
+
+/// `calculate_alpha()` with AGG's identity gamma.
+fn calculate_alpha(area: i32, rule: Rule) -> u8 {
+    let mut cover = (area >> (SHIFT * 2 + 1 - 8)).unsigned_abs();
+    if rule == Rule::EvenOdd {
+        cover &= 511;
+        if cover > 256 {
+            cover = 512 - cover;
+        }
+    }
     cover.min(255) as u8
 }
 
 /// Rasterises closed contours (each implicitly closed, as AGG's
 /// `close_polygon()` does) with the non-zero rule.
 pub fn rasterize(contours: &[Vec<[f64; 2]>]) -> Coverage {
-    let pts = contours.iter().flatten();
     let (mut lo_x, mut lo_y, mut hi_x, mut hi_y) = (i32::MAX, i32::MAX, i32::MIN, i32::MIN);
-    for &[x, y] in pts {
+    for &[x, y] in contours.iter().flatten() {
         let (ix, iy) = (iround(x * SCALE as f64), iround(y * SCALE as f64));
         lo_x = lo_x.min(ix >> SHIFT);
         hi_x = hi_x.max(ix >> SHIFT);
@@ -229,21 +248,34 @@ pub fn rasterize(contours: &[Vec<[f64; 2]>]) -> Coverage {
     if lo_x > hi_x {
         return Coverage::default();
     }
-    let (w, h) = (hi_x - lo_x + 1, hi_y - lo_y + 1);
-    let mut cells = Cells::new(lo_x, lo_y, w, h);
+    rasterize_in(contours, Rule::NonZero, lo_x, lo_y, hi_x + 1, hi_y + 1)
+}
+
+/// Rasterises closed contours with `rule` over pixels `[x0, x1) x [y0,
+/// y1)` only. Edges outside those rows are skipped and cover from left of
+/// the box is carried in, so each pixel's alpha is what a full
+/// rasterisation gives: a band of a page can rasterise its rows alone.
+pub fn rasterize_in(contours: &[Vec<[f64; 2]>], rule: Rule, x0: i32, y0: i32, x1: i32, y1: i32) -> Coverage {
+    let (w, h) = (x1 - x0, y1 - y0);
+    if w <= 0 || h <= 0 {
+        return Coverage::default();
+    }
+    let mut cells = Cells::new(x0, y0, w, h);
+    let (top, bottom) = (y0 << SHIFT, y1 << SHIFT);
+    let up = |p: &[f64; 2]| (iround(p[0] * SCALE as f64), iround(p[1] * SCALE as f64));
     for c in contours {
         if c.len() < 2 {
             continue;
         }
-        let up = |p: &[f64; 2]| (iround(p[0] * SCALE as f64), iround(p[1] * SCALE as f64));
         let start = up(&c[0]);
         let mut prev = start;
-        for p in &c[1..] {
-            let q = up(p);
-            cells.line(prev.0, prev.1, q.0, q.1);
+        for q in c[1..].iter().map(up).chain(std::iter::once(start)) {
+            // An edge wholly above or below the rows adds to no cell in them.
+            if !((prev.1 < top && q.1 < top) || (prev.1 >= bottom && q.1 >= bottom)) {
+                cells.line(prev.0, prev.1, q.0, q.1);
+            }
             prev = q;
         }
-        cells.line(prev.0, prev.1, start.0, start.1);
     }
     let mut alpha = vec![0u8; (w * h) as usize];
     for j in 0..h as usize {
@@ -252,10 +284,75 @@ pub fn rasterize(contours: &[Vec<[f64; 2]>]) -> Coverage {
             let k = j * w as usize + i;
             cover += cells.cover[k];
             let v = ((cover as u32) << (SHIFT + 1)) as i32;
-            alpha[k] = calculate_alpha(v.wrapping_sub(cells.area[k]));
+            alpha[k] = calculate_alpha(v.wrapping_sub(cells.area[k]), rule);
         }
     }
-    Coverage { x0: lo_x, y0: lo_y, w: w as usize, h: h as usize, alpha }
+    Coverage { x0, y0, w: w as usize, h: h as usize, alpha }
+}
+
+/// The pieces `conv_dash` cuts a path into (`vcgen_dash`,
+/// agg_vcgen_dash.cpp), as open polylines, for alternating dash and gap
+/// lengths `dashes` starting with a dash.
+pub fn dash(path: &[[f64; 2]], closed: bool, dashes: &[f64]) -> Vec<Vec<[f64; 2]>> {
+    let mut v: Vec<Vd> = Vec::with_capacity(path.len());
+    push_vertices(&mut v, path, closed);
+    let n = v.len();
+    if dashes.len() < 2 || n < 2 {
+        return Vec::new();
+    }
+    let mut out: Vec<Vec<[f64; 2]>> = Vec::new();
+    let mut piece: Vec<[f64; 2]> = vec![[v[0].x, v[0].y]];
+    let (mut curr_dash, mut curr_dash_start) = (0usize, 0.0f64);
+    let mut src = 1usize;
+    let (mut v1, mut v2) = (0usize, 1usize);
+    let mut curr_rest = v[v1].dist;
+    // conv_adaptor_vcgen hands each move_to-started run to the stroker.
+    let mut emit = |cmd_move: bool, p: [f64; 2], piece: &mut Vec<[f64; 2]>| {
+        if cmd_move {
+            if piece.len() >= 2 {
+                out.push(std::mem::take(piece));
+            }
+            piece.clear();
+        }
+        piece.push(p);
+    };
+    loop {
+        let dash_rest = dashes[curr_dash] - curr_dash_start;
+        let cmd_move = curr_dash & 1 == 1;
+        if curr_rest > dash_rest {
+            curr_rest -= dash_rest;
+            curr_dash += 1;
+            if curr_dash >= dashes.len() {
+                curr_dash = 0;
+            }
+            curr_dash_start = 0.0;
+            let (a, b) = (&v[v1], &v[v2]);
+            let p = [b.x - (b.x - a.x) * curr_rest / a.dist, b.y - (b.y - a.y) * curr_rest / a.dist];
+            emit(cmd_move, p, &mut piece);
+        } else {
+            curr_dash_start += curr_rest;
+            let p = [v[v2].x, v[v2].y];
+            emit(cmd_move, p, &mut piece);
+            src += 1;
+            v1 = v2;
+            curr_rest = v[v1].dist;
+            if closed {
+                if src > n {
+                    break;
+                }
+                v2 = if src >= n { 0 } else { src };
+            } else {
+                if src >= n {
+                    break;
+                }
+                v2 = src;
+            }
+        }
+    }
+    if piece.len() >= 2 {
+        out.push(piece);
+    }
+    out
 }
 
 /// Clips closed contours to an axis-aligned box (Sutherland-Hodgman, each
@@ -525,11 +622,10 @@ impl MathStroke {
     }
 }
 
-/// The outline contours `conv_stroke` produces for a path (`vcgen_stroke`):
-/// two contours for a closed path, one for an open one.
-pub fn stroke(path: &[[f64; 2]], closed: bool, width: f64, join: Join, cap: Cap, miter_limit: f64) -> Vec<Vec<[f64; 2]>> {
-    // vertex_sequence::add() and close(): drop coincident vertices.
-    let mut v: Vec<Vd> = Vec::with_capacity(path.len());
+/// `vertex_sequence::add()` and `close()`: drops coincident vertices and
+/// sets each vertex's distance to the next (the last to the first if
+/// `closed`).
+fn push_vertices(v: &mut Vec<Vd>, path: &[[f64; 2]], closed: bool) {
     for &[x, y] in path {
         let p = Vd { x, y, dist: 0.0 };
         if v.len() > 1 && dist(&v[v.len() - 2], &v[v.len() - 1]) <= VERTEX_DIST_EPSILON {
@@ -555,6 +651,14 @@ pub fn stroke(path: &[[f64; 2]], closed: bool, width: f64, join: Join, cap: Cap,
             v[i].dist = dist(&v[i], &v[0]);
         }
     }
+}
+
+/// The outline contours `conv_stroke` produces for a path (`vcgen_stroke`):
+/// two contours for a closed path, one for an open one.
+pub fn stroke(path: &[[f64; 2]], closed: bool, width: f64, join: Join, cap: Cap, miter_limit: f64) -> Vec<Vec<[f64; 2]>> {
+    let mut v: Vec<Vd> = Vec::with_capacity(path.len());
+    push_vertices(&mut v, path, closed);
+    let n = v.len();
     let closed = closed && n >= 3;
     if n < 2 + closed as usize {
         return Vec::new();
@@ -659,6 +763,42 @@ mod tests {
         assert_eq!(at(&c, 5, 5), 0);
         assert_eq!(at(&c, 0, 5), 255);
         assert_eq!(at(&c, 0, 2), 0);
+    }
+
+    #[test]
+    fn rasterising_a_box_matches_the_full_rasterisation() {
+        let ring = stroke(&[[1.3, 2.2], [17.8, 4.1], [9.4, 15.6]], true, 2.5, Join::Round, Cap::Round, 10.0);
+        let full = rasterize(&ring);
+        for (x0, y0, x1, y1) in [(5, 3, 12, 9), (0, 10, 20, 11), (-3, -3, 25, 25)] {
+            let part = rasterize_in(&ring, Rule::NonZero, x0, y0, x1, y1);
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    let got = part.alpha[((y - y0) * (x1 - x0) + (x - x0)) as usize];
+                    assert_eq!(got, at(&full, x, y), "{x},{y}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn even_odd_leaves_overlaps_empty() {
+        let a = vec![[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]];
+        let b = vec![[1.0, 1.0], [3.0, 1.0], [3.0, 3.0], [1.0, 3.0]];
+        let c = rasterize_in(&[a, b], Rule::EvenOdd, 0, 0, 4, 4);
+        assert_eq!(c.alpha[4 + 1], 0);
+        assert_eq!(c.alpha[0], 255);
+        assert_eq!(c.alpha[2 * 4 + 2], 255);
+    }
+
+    #[test]
+    fn dashes_cut_the_path() {
+        // 10 px dash, 5 px gap along a 40 px line, then around a corner.
+        let p = dash(&[[0.0, 0.0], [40.0, 0.0]], false, &[10.0, 5.0]);
+        let xs: Vec<[f64; 2]> = p.iter().map(|d| [d[0][0], d[d.len() - 1][0]]).collect();
+        assert_eq!(xs, vec![[0.0, 10.0], [15.0, 25.0], [30.0, 40.0]]);
+        let p = dash(&[[0.0, 0.0], [8.0, 0.0], [8.0, 8.0]], false, &[12.0, 2.0]);
+        assert_eq!(p[0], vec![[0.0, 0.0], [8.0, 0.0], [8.0, 4.0]]);
+        assert_eq!(p[1], vec![[8.0, 6.0], [8.0, 8.0]]);
     }
 
     #[test]

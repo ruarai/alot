@@ -128,7 +128,7 @@ test_that("unsupported layers and coords keep ggplot2's pointsGrob, with a reaso
       ),
     "no rows" = ggplot2::ggplot(d[0, ], ggplot2::aes(x, y)) + ggplot2::geom_point(),
     "x or y is AsIs" = ggplot2::ggplot(d[1, ]) + ggplot2::geom_point(ggplot2::aes(x = I(0.5), y = I(0.5))),
-    "no Rust drawer for this geom" = base + ggplot2::geom_line()
+    "no Rust drawer for this geom" = base + ggplot2::geom_step()
   )
   for (reason in names(cases)) {
     p <- cases[[reason]]
@@ -149,10 +149,10 @@ test_that("rows with missing values are removed as ggplot2 does", {
 })
 
 test_that("alot_render_coverage() reports each layer", {
-  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_line() + ggplot2::geom_point()
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_step() + ggplot2::geom_point()
   cov <- alot_render_coverage(p)
   expect_equal(cov$tier, "hybrid")
-  expect_equal(cov$layers$geom, c("GeomLine", "GeomPoint"))
+  expect_equal(cov$layers$geom, c("GeomStep", "GeomPoint"))
   expect_equal(cov$layers$engine, c("ggplot2", "rust"))
   expect_equal(cov$layers$reason, c("no Rust drawer for this geom", NA))
 })
@@ -179,7 +179,7 @@ test_that("alot_png() writes a PNG and closes its device", {
 })
 
 test_that("alot_png() draws unsupported plots with ggplot2", {
-  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_line()
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_step()
   file <- withr::local_tempfile(fileext = ".png")
   before <- grDevices::dev.cur()
   rlang::local_options(rlib_message_verbosity = "verbose")
@@ -322,7 +322,7 @@ test_that("alot_png() restores the current device", {
   withr::defer(grDevices::graphics.off())
   alot_png(p, withr::local_tempfile(fileext = ".png"), width = 2, height = 2, dpi = 50)
   expect_equal(grDevices::dev.cur(), dev)
-  suppressMessages(alot_png(ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_line(),
+  suppressMessages(alot_png(ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_step(),
     withr::local_tempfile(fileext = ".png"), width = 2, height = 2, dpi = 50))
   expect_equal(grDevices::dev.cur(), dev)
 })
@@ -410,4 +410,78 @@ test_that("blank line types draw no outline", {
   p <- ggplot2::ggplot(mtcars, ggplot2::aes(factor(cyl))) + ggplot2::geom_bar(colour = "black", linetype = "blank")
   expect_equal(alot_render_coverage(p)$layers$engine, "rust")
   expect_render_close(p, tier = "hybrid")
+})
+
+# Path and polygon layers (R1.4): GeomPath's draw_panel (GeomLine) and
+# GeomPolygon's.
+
+test_that("lines, dashes and polygons render like ragg at several widths", {
+  ec <- ggplot2::economics_long
+  plots <- list()
+  for (lw in c(0.25, 0.5, 1.5, 3)) {
+    plots <- c(plots, list(
+      ggplot2::ggplot(ec, ggplot2::aes(date, value01, colour = variable)) + ggplot2::geom_line(linewidth = lw),
+      ggplot2::ggplot(ec, ggplot2::aes(date, value01, linetype = variable)) + ggplot2::geom_line(linewidth = lw),
+      ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg)) +
+        ggplot2::geom_path(linewidth = lw, lineend = "round", linejoin = "mitre", linetype = "1343", alpha = 0.6)
+    ))
+  }
+  tri <- data.frame(x = c(1, 3, 2, 2.2, 4, 3), y = c(1, 1, 3, 1.5, 1.5, 3.5), g = rep(1:2, each = 3))
+  plots <- c(plots, list(
+    ggplot2::ggplot(tri, ggplot2::aes(x, y, group = g, fill = factor(g))) +
+      ggplot2::geom_polygon(colour = "black", linewidth = 1, alpha = 0.6),
+    ggplot2::ggplot(tri, ggplot2::aes(x, y, group = g)) +
+      ggplot2::geom_polygon(fill = NA, colour = "red", linewidth = 2, linetype = "dashed", linejoin = "mitre")
+  ))
+  for (i in seq_along(plots)) {
+    p <- plots[[i]]
+    expect_true(all(alot_render_coverage(p)$layers$engine == "rust"))
+    expect_render_close(p, tier = "hybrid", label = paste("plot", i))
+    expect_render_close(p, width = 300, height = 250, res = 150, tier = "hybrid", label = paste("plot", i, "at 150 dpi"))
+  }
+})
+
+test_that("missing values break lines as grid does", {
+  d <- data.frame(x = 1:20, y = sin(1:20))
+  d$y[c(5, 12, 13)] <- NA
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_path(linewidth = 1)
+  expect_equal(alot_render_coverage(p)$layers$engine, "rust")
+  expect_render_close(p, tier = "hybrid")
+})
+
+test_that("polygons with holes follow the fill rule", {
+  holes <- data.frame(
+    x = c(0, 4, 4, 0, 1, 3, 3, 1, 6, 9, 9, 6),
+    y = c(0, 0, 4, 4, 1, 1, 3, 3, 0, 0, 3, 3),
+    g = rep(c(1, 1, 2), each = 4), s = rep(1:3, each = 4)
+  )
+  for (rule in c("evenodd", "winding")) {
+    p <- ggplot2::ggplot(holes, ggplot2::aes(x, y, group = g, subgroup = s)) +
+      ggplot2::geom_polygon(rule = rule, fill = "steelblue", colour = "black")
+    expect_equal(alot_render_coverage(p)$layers$engine, "rust")
+    expect_render_close(p, tier = "hybrid")
+  }
+})
+
+test_that("unsupported path layers keep ggplot2's grobs, with a reason", {
+  base <- ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg))
+  na <- data.frame(x = c(1, 2, NA, 1), y = c(1, 2, 1, 3))
+  cases <- list(
+    "arrows" = base + ggplot2::geom_path(arrow = grid::arrow()),
+    "aesthetics vary along a line" = base + ggplot2::geom_path(ggplot2::aes(colour = hp)),
+    "coord is not an unreversed coord_cartesian()" = base + ggplot2::geom_line() + ggplot2::coord_flip(),
+    "NA in x or y" = ggplot2::ggplot(na, ggplot2::aes(x, y)) + ggplot2::geom_polygon(),
+    "no Rust drawer for this geom" = base + ggplot2::geom_step()
+  )
+  for (reason in names(cases)) {
+    p <- cases[[reason]]
+    expect_equal(alot_render_coverage(p)$layers$reason, reason)
+  }
+})
+
+test_that("lty_code() gives the graphics engine's line type codes", {
+  expect_equal(lty_code(c("solid", "dashed", "dotdash", "1F", "blank", NA)), c(0, 0x44, 0x3431, 0xF1, -1, -1))
+  expect_equal(lty_code(0:6), c(-1, 0, 0x44, 0x31, 0x3431, 0x37, 0x2622))
+  expect_null(lty_code("0F"))
+  expect_null(lty_code(7))
 })

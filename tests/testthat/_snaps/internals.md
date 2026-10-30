@@ -1915,3 +1915,111 @@
           mapped_discrete(x)
       }
 
+# upstream path drawing matches what the hybrid tier mirrors
+
+    Code
+      print(body(environment(ggplot2::GeomPath$draw_panel)$f))
+    Output
+      {
+          data <- fix_linewidth(data, snake_class(self))
+          if (!anyDuplicated(data$group)) {
+              cli::cli_inform(c("{.fn {snake_class(self)}}: Each group consists of only one observation.", 
+                  i = "Do you need to adjust the {.field group} aesthetic?"))
+          }
+          data <- data[order(data$group), , drop = FALSE]
+          munched <- coord_munch(coord, data, panel_params)
+          rows <- vec_ave(seq_len(nrow(munched)), munched$group, length)
+          munched <- munched[rows >= 2, ]
+          if (nrow(munched) < 2) 
+              return(zeroGrob())
+          attr <- dapply(munched, "group", function(df) {
+              linetype <- unique0(df$linetype)
+              data_frame0(solid = length(linetype) == 1 && (identical(linetype, 
+                  "solid") || linetype == 1), constant = nrow(unique0(df[, 
+                  names(df) %in% c("alpha", "colour", "linewidth", 
+                      "linetype")])) == 1, .size = 1)
+          })
+          solid_lines <- all(attr$solid)
+          constant <- all(attr$constant)
+          if (!solid_lines && !constant) {
+              cli::cli_abort("{.fn {snake_class(self)}} can't have varying {.field colour}, {.field linewidth}, and/or {.field alpha} along the line when {.field linetype} isn't solid.")
+          }
+          n <- nrow(munched)
+          group_diff <- munched$group[-1] != munched$group[-n]
+          start <- c(TRUE, group_diff)
+          end <- c(group_diff, TRUE)
+          munched$fill <- arrow.fill %||% munched$colour
+          if (!constant) {
+              arrow <- repair_segment_arrow(arrow, munched$group)
+              segmentsGrob(munched$x[!end], munched$y[!end], munched$x[!start], 
+                  munched$y[!start], default.units = "native", arrow = arrow, 
+                  gp = gg_par(col = alpha(munched$colour, munched$alpha)[!end], 
+                      fill = alpha(munched$fill, munched$alpha)[!end], 
+                      lwd = munched$linewidth[!end], lty = munched$linetype[!end], 
+                      lineend = lineend, linejoin = linejoin, linemitre = linemitre))
+          }
+          else {
+              id <- match(munched$group, unique0(munched$group))
+              polylineGrob(munched$x, munched$y, id = id, default.units = "native", 
+                  arrow = arrow, gp = gg_par(col = alpha(munched$colour, 
+                      munched$alpha)[start], fill = alpha(munched$fill, 
+                      munched$alpha)[start], lwd = munched$linewidth[start], 
+                      lty = munched$linetype[start], lineend = lineend, 
+                      linejoin = linejoin, linemitre = linemitre))
+          }
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomPath$handle_na)$f))
+    Output
+      {
+          aesthetics <- c(self$required_aes, self$non_missing_aes)
+          complete <- stats::complete.cases(data[names(data) %in% aesthetics])
+          kept <- vec_ave(complete, interaction(data$group, data$PANEL, 
+              drop = TRUE), keep_mid_true)
+          data <- data[kept, ]
+          if (!all(kept) && !params$na.rm) {
+              cli::cli_warn(paste0("Removed {sum(!kept)} row{?s} containing missing values or values ", 
+                  "outside the scale range ({.fn {snake_class(self)}})."))
+          }
+          data
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomPolygon$draw_panel)$f))
+    Output
+      {
+          data <- fix_linewidth(data, snake_class(self))
+          n <- nrow(data)
+          if (n == 1) 
+              return(zeroGrob())
+          munched <- coord_munch(coord, data, panel_params, is_closed = TRUE)
+          if (is.null(munched$subgroup)) {
+              munched <- munched[order(munched$group), ]
+              first_idx <- !duplicated(munched$group)
+              first_rows <- munched[first_idx, ]
+              ggname("geom_polygon", polygonGrob(munched$x, munched$y, 
+                  default.units = "native", id = munched$group, gp = gg_par(col = first_rows$colour, 
+                      fill = fill_alpha(first_rows$fill, first_rows$alpha), 
+                      lwd = first_rows$linewidth, lty = first_rows$linetype, 
+                      lineend = lineend, linejoin = linejoin, linemitre = linemitre)))
+          }
+          else {
+              munched <- munched[order(munched$group, munched$subgroup), 
+                  ]
+              id <- match(munched$subgroup, unique0(munched$subgroup))
+              first_idx <- !duplicated(munched$group)
+              first_rows <- munched[first_idx, ]
+              ggname("geom_polygon", pathGrob(munched$x, munched$y, 
+                  default.units = "native", id = id, pathId = munched$group, 
+                  rule = rule, gp = gg_par(col = first_rows$colour, 
+                      fill = fill_alpha(first_rows$fill, first_rows$alpha), 
+                      lwd = first_rows$linewidth, lty = first_rows$linetype, 
+                      lineend = lineend, linejoin = linejoin, linemitre = linemitre)))
+          }
+      }
+

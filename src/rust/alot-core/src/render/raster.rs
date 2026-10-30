@@ -201,6 +201,7 @@ fn prepare(list: &DisplayList, width: usize, height: usize, band_rows: usize) ->
         .map(|item| match item {
             Item::Points(b) => Prepared::Marks(b.bucket(band_rows, n_bands)),
             Item::Rects(b) => Prepared::Marks(b.bucket(band_rows, n_bands)),
+            Item::Paths(b) => Prepared::Marks(b.bucket(band_rows, n_bands)),
             _ => Prepared::None,
         })
         .collect();
@@ -324,6 +325,9 @@ fn draw_band(page: &Page, b: usize, buf: &mut [[f32; 4]]) {
                 batch.draw(buf, top, width, buckets.band(b), &shares);
             }
             (Item::Rects(batch), Prepared::Marks(buckets)) => {
+                batch.draw(buf, top, width, buckets.band(b), &shares);
+            }
+            (Item::Paths(batch), Prepared::Marks(buckets)) => {
                 batch.draw(buf, top, width, buckets.band(b), &shares);
             }
             _ => {}

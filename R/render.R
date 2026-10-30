@@ -169,6 +169,8 @@ hybrid_layer <- function(layer) {
   draw <- switch(hybrid_kind(layer) %||% "",
     points = draw_points_layer,
     rects = draw_rects_layer,
+    paths = draw_paths_layer,
+    polygons = draw_polygons_layer,
     NULL
   )
   if (is.null(draw)) {
@@ -179,17 +181,27 @@ hybrid_layer <- function(layer) {
   )
 }
 
-# Which Rust drawer a layer's geom has: GeomPoint's draw_panel, or
-# GeomRect's (inherited by GeomTile, GeomBar and GeomCol).
+# Which Rust drawer a layer's geom has: GeomPoint's draw_panel, GeomRect's
+# (inherited by GeomTile, GeomBar and GeomCol), GeomPath's (GeomLine) or
+# GeomPolygon's.
 hybrid_kind <- function(layer) {
   geom <- layer$geom
   if (identical(geom, ggplot2::GeomPoint)) {
     return("points")
   }
-  rect_geoms <- c("GeomRect", "GeomTile", "GeomBar", "GeomCol")
-  same_draw <- identical(environment(geom$draw_panel)$f, environment(ggplot2::GeomRect$draw_panel)$f)
-  if (class(geom)[1] %in% rect_geoms && same_draw) {
-    return("rects")
+  same_draw <- function(parent) {
+    identical(environment(geom$draw_panel)$f, environment(parent$draw_panel)$f)
+  }
+  kinds <- list(
+    rects = list(c("GeomRect", "GeomTile", "GeomBar", "GeomCol"), ggplot2::GeomRect),
+    paths = list(c("GeomPath", "GeomLine"), ggplot2::GeomPath),
+    polygons = list("GeomPolygon", ggplot2::GeomPolygon)
+  )
+  for (kind in names(kinds)) {
+    k <- kinds[[kind]]
+    if (class(geom)[1] %in% k[[1]] && same_draw(k[[2]])) {
+      return(kind)
+    }
   }
   NULL
 }
@@ -240,7 +252,9 @@ hybrid_decline <- function(layer, data, layout) {
   }
   reason <- switch(kind,
     points = points_decline(data),
-    rects = rects_decline(data, layer$computed_geom_params)
+    rects = rects_decline(data, layer$computed_geom_params),
+    paths = paths_decline(data, layer$computed_geom_params),
+    polygons = polygons_decline(data, layer$computed_geom_params)
   )
   if (!is.null(reason)) {
     return(reason)
@@ -316,6 +330,119 @@ rects_decline <- function(data, params) {
     return("unsupported linejoin")
   }
   NULL
+}
+
+# R's line types as the packed hex codes the graphics engine passes to
+# devices (GE_LTYpar in R src/main/engine.c: named types, integers 0-6 and
+# hex strings of 2, 4, 6 or 8 digits, first digit lowest), with -1 for
+# blank; NULL if any can't be converted.
+lty_code <- function(lty) {
+  u <- unique(lty)
+  codes <- lty_code_unique(u)
+  if (!is.null(codes)) codes[match(lty, u)]
+}
+
+lty_code_unique <- function(lty) {
+  named <- c(solid = "", dashed = "44", dotted = "13", dotdash = "1343", longdash = "73", twodash = "2262")
+  if (is.numeric(lty)) {
+    if (any(is.na(lty) | lty != round(lty) | lty < 0 | lty > 6)) return(NULL)
+    lty <- c("blank", names(named))[lty + 1]
+  }
+  if (!is.character(lty)) return(NULL)
+  lty[is.na(lty)] <- "blank"
+  hex <- ifelse(lty %in% names(named), named[lty], lty)
+  hex[lty == "blank"] <- NA
+  ok <- is.na(hex) | hex == "" | (grepl("^[1-9a-fA-F]+$", hex) & nchar(hex) %in% c(2, 4, 6, 8))
+  if (!all(ok)) return(NULL)
+  vapply(hex, function(h) {
+    if (is.na(h)) return(-1)
+    if (h == "") return(0)
+    digits <- strtoi(strsplit(h, "")[[1]], 16L)
+    sum(digits * 16^(seq_along(digits) - 1))
+  }, numeric(1), USE.NAMES = FALSE)
+}
+
+line_params_decline <- function(params) {
+  if (!(params$lineend %||% "butt") %in% c("round", "butt", "square")) {
+    return("unsupported lineend")
+  }
+  if (!(params$linejoin %||% "round") %in% c("round", "mitre", "bevel")) {
+    return("unsupported linejoin")
+  }
+  if (!is.numeric(params$linemitre %||% 10) || (params$linemitre %||% 10) < 1) {
+    return("unsupported linemitre")
+  }
+  NULL
+}
+
+paths_decline <- function(data, params) {
+  cols <- c("x", "y", "colour", "linewidth", "linetype", "alpha", "group")
+  if (!all(cols %in% names(data))) {
+    return("missing path aesthetics")
+  }
+  if (!is.null(params$arrow)) {
+    return("arrows")
+  }
+  if (!is.double(data$x) || !is.double(data$y) || !is.character(data$colour)) {
+    return("x, y or colour has an unsupported type")
+  }
+  if (inherits(data$x, "AsIs") || inherits(data$y, "AsIs")) {
+    return("x or y is AsIs")
+  }
+  if (!is.numeric(data$linewidth) || anyNA(data$linewidth)) {
+    return("linewidth is NA or not numeric")
+  }
+  if (is.null(lty_code(data$linetype))) {
+    return("unsupported linetype")
+  }
+  # Constant along each line: every row equals its group's first row.
+  g <- vctrs::vec_group_id(data$group)
+  first <- match(seq_len(attr(g, "n")), g)
+  for (col in c("colour", "linewidth", "linetype", "alpha")) {
+    v <- data[[col]]
+    if (!all(vctrs::vec_equal(v, v[first[g]], na_equal = TRUE))) {
+      return("aesthetics vary along a line")
+    }
+  }
+  line_params_decline(params)
+}
+
+# Integer keys for (PANEL, group) and the rows in drawing order: by panel,
+# then group (then subgroup), as draw_panel sorts each panel's data.
+panel_group_order <- function(data, sub = NULL) {
+  panel <- as.integer(data$PANEL)
+  group <- vctrs::vec_group_id(data.frame(panel, data$group))
+  order <- if (is.null(sub)) order(panel, data$group) else order(panel, data$group, sub)
+  list(key = as.integer(group), order = order)
+}
+
+polygons_decline <- function(data, params) {
+  cols <- c("x", "y", "colour", "fill", "linewidth", "linetype", "alpha", "group")
+  if (!all(cols %in% names(data))) {
+    return("missing polygon aesthetics")
+  }
+  if (!is.double(data$x) || !is.double(data$y)) {
+    return("x or y is not double")
+  }
+  if (inherits(data$x, "AsIs") || inherits(data$y, "AsIs")) {
+    return("x or y is AsIs")
+  }
+  if (anyNA(data$x) || anyNA(data$y)) {
+    return("NA in x or y")
+  }
+  if (!is_colour_vector(data$colour) || !is_colour_vector(data$fill)) {
+    return("colour or fill is not a colour vector")
+  }
+  if (!is.numeric(data$linewidth) || anyNA(data$linewidth)) {
+    return("linewidth is NA or not numeric")
+  }
+  if (is.null(lty_code(data$linetype))) {
+    return("unsupported linetype")
+  }
+  if (!(params$rule %||% "evenodd") %in% c("evenodd", "winding")) {
+    return("unsupported rule")
+  }
+  line_params_decline(params)
 }
 
 # Mirrors Layer$draw_geom and Geom$draw_layer (ggplot2 R/layer.R, R/geom-.R)
@@ -399,6 +526,111 @@ draw_rects_layer <- function(data, layout, layer) {
   })
 }
 
+# Codes for rs_render_paths(): lineend, linejoin.
+line_style <- function(closed, rule, params, linejoin_default) {
+  c(
+    as.integer(closed), rule,
+    match(params$lineend %||% "butt", c("round", "butt", "square")) - 1L,
+    match(params$linejoin %||% linejoin_default, c("round", "mitre", "bevel")) - 1L
+  )
+}
+
+# One lazy grob per panel for path-like layers, given the rows in drawing
+# order and each row's path and ring (shared$order, $path, $ring).
+path_grobs <- function(kind, shared, data, layout, prefix) {
+  n_panels <- nlevels(as.factor(data$PANEL))
+  panel <- as.integer(data$PANEL)[shared$order]
+  shared$rows <- split(shared$order, factor(panel, levels = seq_len(n_panels)))
+  shared$path_rows <- split(shared$path, factor(panel, levels = seq_len(n_panels)))
+  shared$ring_rows <- split(shared$ring, factor(panel, levels = seq_len(n_panels)))
+  shared$panel <- as.integer(data$PANEL)
+  lapply(seq_len(n_panels), function(i) {
+    if (length(shared$rows[[i]]) == 0) {
+      return(ggplot2::zeroGrob())
+    }
+    hybrid_grob(kind, shared, i, layout$panel_params[[i]], prefix)
+  })
+}
+
+# Mirrors GeomPath$draw_panel (ggplot2 R/geom-path.R) for coord_cartesian
+# when aesthetics are constant along each line: one polyline per group, in
+# group order, styled from its first row; groups of one row are dropped.
+draw_paths_layer <- function(data, layout, layer) {
+  if (gg_empty(data)) {
+    return(layer$draw_geom(data, layout))
+  }
+  data <- point_handle_na(layer, data)
+  params <- layer$computed_geom_params
+  if (!is.null(hybrid_decline(layer, data, layout))) {
+    return(layer$geom$draw_layer(data, params, layout, layout$coord))
+  }
+  # draw_panel's message, once per panel as ggplot2 gives it.
+  for (d in split(data$group, data$PANEL)) {
+    if (length(d) && !anyDuplicated(d)) {
+      cli::cli_inform(c(
+        "{.fn {gg_snake_class(layer$geom)}}: Each group consists of only one observation.",
+        i = "Do you need to adjust the {.field group} aesthetic?"
+      ))
+    }
+  }
+  pg <- panel_group_order(data)
+  key <- pg$key
+  order <- pg$order[tabulate(key)[key[pg$order]] >= 2]
+  first <- order[!duplicated(key[order])]
+  path <- match(key[order], key[first]) - 1L
+  colour <- point_colours(data$colour[first], data$alpha[first])
+  if (is.null(colour)) {
+    return(layer$geom$draw_layer(data, params, layout, layout$coord))
+  }
+  shared <- list(
+    x = data$x, y = data$y, order = order, path = path, ring = path,
+    colour = colour, fill = integer(length(first)),
+    lwd = data$linewidth[first] * ggplot2::.pt,
+    lty = pmax(lty_code(data$linetype[first]), 0),
+    style = line_style(FALSE, 0L, params, "round"),
+    mitre = as.double(params$linemitre %||% 10),
+    data = data, coord = layout$coord, geom = layer$geom, params = params
+  )
+  shared$lwd[lty_code(data$linetype[first]) < 0] <- 0
+  path_grobs("paths", shared, data, layout, "geom_path")
+}
+
+# Mirrors GeomPolygon$draw_panel (ggplot2 R/geom-polygon.R) for
+# coord_cartesian: polygonGrob (one polygon per group, filled non-zero by
+# ragg's drawPolygon) or, with subgroups, pathGrob (one path per group, its
+# rings by subgroup, filled with `rule`). Each is styled from the group's
+# first row: col = colour, fill = fill_alpha(fill, alpha).
+draw_polygons_layer <- function(data, layout, layer) {
+  params <- layer$computed_geom_params
+  if (gg_empty(data) || !is.null(hybrid_decline(layer, data, layout))) {
+    return(layer$draw_geom(data, layout))
+  }
+  sub <- data$subgroup
+  pg <- panel_group_order(data, sub)
+  key <- pg$key
+  order <- pg$order
+  first <- order[!duplicated(key[order])]
+  path <- match(key[order], key[first]) - 1L
+  ring <- if (is.null(sub)) path else vctrs::vec_group_id(data.frame(key, sub)[order, ]) - 1L
+  colour <- point_colours(as.character(data$colour[first]), NA)
+  fill <- if (!is.null(colour)) point_colours(as.character(data$fill[first]), data$alpha[first])
+  if (is.null(fill)) {
+    return(layer$draw_geom(data, layout))
+  }
+  codes <- lty_code(data$linetype[first])
+  rule <- if (is.null(sub)) 0L else match(params$rule %||% "evenodd", c("winding", "evenodd")) - 1L
+  shared <- list(
+    x = data$x, y = data$y, order = order, path = path, ring = ring,
+    colour = colour, fill = fill,
+    lwd = ifelse(codes < 0, 0, data$linewidth[first] * ggplot2::.pt),
+    lty = pmax(codes, 0),
+    style = line_style(TRUE, rule, params, "round"),
+    mitre = as.double(params$linemitre %||% 10),
+    data = data, coord = layout$coord, geom = layer$geom, params = params
+  )
+  path_grobs("polygons", shared, data, layout, "geom_polygon")
+}
+
 # Packed RGBA for rs_render_points(), as scales::alpha(colour, alpha). Rust
 # parses hex; other colour specs (names) go through col2rgb() once per
 # distinct value. NA stays NA, which Rust packs as transparent.
@@ -438,7 +670,8 @@ raster_device_res <- function() {
 }
 
 # Range a view scale rescales from, if it rescales positions linearly with
-# scales::rescale: ScaleContinuous$rescale with the default rescaler, or
+# scales::rescale: ScaleContinuous$rescale with the default rescaler (also
+# date and datetime scales), or
 # ScaleDiscretePosition$rescale, whose map() passes mapped (numeric)
 # positions through (ggplot2 R/scale-.R, R/scale-discrete-.R).
 linear_range <- function(view) {
@@ -446,7 +679,10 @@ linear_range <- function(view) {
   scale <- view$scale
   # `$` wraps ggproto fields that are functions; compare the inner one.
   inner <- function(f) environment(f)$f
-  continuous <- inherits(scale, "ScaleContinuousPosition") &&
+  # Date and datetime position scales inherit ScaleContinuous, not
+  # ScaleContinuousPosition, and rescale the same way.
+  position <- any(scale$aesthetics %in% c("x", "y"))
+  continuous <- inherits(scale, "ScaleContinuous") && position &&
     identical(inner(scale$rescale), inner(ggplot2::ScaleContinuous$rescale)) &&
     identical(inner(scale$rescaler), scales::rescale)
   discrete <- inherits(scale, "ScaleDiscretePosition") &&
@@ -495,6 +731,12 @@ drawDetails.alot_hybrid_layer <- function(x, recording) {
     rects = rs_render_rects(
       s$xmin, s$xmax, s$ymin, s$ymax, rows, x_range, y_range, rect, dims,
       s$colour, s$fill, s$lwd, s$join, res, render_threads()
+    ),
+    paths = ,
+    polygons = rs_render_paths(
+      s$x, s$y, rows, s$path_rows[[x$panel]], s$ring_rows[[x$panel]],
+      s$colour, s$fill, as.double(s$lwd), as.double(s$lty), s$style, s$mitre,
+      x_range, y_range, rect, dims, res, render_threads()
     )
   )
   if (is.null(img)) {
@@ -525,6 +767,16 @@ hybrid_fallback_grob <- function(x) {
     rects = s$geom$draw_panel(
       data, x$panel_params, s$coord,
       lineend = s$params$lineend %||% "butt", linejoin = s$params$linejoin %||% "mitre"
+    ),
+    paths = s$geom$draw_panel(
+      data, x$panel_params, s$coord,
+      lineend = s$params$lineend %||% "butt", linejoin = s$params$linejoin %||% "round",
+      linemitre = s$params$linemitre %||% 10
+    ),
+    polygons = s$geom$draw_panel(
+      data, x$panel_params, s$coord, rule = s$params$rule %||% "evenodd",
+      lineend = s$params$lineend %||% "butt", linejoin = s$params$linejoin %||% "round",
+      linemitre = s$params$linemitre %||% 10
     )
   )
 }
