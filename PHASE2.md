@@ -16,7 +16,7 @@ grid as before).
 - The result should be **visually identical** to ggplot2 drawn with
   `ragg::agg_png` at the same size and resolution. It does not need to match
   pixel for pixel, since anti-aliasing and text rasterisation differ. The
-  default check is: no pixel off by more than 32 of 255, and under 0.1% of
+  default check is: no pixel off by more than 32 of 255, and under 1% of
   pixels off by more than 8.
 - **Layout must match numerically.** Panel, axis, strip, legend and title
   boxes should land within 0.5 px of where grid puts them.

@@ -13,6 +13,10 @@ hot paths in Rust. **Its output must equal ggplot2's** under
   root). Read the upstream function before mirroring or porting it, and cite
   it in a comment, for example `# Mirrors Layout$map_position (ggplot2
   R/layout.R).`
+- For rendering (Phase 2), the references are ragg 1.5.2 at `../ragg`
+  (mainly `src/AggDevice.h`) and R 4.6.1 at `../r-source` (graphics engine
+  in `src/main/engine.c`, grid in `src/library/grid`). Cite them the same
+  way.
 
 ## Commands
 

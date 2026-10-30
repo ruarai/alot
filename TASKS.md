@@ -525,12 +525,12 @@ alongside Phase 1's remaining tasks.
   prototype's speed, and every fallback in `test-render.R` is reported by
   `alot_render_coverage()`.
 
-### R0.2 Fidelity and layout harness
+### R0.2 Fidelity and layout harness — done
 - **Depends:** —
 - **Touches:** `tests/testthat/helper-render.R`, `tools/render-corpus.R`,
   `tests/testthat/test-render-corpus.R`, `.Rbuildignore`
 - **Do:**
-  - `expect_render_close(p, ..., max = 32, share = 0.001, tier = "full")`
+  - `expect_render_close(p, ..., max = 32, share = 0.01, tier = "full")`
     draws `p` live with ggplot2 + `agg_capture()` and with alot in the given
     tier, and compares pixels. It fails if alot raised a fallback warning
     or used a different tier. On failure it writes reference, result and

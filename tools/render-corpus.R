@@ -1,0 +1,132 @@
+# Select the render corpus for tests/testthat/test-render-corpus.R (R0.2).
+#
+# Run from the repo root after tools/extract-corpus.R:
+#
+#   Rscript tools/render-corpus.R
+#
+# Evaluates every plot of the Phase 1 corpus (tests/testthat/corpus/) and
+# keeps those within PHASE2.md's scope ("In scope" / "Out of scope"): only
+# in-scope geoms, coords, facets, guides and theme elements, no plotmath
+# labels, and plots that ggplot2 builds and lays out without error. Writes
+# their file and plot id to tests/testthat/render-corpus.tsv.
+
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(testthat)
+})
+local_edition(3)
+Sys.setenv(NOT_CRAN = "true")
+
+corpus_dir <- file.path("tests", "testthat", "corpus")
+out_file <- file.path("tests", "testthat", "render-corpus.tsv")
+
+# PHASE2.md, "In scope".
+scope_geoms <- c(
+  "GeomPoint", "GeomLine", "GeomPath", "GeomStep", "GeomPolygon", "GeomRect",
+  "GeomTile", "GeomRaster", "GeomCol", "GeomBar", "GeomArea", "GeomRibbon",
+  "GeomDensity", "GeomBoxplot", "GeomViolin", "GeomErrorbar", "GeomLinerange",
+  "GeomPointrange", "GeomCrossbar", "GeomSegment", "GeomCurve", "GeomAbline",
+  "GeomHline", "GeomVline", "GeomSmooth", "GeomText", "GeomLabel", "GeomRug",
+  "GeomBlank"
+)
+scope_coords <- c("CoordCartesian", "CoordFlip", "CoordFixed", "CoordTransform")
+scope_facets <- c("FacetNull", "FacetWrap", "FacetGrid")
+scope_guides <- c(
+  "GuideAxis", "GuideNone", "GuideLegend", "GuideColourbar", "GuideColoursteps",
+  "GuideBins"
+)
+scope_elements <- c(
+  "ggplot2::element_text", "ggplot2::element_line", "ggplot2::element_rect",
+  "ggplot2::element_blank",
+  # Built-in themes carry these for geom defaults; they don't draw.
+  "ggplot2::element_geom", "ggplot2::element_point", "ggplot2::element_polygon"
+)
+
+is_plotmath <- function(x) is.expression(x) || is.call(x) || is.symbol(x)
+
+# Why a built plot is outside PHASE2.md's scope, or NULL if it is within.
+out_of_scope <- function(b) {
+  plot <- b@plot
+  geoms <- vapply(plot@layers, function(l) class(l$geom)[1], character(1))
+  if (!all(geoms %in% scope_geoms)) {
+    return(paste("geom", setdiff(geoms, scope_geoms)[1]))
+  }
+  coord <- class(b@layout$coord)[1]
+  if (!coord %in% scope_coords) return(paste("coord", coord))
+  facet <- class(b@layout$facet)[1]
+  if (!facet %in% scope_facets) return(paste("facet", facet))
+  guides <- unlist(lapply(b@plot@guides$guides, function(g) class(g)[1]))
+  axes <- unlist(lapply(b@layout$panel_params, function(pp) {
+    lapply(pp$guides$guides, function(g) class(g)[1])
+  }))
+  bad <- setdiff(c(guides, axes), scope_guides)
+  if (length(bad)) return(paste("guide", bad[1]))
+  labels <- c(plot@labels, lapply(plot@scales$scales, function(s) s$name))
+  if (any(vapply(labels, is_plotmath, logical(1)))) return("plotmath label")
+  breaks_labels <- unlist(lapply(b@layout$panel_params, function(pp) {
+    lapply(c("x", "y"), function(a) pp[[a]]$get_labels())
+  }), recursive = FALSE)
+  if (any(vapply(breaks_labels, is_plotmath, logical(1)))) return("plotmath axis label")
+  theme <- ggplot2:::plot_theme(plot)
+  el_class <- vapply(theme, function(e) {
+    if (is.null(e) || !inherits(e, "ggplot2::element")) "" else class(e)[1]
+  }, character(1))
+  bad <- setdiff(el_class[nzchar(el_class)], scope_elements)
+  if (length(bad)) return(paste("theme element", bad[1]))
+  NULL
+}
+
+kept <- list()
+dropped <- list()
+check <- function(file, id, p) {
+  if (!is_ggplot(p)) return()
+  set.seed(1)
+  b <- tryCatch(suppressWarnings(suppressMessages(ggplot_build(p))), error = identity)
+  why <- if (inherits(b, "error")) "build error" else tryCatch(out_of_scope(b), error = function(e) "scope check error")
+  if (is.null(why)) {
+    g <- tryCatch(suppressWarnings(suppressMessages(ggplot_gtable(b))), error = identity)
+    if (inherits(g, "error")) why <- "gtable error"
+  }
+  if (is.null(why)) {
+    kept[[length(kept) + 1]] <<- data.frame(file = file, id = id)
+  } else {
+    dropped[[length(dropped) + 1]] <<- data.frame(file = file, id = id, why = why)
+  }
+}
+
+files <- list.files(corpus_dir, "\\.R$")
+files <- files[!startsWith(files, "_")]
+if (nzchar(Sys.getenv("ALOT_RENDER_CORPUS"))) files <- grep(Sys.getenv("ALOT_RENDER_CORPUS"), files, value = TRUE)
+for (file in files) {
+  for (block in parse(file.path(corpus_dir, file), keep.source = FALSE, encoding = "UTF-8")) {
+    env <- new.env(parent = asNamespace("ggplot2"))
+    sys.source(file.path(corpus_dir, "_helpers.R"), envir = env)
+    env$.plot <- function(id, expr) {
+      p <- expr
+      check(file, id, p)
+      invisible(p)
+    }
+    runner <- rlang::new_function(list(), block[[3]], env)
+    old_opts <- options()
+    old_theme <- theme_get()
+    set.seed(1)
+    tryCatch(suppressWarnings(suppressMessages(runner())), error = identity, skip = identity)
+    options(old_opts)
+    theme_set(old_theme)
+  }
+  message(file, ": ", sum(vapply(kept, function(k) k$file == file, logical(1))), " kept")
+}
+
+kept <- do.call(rbind, kept)
+dropped <- do.call(rbind, dropped)
+writeLines(
+  c(
+    "# Generated by tools/render-corpus.R: Phase 1 corpus plots within PHASE2.md's scope.",
+    "# Do not edit by hand; rerun the script instead.",
+    paste(c("file", "id"), collapse = "\t"),
+    paste(kept$file, kept$id, sep = "\t")
+  ),
+  out_file
+)
+message(sprintf("%d plots kept, %d dropped.", nrow(kept), nrow(dropped)))
+print(sort(table(dropped$why), decreasing = TRUE))

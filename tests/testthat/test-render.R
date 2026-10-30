@@ -1,24 +1,8 @@
 # The hybrid tier: point layers rasterised in Rust (R/render.R). Output
-# is compared with ggplot2 drawn by ragg pixel by pixel: rendering only has
-# to look the same, so edge pixels may differ slightly (anti-aliasing,
-# subpixel positions).
-
-capture_rgb <- function(g, width = 400, height = 300, res = 96) {
-  cap <- ragg::agg_capture(width = width, height = height, units = "px", res = res)
-  on.exit(grDevices::dev.off())
-  grid::grid.newpage()
-  grid::grid.draw(g)
-  grDevices::col2rgb(cap(native = FALSE))
-}
-
-# Largest per-pixel difference and the share of pixels differing by more
-# than 8 (of 255).
-render_diff <- function(p, ...) {
-  b <- ggplot2::ggplot_build(p)
-  d <- abs(capture_rgb(ggplot2::ggplot_gtable(b), ...) - capture_rgb(hybrid_gtable(b), ...))
-  px <- apply(d, 2, max)
-  c(max = max(d), share = mean(px > 8))
-}
+# is compared with ggplot2 drawn by ragg pixel by pixel with
+# expect_render_close() (helper-render.R): rendering only has to look the
+# same, so edge pixels may differ slightly (anti-aliasing, subpixel
+# positions).
 
 # Width and height from a PNG's IHDR chunk.
 png_size <- function(file) {
@@ -51,7 +35,7 @@ d <- data.frame(
 test_that("ggplot2's default point renders like ragg", {
   p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_point()
   expect_true(uses_rust(p))
-  expect_lte(render_diff(p)[["max"]], 32)
+  expect_render_close(p, tier = "hybrid")
 })
 
 test_that("supported shapes render like ragg", {
@@ -59,9 +43,7 @@ test_that("supported shapes render like ragg", {
     p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) +
       ggplot2::geom_point(shape = shape, size = 4, alpha = 0.5, colour = "steelblue")
     expect_true(uses_rust(p))
-    diff <- render_diff(p)
-    expect_lte(diff[["max"]], 32)
-    expect_lt(diff[["share"]], 0.01)
+    expect_render_close(p, tier = "hybrid")
   }
 })
 
@@ -71,9 +53,7 @@ test_that("mapped colour, shape, stroke, facets and log scales render like ragg"
     ggplot2::scale_x_log10() +
     ggplot2::facet_wrap(~s)
   expect_true(uses_rust(p))
-  diff <- render_diff(p, width = 600, height = 400, res = 150)
-  expect_lte(diff[["max"]], 32)
-  expect_lt(diff[["share"]], 0.01)
+  expect_render_close(p, width = 600, height = 400, res = 150, tier = "hybrid")
 })
 
 test_that("infinite positions are squished to the panel edge", {
@@ -83,9 +63,7 @@ test_that("infinite positions are squished to the panel edge", {
   expect_true(uses_rust(p))
   # Half of each point is clipped at the panel edge, which falls between
   # pixels; the edge pixels there differ more than elsewhere.
-  diff <- render_diff(p)
-  expect_lte(diff[["max"]], 64)
-  expect_lt(diff[["share"]], 0.001)
+  expect_render_close(p, max = 64, tier = "hybrid")
 })
 
 test_that("unsupported layers and coords keep ggplot2's pointsGrob, with a reason", {
@@ -105,6 +83,7 @@ test_that("unsupported layers and coords keep ggplot2's pointsGrob, with a reaso
         rescaler = function(x, to = c(0, 1), from = range(x)) scales::rescale(x, to, from)
       ),
     "no rows" = ggplot2::ggplot(d[0, ], ggplot2::aes(x, y)) + ggplot2::geom_point(),
+    "x or y is AsIs" = ggplot2::ggplot(d[1, ]) + ggplot2::geom_point(ggplot2::aes(x = I(0.5), y = I(0.5))),
     "no Rust drawer for this geom" = base + ggplot2::geom_line()
   )
   for (reason in names(cases)) {
@@ -164,4 +143,54 @@ test_that("an internal error in the hybrid tier warns and draws with ggplot2", {
   expect_equal(attr(out, "tier"), "ggplot2")
   expect_gt(file.size(file), 0)
   expect_equal(grDevices::dev.cur(), before)
+})
+
+test_that("expect_render_close() passes close renders and fails on tier or fallback", {
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_point()
+  expect_success(expect_render_close(p, tier = "hybrid"))
+  expect_failure(expect_render_close(p, tier = "full"), "hybrid tier, not full")
+  local_mocked_bindings(rs_render_points = function(...) stop("boom"))
+  expect_failure(expect_render_close(p, tier = "hybrid"), "fallback warning")
+})
+
+test_that("expect_render_close() fails on misplaced marks and writes images", {
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_point()
+  shifted <- ggplot2::ggplot_build(ggplot2::ggplot(d, ggplot2::aes(y, x)) + ggplot2::geom_point())
+  local_mocked_bindings(render_raster = function(built, size) {
+    list(tier = "hybrid", raster = render_hybrid(shifted, size))
+  })
+  msg <- tryCatch(expect_render_close(p, tier = "hybrid"), expectation_failure = conditionMessage)
+  expect_match(msg, "Render differs")
+  dir <- sub(".*Images: ", "", msg)
+  expect_setequal(list.files(dir), c("reference.png", "result.png", "diff.png"))
+})
+
+test_that("layout_boxes() puts the panel where ragg draws its background", {
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_point(alpha = 0) +
+    ggplot2::theme(panel.grid = ggplot2::element_blank())
+  for (size in list(render_size, list(width = 300, height = 250, units = "px", res = 150))) {
+    b <- ggplot2::ggplot_build(p)
+    boxes <- layout_boxes(b, size)
+    panel <- boxes[boxes$name == "panel", ]
+    expect_equal(nrow(panel), 1)
+    # The fully grey92 pixels of the background lie within a pixel of the
+    # panel box.
+    img <- render_reference(b, size)
+    ch <- raster_channels(img)
+    grey <- matrix(colSums(ch[1:3, ] == 0xEB) == 3, nrow = size$height, byrow = TRUE)
+    rows <- range(which(rowSums(grey) > 20))
+    cols <- range(which(colSums(grey) > 20))
+    found <- c(cols[1] - 1, rows[1] - 1, cols[2], rows[2])
+    expect_lte(max(abs(found - unlist(panel[c("x0", "y0", "x1", "y1")]))), 1)
+  }
+})
+
+test_that("expect_layout_close() compares boxes by name", {
+  a <- data.frame(name = c("panel", "axis-l"), x0 = c(10, 0), y0 = c(5, 5), x1 = c(100, 10), y1 = c(80, 80))
+  b <- a
+  b$x0[1] <- 10.4
+  expect_success(expect_layout_close(b, a))
+  b$x0[1] <- 10.6
+  expect_failure(expect_layout_close(b, a), "panel")
+  expect_failure(expect_layout_close(b[2, ], a), "Missing boxes: panel")
 })

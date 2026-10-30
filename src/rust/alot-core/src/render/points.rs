@@ -24,7 +24,7 @@ const TRC1: f64 = 1.34677368708859836060;
 const TRC2: f64 = 0.77756015077810708036;
 
 /// Subpixel positions per axis.
-const SUB: usize = 8;
+const SUB: usize = 16;
 /// Coverage samples per pixel axis when building sprites.
 const SAMPLES: usize = 16;
 

@@ -597,3 +597,15 @@ interleaved runs:
 Pixels as before (max |diff| 15, 0.018% differ by more than 8).
 `alot_png()` on the built plot takes about 370 ms end to end; the tier
 check (`render_coverage()`) is about 6 ms of that.
+
+### R0.2: point sprites at 1/16-px offsets (2026-10-30)
+
+The render harness showed point edges differing from ragg on 0.2–0.7% of
+pixels (more than 8 of 255) with sprites at 1/8-px offsets. At 1/16 px
+(`SUB = 16`, still 16 × 16 coverage samples) that drops to about 0.04%;
+1/32 px would be near zero but costs 4× more per sprite set again. README
+benchmark, release build, 7 interleaved runs: draw 170 → 197 ms, total
+567 → 592 ms (ggplot2 3386 ms). Pixels: max |diff| 15 → 11; 0.018% →
+0.002% differ by more than 8. A new sprite set (size 7.3 at 300 dpi) costs
+about 0.37 s to build, 4× the 1/8-px cost; R1.2's lazy per-offset sprites
+should remove most of that.

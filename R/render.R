@@ -34,32 +34,41 @@ alot_png <- function(plot, filename, width = 7, height = 5, units = "in", res = 
   built <- if (ggplot2::is_ggplot(plot)) alot_build(plot) else plot
   filename <- path.expand(filename)
   size <- list(width = width, height = height, units = units, res = res, ...)
-  tier <- render_coverage(built)$tier
-  if (tier == "hybrid") {
-    tier <- tryCatch(
-      {
-        render_hybrid(built, filename, size)
-        "hybrid"
-      },
-      error = function(e) {
-        cli::cli_warn(c(
-          "alot's hybrid renderer failed; drawing with ggplot2 instead.",
-          "x" = conditionMessage(e)
-        ))
-        "ggplot2"
-      }
-    )
+  out <- render_raster(built, size)
+  if (is.null(out$raster)) {
+    render_ggplot2(built, filename, size)
   } else {
+    rs_write_png(out$raster, filename)
+  }
+  invisible(structure(filename, tier = out$tier))
+}
+
+# Draws a built plot with the first tier that supports it. Returns the
+# `tier` and, for alot's tiers, the page as a nativeRaster; for the ggplot2
+# tier, `raster` is NULL and the caller draws with ggplot2. An internal
+# error in alot's tier warns (class "alot_render_fallback") and drops to
+# ggplot2.
+render_raster <- function(built, size) {
+  tier <- render_coverage(built)$tier
+  if (tier == "ggplot2") {
     cli::cli_inform(
       c("i" = "alot can't render any layer of this plot; drawing with ggplot2.",
         "i" = "See {.fn alot_render_coverage} for why."),
       .frequency = "once", .frequency_id = "alot_render_ggplot2"
     )
+    return(list(tier = "ggplot2", raster = NULL))
   }
-  if (tier == "ggplot2") {
-    render_ggplot2(built, filename, size)
-  }
-  invisible(structure(filename, tier = tier))
+  tryCatch(
+    list(tier = tier, raster = render_hybrid(built, size)),
+    error = function(e) {
+      cli::cli_warn(
+        c("alot's {tier} renderer failed; drawing with ggplot2 instead.",
+          "x" = conditionMessage(e)),
+        class = "alot_render_fallback"
+      )
+      list(tier = "ggplot2", raster = NULL)
+    }
+  )
 }
 
 #' Report how alot would render a plot
@@ -89,21 +98,23 @@ render_coverage <- function(built) {
   )
 }
 
-render_hybrid <- function(built, filename, size) {
-  gtable <- hybrid_gtable(built)
+# The gtable is built with the device open, as print.ggplot() does:
+# ggplot_gtable() measures text on the current device.
+render_hybrid <- function(built, size) {
   cap <- do.call(ragg::agg_capture, size)
   dev <- grDevices::dev.cur()
   on.exit(close_device(dev))
+  gtable <- hybrid_gtable(built)
   grid::grid.newpage()
   grid::grid.draw(gtable)
-  rs_write_png(cap(native = TRUE), filename)
+  cap(native = TRUE)
 }
 
 render_ggplot2 <- function(built, filename, size) {
-  gtable <- ggplot2::ggplot_gtable(built)
   do.call(ragg::agg_png, c(list(filename), size))
   dev <- grDevices::dev.cur()
   on.exit(close_device(dev))
+  gtable <- ggplot2::ggplot_gtable(built)
   grid::grid.newpage()
   grid::grid.draw(gtable)
 }
@@ -160,6 +171,11 @@ hybrid_decline <- function(layer, data, layout) {
   }
   if (!is.double(data$x) || !is.double(data$y) || !is.character(data$colour)) {
     return("x, y or colour has an unsupported type")
+  }
+  # Coord$transform() leaves AsIs positions untransformed (transform_position
+  # callers in ggplot2 R/coord-.R); the hybrid would rescale them.
+  if (inherits(data$x, "AsIs") || inherits(data$y, "AsIs")) {
+    return("x or y is AsIs")
   }
   if (anyNA(data$x) || anyNA(data$y) || anyNA(data$size) || anyNA(data$stroke) || anyNA(data$colour)) {
     return("NA in x, y, size, stroke or colour")
