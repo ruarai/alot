@@ -48,3 +48,9 @@ gg_flip_axis_labels  <- function(...) gg("flip_axis_labels")(...)
 gg_scale_flip_position <- function(...) gg("scale_flip_position")(...)
 gg_is_waiver         <- function(...) gg("is_waiver")(...)
 `%|W|%`              <- function(a, b) if (gg_is_waiver(a)) b else a
+
+# ggsave() helpers (ggplot2 R/save.R), for alot_png() and alot_ggsave().
+gg_parse_dpi         <- function(...) gg("parse_dpi")(...)
+gg_plot_dim          <- function(...) gg("plot_dim")(...)
+gg_get_plot_background <- function(...) gg("get_plot_background")(...)
+gg_validate_path     <- function(...) gg("validate_path")(...)

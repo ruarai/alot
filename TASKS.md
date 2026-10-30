@@ -564,7 +564,7 @@ alongside Phase 1's remaining tasks.
 - **Done when:** baselines for ggplot2 + ragg and the hybrid are in
   `RESULTS.md`, and PHASE2.md has a target for the default page.
 
-### R0.4 API: `alot_png()` and `alot_ggsave()`
+### R0.4 API: `alot_png()` and `alot_ggsave()` — done
 - **Depends:** R0.1
 - **Touches:** `R/render.R`, `R/ggsave.R`, `tests/testthat/test-render.R`
 - **Do:**

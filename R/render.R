@@ -20,27 +20,47 @@
 #' and layers with a Rust drawer are rasterised in Rust; the PNG is encoded
 #' in Rust. Otherwise the plot is drawn by ggplot2 on [ragg::agg_png()].
 #' If the hybrid tier hits an internal error, `alot_png()` warns and draws
-#' with ggplot2.
+#' with ggplot2. The arguments follow [ggplot2::ggsave()]'s, and the file
+#' has the size, resolution and colour type `ggsave()` gives with ragg.
 #'
 #' @param plot A ggplot or a built plot.
 #' @param filename Output file.
-#' @param width,height,units,res Passed to [ragg::agg_capture()] or
+#' @param width,height Plot size in `units`.
+#' @param units One of `"in"`, `"cm"`, `"mm"` or `"px"`.
+#' @param dpi Resolution: a number, or `"screen"`, `"print"` or `"retina"`.
+#' @param bg Background colour. If `NULL`, the plot theme's
+#'   `plot.background` fill, as in [ggplot2::ggsave()].
+#' @param scaling Scaling factor for line widths and text, as in
 #'   [ragg::agg_png()].
-#' @param ... Passed to [ragg::agg_capture()] or [ragg::agg_png()].
+#' @param ... Passed to the ragg device ([ragg::agg_capture()] or
+#'   [ragg::agg_png()]).
 #' @return `filename`, invisibly, with attribute `"tier"` naming the tier
 #'   that drew it (`"hybrid"` or `"ggplot2"`).
+#' @seealso [alot_ggsave()]
 #' @export
-alot_png <- function(plot, filename, width = 7, height = 5, units = "in", res = 96, ...) {
+alot_png <- function(plot, filename, width = 7, height = 7, units = c("in", "cm", "mm", "px"),
+                     dpi = 300, bg = NULL, scaling = 1, ...) {
   built <- if (ggplot2::is_ggplot(plot)) alot_build(plot) else plot
   filename <- path.expand(filename)
-  size <- list(width = width, height = height, units = units, res = res, ...)
+  dpi <- gg_parse_dpi(dpi)
+  dim <- gg_plot_dim(c(width, height), units = units[1], limitsize = FALSE, dpi = dpi)
+  bg <- gg_get_plot_background(built@plot, bg)
+  size <- list(width = dim[1], height = dim[2], units = "in", res = dpi, bg = bg, scaling = scaling, ...)
   out <- render_raster(built, size)
   if (is.null(out$raster)) {
     render_ggplot2(built, filename, size)
   } else {
-    rs_write_png(out$raster, filename)
+    write_png(out$raster, filename, bg, dpi)
   }
   invisible(structure(filename, tier = out$tier))
+}
+
+# Writes a nativeRaster as ragg's agg_png() would for this background and
+# resolution: RGBA only if `bg` is not opaque (ragg src/png_dev.cpp), and a
+# pHYs chunk from `dpi` unless it is NA.
+write_png <- function(raster, filename, bg = "white", dpi = NA) {
+  alpha <- grDevices::col2rgb(bg, alpha = TRUE)[4, 1] < 255
+  rs_write_png(raster, filename, alpha, if (is.na(dpi)) 0 else as.double(dpi))
 }
 
 # Draws a built plot with the first tier that supports it. Returns the
@@ -101,9 +121,10 @@ render_coverage <- function(built) {
 # The gtable is built with the device open, as print.ggplot() does:
 # ggplot_gtable() measures text on the current device.
 render_hybrid <- function(built, size) {
+  old <- grDevices::dev.cur()
   cap <- do.call(ragg::agg_capture, size)
   dev <- grDevices::dev.cur()
-  on.exit(close_device(dev))
+  on.exit(close_device(dev, old))
   gtable <- hybrid_gtable(built)
   grid::grid.newpage()
   grid::grid.draw(gtable)
@@ -111,23 +132,26 @@ render_hybrid <- function(built, size) {
 }
 
 render_ggplot2 <- function(built, filename, size) {
+  old <- grDevices::dev.cur()
   do.call(ragg::agg_png, c(list(filename), size))
   dev <- grDevices::dev.cur()
-  on.exit(close_device(dev))
+  on.exit(close_device(dev, old))
   gtable <- ggplot2::ggplot_gtable(built)
   grid::grid.newpage()
   grid::grid.draw(gtable)
 }
 
-# Closing a device after an error mid-draw warns "Killing locked device";
-# the error itself is reported instead.
-close_device <- function(dev) {
+# Closes `dev` and makes `old` current again, as ggsave() does. Closing a
+# device after an error mid-draw warns "Killing locked device"; the error
+# itself is reported instead.
+close_device <- function(dev, old = 1L) {
   withCallingHandlers(
     grDevices::dev.off(dev),
     warning = function(w) {
       if (grepl("locked device", conditionMessage(w))) invokeRestart("muffleWarning")
     }
   )
+  if (old > 1 && old %in% grDevices::dev.list()) grDevices::dev.set(old)
 }
 
 # Like ggplot2::ggplot_gtable(), but layers with a Rust drawer become grobs

@@ -136,16 +136,17 @@ fn render_points(
     out
 }
 
-/// Writes a nativeRaster (`dim` = height, width) to `path` as PNG.
+/// Writes a nativeRaster (`dim` = height, width) to `path` as PNG: RGBA if
+/// `alpha`, else RGB; with a `pHYs` chunk if `dpi` is positive.
 /// @noRd
 #[extendr(r_name = "rs_write_png")]
-fn write_png(raster: Robj, path: &str) -> extendr_api::Result<()> {
+fn write_png(raster: Robj, path: &str, alpha: bool, dpi: f64) -> extendr_api::Result<()> {
     let dim = raster.get_attrib("dim").and_then(|d| d.as_integer_vector()).unwrap_or_default();
     let (Some(px), &[h, w]) = (raster.as_integer_slice(), &dim[..]) else {
         return Err(Error::Other("expected a nativeRaster".into()));
     };
     let px = unsafe { std::slice::from_raw_parts(px.as_ptr() as *const u32, px.len()) };
-    let bytes = alot_core::render::png::encode(w as u32, h as u32, px).map_err(|e| Error::Other(e.to_string()))?;
+    let bytes = alot_core::render::png::encode(w as u32, h as u32, px, alpha, (dpi > 0.0).then_some(dpi)).map_err(|e| Error::Other(e.to_string()))?;
     std::fs::write(path, bytes).map_err(|e| Error::Other(e.to_string()))
 }
 

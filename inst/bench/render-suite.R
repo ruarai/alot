@@ -106,7 +106,7 @@ run_hybrid <- function(p, size, file) {
     grid::grid.newpage()
     grid::grid.draw(g)
   })
-  t_encode <- secs(alot_ns$rs_write_png(cap(native = TRUE), file))
+  t_encode <- secs(alot_ns$write_png(cap(native = TRUE), file, dpi = size$res))
   grDevices::dev.off()
   c(build = t_build, gtable = t_gtable, draw = t_draw, encode = t_encode)
 }

@@ -1,6 +1,7 @@
 S3method(grid::drawDetails, alot_hybrid_points)
 export(alot_build)
 export(alot_coverage)
+export(alot_ggsave)
 export(alot_png)
 export(alot_print)
 export(alot_render_coverage)

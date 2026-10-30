@@ -4,17 +4,37 @@
 \alias{alot_png}
 \title{Render a plot to PNG with alot (experimental)}
 \usage{
-alot_png(plot, filename, width = 7, height = 5, units = "in", res = 96, ...)
+alot_png(
+  plot,
+  filename,
+  width = 7,
+  height = 7,
+  units = c("in", "cm", "mm", "px"),
+  dpi = 300,
+  bg = NULL,
+  scaling = 1,
+  ...
+)
 }
 \arguments{
 \item{plot}{A ggplot or a built plot.}
 
 \item{filename}{Output file.}
 
-\item{width, height, units, res}{Passed to [ragg::agg_capture()] or
+\item{width, height}{Plot size in `units`.}
+
+\item{units}{One of `"in"`, `"cm"`, `"mm"` or `"px"`.}
+
+\item{dpi}{Resolution: a number, or `"screen"`, `"print"` or `"retina"`.}
+
+\item{bg}{Background colour. If `NULL`, the plot theme's
+`plot.background` fill, as in [ggplot2::ggsave()].}
+
+\item{scaling}{Scaling factor for line widths and text, as in
 [ragg::agg_png()].}
 
-\item{...}{Passed to [ragg::agg_capture()] or [ragg::agg_png()].}
+\item{...}{Passed to the ragg device ([ragg::agg_capture()] or
+[ragg::agg_png()]).}
 }
 \value{
 `filename`, invisibly, with attribute `"tier"` naming the tier
@@ -27,5 +47,9 @@ it with the first rendering tier that supports it (see
 and layers with a Rust drawer are rasterised in Rust; the PNG is encoded
 in Rust. Otherwise the plot is drawn by ggplot2 on [ragg::agg_png()].
 If the hybrid tier hits an internal error, `alot_png()` warns and draws
-with ggplot2.
+with ggplot2. The arguments follow [ggplot2::ggsave()]'s, and the file
+has the size, resolution and colour type `ggsave()` gives with ragg.
+}
+\seealso{
+[alot_ggsave()]
 }

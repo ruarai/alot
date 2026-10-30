@@ -4,11 +4,33 @@
 # same, so edge pixels may differ slightly (anti-aliasing, subpixel
 # positions).
 
-# Width and height from a PNG's IHDR chunk.
+# Header fields of a PNG: width, height, colour type (2 RGB, 6 RGBA) and
+# the pHYs chunk's pixels per unit (x, y) and unit, NULL if absent.
+png_info <- function(file) {
+  bytes <- readBin(file, "raw", file.size(file))
+  stopifnot(identical(bytes[1:8], as.raw(c(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))))
+  int <- function(at) readBin(bytes[at:(at + 3)], "integer", endian = "big")
+  out <- list(phys = NULL)
+  at <- 9
+  while (at < length(bytes)) {
+    len <- int(at)
+    type <- rawToChar(bytes[(at + 4):(at + 7)])
+    data <- at + 8
+    if (type == "IHDR") {
+      out$width <- int(data)
+      out$height <- int(data + 4)
+      out$colour_type <- as.integer(bytes[data + 9])
+    }
+    if (type == "pHYs") out$phys <- c(int(data), int(data + 4), as.integer(bytes[data + 8]))
+    if (type == "IEND") break
+    at <- data + len + 4
+  }
+  out
+}
+
 png_size <- function(file) {
-  bytes <- readBin(file, "raw", 24)
-  stopifnot(identical(bytes[13:16], charToRaw("IHDR")))
-  c(readBin(bytes[17:20], "integer", endian = "big"), readBin(bytes[21:24], "integer", endian = "big"))
+  info <- png_info(file)
+  c(info$width, info$height)
 }
 
 panel_children <- function(g) {
@@ -116,7 +138,7 @@ test_that("alot_png() writes a PNG and closes its device", {
   p <- ggplot2::ggplot(d, ggplot2::aes(x, y, colour = c)) + ggplot2::geom_point(alpha = 0.5)
   file <- withr::local_tempfile(fileext = ".png")
   before <- grDevices::dev.cur()
-  expect_no_warning(out <- alot_png(p, file, width = 400, height = 300, units = "px"))
+  expect_no_warning(out <- alot_png(p, file, width = 400, height = 300, units = "px", dpi = 96))
   expect_equal(attr(out, "tier"), "hybrid")
   bytes <- readBin(file, "raw", 8)
   expect_equal(bytes, as.raw(c(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)))
@@ -128,7 +150,7 @@ test_that("alot_png() draws unsupported plots with ggplot2", {
   file <- withr::local_tempfile(fileext = ".png")
   before <- grDevices::dev.cur()
   rlang::local_options(rlib_message_verbosity = "verbose")
-  expect_message(out <- alot_png(p, file, width = 400, height = 300, units = "px"), "drawing with ggplot2")
+  expect_message(out <- alot_png(p, file, width = 400, height = 300, units = "px", dpi = 96), "drawing with ggplot2")
   expect_equal(attr(out, "tier"), "ggplot2")
   expect_equal(png_size(file), c(400, 300))
   expect_equal(grDevices::dev.cur(), before)
@@ -139,7 +161,7 @@ test_that("an internal error in the hybrid tier warns and draws with ggplot2", {
   file <- withr::local_tempfile(fileext = ".png")
   before <- grDevices::dev.cur()
   local_mocked_bindings(rs_render_points = function(...) stop("boom"))
-  expect_warning(out <- alot_png(p, file, width = 400, height = 300, units = "px"), "boom")
+  expect_warning(out <- alot_png(p, file, width = 400, height = 300, units = "px", dpi = 96), "boom")
   expect_equal(attr(out, "tier"), "ggplot2")
   expect_gt(file.size(file), 0)
   expect_equal(grDevices::dev.cur(), before)
@@ -193,4 +215,81 @@ test_that("expect_layout_close() compares boxes by name", {
   b$x0[1] <- 10.6
   expect_failure(expect_layout_close(b, a), "panel")
   expect_failure(expect_layout_close(b[2, ], a), "Missing boxes: panel")
+})
+
+# alot_png() / alot_ggsave() (R0.4) against ggsave() with ragg.
+
+ggsave_ragg <- function(file, plot, ...) {
+  ggplot2::ggsave(file, plot, device = ragg::agg_png, ...)
+}
+
+test_that("alot_png() defaults to ggsave()'s 7 x 7 in at 300 dpi", {
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_point()
+  file <- withr::local_tempfile(fileext = ".png")
+  expect_no_warning(alot_png(p, file))
+  info <- png_info(file)
+  expect_equal(c(info$width, info$height), c(2100, 2100))
+  expect_equal(info$phys, c(11811L, 11811L, 1L))
+  expect_equal(info$colour_type, 2L)
+})
+
+test_that("alot_ggsave() matches ggsave() with ragg for PNGs", {
+  points <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_point()
+  lines <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_line()
+  cases <- list(
+    list(plot = points, width = 4, height = 3),
+    list(plot = points, width = 10, height = 6, units = "cm", dpi = 150),
+    list(plot = points, width = 80, height = 60, units = "mm", dpi = "screen", scale = 1.5),
+    list(plot = points, width = 640, height = 480, units = "px", dpi = 72),
+    list(plot = points, width = 3, height = 2, dpi = "retina", bg = "transparent"),
+    list(plot = points + ggplot2::theme(plot.background = ggplot2::element_rect(fill = NA)), width = 3, height = 2, dpi = 100),
+    list(plot = lines, width = 3, height = 2, dpi = 120)
+  )
+  for (args in cases) {
+    ref <- withr::local_tempfile(fileext = ".png")
+    out <- withr::local_tempfile(fileext = ".png")
+    suppressMessages(do.call(ggsave_ragg, c(list(ref), args)))
+    res <- suppressMessages(do.call(alot_ggsave, c(list(out), args)))
+    expect_equal(res, out, ignore_attr = TRUE)
+    expect_equal(png_info(out), png_info(ref))
+  }
+})
+
+test_that("alot_ggsave() draws PNGs with alot and passes other files to ggsave()", {
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_point()
+  dir <- withr::local_tempdir()
+  out <- alot_ggsave("plot.PNG", p, path = dir, width = 3, height = 2, dpi = 72)
+  expect_equal(attr(out, "tier"), "hybrid")
+  expect_equal(png_size(file.path(dir, "plot.PNG")), c(216, 144))
+  out <- alot_ggsave(file.path(dir, "plot.dat"), p, device = "png", width = 3, height = 2, dpi = 72)
+  expect_equal(attr(out, "tier"), "hybrid")
+  pdf <- file.path(dir, "plot.pdf")
+  out <- alot_ggsave(pdf, p, width = 3, height = 2)
+  expect_null(attr(out, "tier"))
+  expect_equal(readBin(pdf, "raw", 4), charToRaw("%PDF"))
+  out <- alot_ggsave(file.path(dir, "fn.png"), p, device = ragg::agg_png, width = 3, height = 2, dpi = 72)
+  expect_null(attr(out, "tier"))
+  expect_equal(png_size(file.path(dir, "fn.png")), c(216, 144))
+})
+
+test_that("alot_ggsave() reports the default size and checks limitsize like ggsave()", {
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_point()
+  file <- withr::local_tempfile(fileext = ".png")
+  expect_message(alot_ggsave(file, p, dpi = 30), "Saving 7 x 7 in image")
+  expect_error(alot_ggsave(file, p, width = 60, height = 2), "exceed 50 inches")
+})
+
+test_that("alot_png() restores the current device", {
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_point()
+  pdf_file <- withr::local_tempfile(fileext = ".pdf")
+  grDevices::pdf(pdf_file)
+  dev <- grDevices::dev.cur()
+  grDevices::pdf(withr::local_tempfile(fileext = ".pdf"))
+  grDevices::dev.set(dev)
+  withr::defer(grDevices::graphics.off())
+  alot_png(p, withr::local_tempfile(fileext = ".png"), width = 2, height = 2, dpi = 50)
+  expect_equal(grDevices::dev.cur(), dev)
+  suppressMessages(alot_png(ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_line(),
+    withr::local_tempfile(fileext = ".png"), width = 2, height = 2, dpi = 50))
+  expect_equal(grDevices::dev.cur(), dev)
 })

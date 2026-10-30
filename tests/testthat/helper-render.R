@@ -72,9 +72,9 @@ expect_render_close <- function(p, ..., max = 32, share = 0.01, tier = "full", l
     dir.create(dir)
     diff <- ref
     diff[] <- bitwOr(as.integer(pmin(px * 4L, 255L)) * 65793L, -16777216L)
-    rs_write_png(ref, file.path(dir, "reference.png"))
-    rs_write_png(out$raster, file.path(dir, "result.png"))
-    rs_write_png(diff, file.path(dir, "diff.png"))
+    write_png(ref, file.path(dir, "reference.png"))
+    write_png(out$raster, file.path(dir, "result.png"))
+    write_png(diff, file.path(dir, "diff.png"))
     msg <- sprintf(
       "Render differs from ggplot2 + ragg: max %d (allowed %d), %.4f%% of pixels by > 8 (allowed %.4f%%).\nImages: %s",
       max(px), max, 100 * mean(px > 8), 100 * share, dir
