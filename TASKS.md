@@ -405,6 +405,24 @@ All stat kernels use the grouped driver (T0.4) and register under
   time. Open one task per step that could plausibly pass the 1.25× rule, and
   record the rest as "stays in R".
 
+### T6.2 Overhead around the position scale kernels
+- **Depends:** T1.1, T1.2
+- **Touches:** `R/kernels-scale.R`, `R/layout.R`, `R/convert.R`
+- **Do:**
+  - On the README example plot (1e6 rows, `facet_wrap`, log x, continuous
+    colour, discrete shape), the position train and map steps take about
+    100 ms (45% of the build, 2026-10-30). That is with kernels on:
+    `train_position_1/_2` 28 + 27 ms and `map_position_1/_2` 24 + 21 ms.
+  - Profile these steps (e.g. `Rprof` or `profvis` around
+    `alot:::step_times(p)`). Split the time into Rust compute and the R work
+    around each call: column conversion, per-panel and per-scale splitting,
+    `rebuild_frame()` and any copies.
+  - Remove the overhead that profiling finds, e.g. by converting each
+    column once per step instead of once per scale or panel.
+- **Done when:** the profile split is recorded in `RESULTS.md`, and any
+  change keeps the shared criteria and makes these steps faster on the
+  example plot.
+
 ---
 
 ## Phase 1 exit
