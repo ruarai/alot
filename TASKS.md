@@ -198,7 +198,7 @@ not repeated below:
   - Train with the continuous range kernel.
   - Map: `rescale`, then a Rust `colour_ramp` interpolation over a palette
     whose colours R samples (O(k)). Then `oob` and `na.value`.
-  - Support the gradient, gradient2 (`rescale_mid`), gradientn and viridis
+  - Support the gradient, gradient2 (`rescale_mid`), gradientn, distiller and viridis
     scales. Detect them by the scale's palette and rescaler and fall back for
     anything custom.
 - **Done when:** the shared criteria hold. Benchmark target: the `map_df`
