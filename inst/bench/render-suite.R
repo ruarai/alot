@@ -83,6 +83,15 @@ render_cases <- list(
       ggplot(d, aes(x, y)) + geom_point(size = 0.5) + facet_wrap(~p)
     },
     size = readme_size
+  ),
+  # R6.3: facet_grid() with free scales and free space.
+  grid_free_1e6 = list(
+    plot = function() {
+      d <- data.frame(x = stats::rnorm(1e6), y = stats::rexp(1e6), a = sample(letters[1:3], 1e6, TRUE), b = sample(LETTERS[1:4], 1e6, TRUE))
+      d$x <- d$x * match(d$b, LETTERS)
+      ggplot(d, aes(x, y)) + geom_point(size = 0.3) + facet_grid(a ~ b, scales = "free", space = "free_x")
+    },
+    size = readme_size
   )
 )
 

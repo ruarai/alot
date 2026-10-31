@@ -4920,6 +4920,245 @@
           list(facets = data_frame0(!!!labeller(labels)))
       }
 
+# upstream facet_grid() assembly matches what the Rust layout mirrors
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (is.null(grobs)) {
+              return(table)
+          }
+          panel_col <- panel_cols(table)
+          panel_row <- panel_rows(table)
+          row <- switch(side, bottom = max(panel_row$b) + shift - 1L, 
+              top = min(panel_row$t) - shift, panel_row$t)
+          col <- switch(side, right = max(panel_col$r) + shift - 1L, 
+              left = min(panel_col$l) - shift, panel_col$l)
+          if (!is.null(spacing)) {
+              table <- switch(side, bottom = , top = gtable_add_rows(table, 
+                  spacing, row), left = , right = gtable_add_cols(table, 
+                  spacing, col))
+              row <- row + as.numeric(side == "bottom")
+              col <- col + as.numeric(side == "right")
+          }
+          table <- switch(side, bottom = , top = gtable_add_rows(table, 
+              max_height(grobs), row), left = , right = gtable_add_cols(table, 
+              max_width(grobs), col))
+          name <- paste(name, seq_along(grobs), sep = "-")
+          row <- row + as.numeric(side %in% c("top", "bottom"))
+          col <- col + as.numeric(side %in% c("left", "right"))
+          gtable_add_grob(table, grobs, t = row, l = col, name = name, 
+              z = z, clip = clip)
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          grobs <- table$grobs[grep(pattern, table$layout$name)]
+          !all(vapply(grobs, is_zero, logical(1)))
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          panels <- table$layout[grepl("^panel", table$layout$name), 
+              , drop = FALSE]
+          unique0(panels[, c("l", "r")])
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          panels <- table$layout[grepl("^panel", table$layout$name), 
+              , drop = FALSE]
+          unique0(panels[, c("t", "b")])
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (!is_guides(guides)) {
+              return(zeroGrob())
+          }
+          pair <- guides$get_position(position)
+          pair$params$draw_label <- labels %||% NULL
+          pair$guide$draw(theme, params = pair$params)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::FacetGrid[[m]])$f))
+    Output
+      {
+          draw_axes <- params$draw_axes %||% list(x = FALSE, y = FALSE)
+          axis_labels <- params$axis_labels %||% list(x = TRUE, y = TRUE)
+          dim <- c(max(layout$ROW), max(layout$COL))
+          if (!axis_labels$x) {
+              cols <- seq_len(nrow(layout))
+              x_order <- as.integer(layout$PANEL[order(layout$ROW, 
+                  layout$COL)])
+          }
+          else {
+              cols <- which(layout$ROW == 1)
+              x_order <- layout$COL
+          }
+          if (!axis_labels$y) {
+              rows <- seq_len(nrow(layout))
+              y_order <- as.integer(layout$PANEL[order(layout$ROW, 
+                  layout$COL)])
+          }
+          else {
+              rows <- which(layout$COL == 1)
+              y_order <- layout$ROW
+          }
+          ranges <- censor_labels(ranges, layout, axis_labels)
+          axes <- render_axes(ranges[cols], ranges[rows], coord, theme, 
+              transpose = TRUE)
+          mtx <- function(x, o) matrix(x[o], dim[1], dim[2], byrow = TRUE)
+          if (draw_axes$x) {
+              table <- weave_axes(table, lapply(axes$x, mtx, o = x_order))
+          }
+          else {
+              table <- seam_table(table, axes$x$top, side = "top", 
+                  name = "axis-t", z = 3)
+              table <- seam_table(table, axes$x$bottom, side = "bottom", 
+                  name = "axis-b", z = 3)
+          }
+          if (draw_axes$y) {
+              table <- weave_axes(table, lapply(axes$y, mtx, o = y_order))
+          }
+          else {
+              table <- seam_table(table, axes$y$left, side = "left", 
+                  name = "axis-l", z = 3)
+              table <- seam_table(table, axes$y$right, side = "right", 
+                  name = "axis-r", z = 3)
+          }
+          table
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::FacetGrid[[m]])$f))
+    Output
+      {
+          strips <- self$format_strip_labels(layout, params)
+          strips <- render_strips(strips$cols, strips$rows, theme = theme)
+          padding <- convertUnit(calc_element("strip.switch.pad.grid", 
+              theme), "cm")
+          switch_x <- !is.null(params$switch) && params$switch %in% 
+              c("both", "x")
+          inside_x <- (calc_element("strip.placement.x", theme) %||% 
+              "inside") == "inside"
+          shift_x <- if (inside_x) 
+              1
+          else 2
+          if (switch_x) {
+              space <- if (!inside_x & table_has_grob(table, "axis-b")) 
+                  padding
+              table <- seam_table(table, strips$x$bottom, side = "bottom", 
+                  name = "strip-b", shift = shift_x, z = 2, clip = "off", 
+                  spacing = space)
+          }
+          else {
+              space <- if (!inside_x & table_has_grob(table, "axis-t")) 
+                  padding
+              table <- seam_table(table, strips$x$top, side = "top", 
+                  name = "strip-t", shift = shift_x, z = 2, clip = "off", 
+                  spacing = space)
+          }
+          switch_y <- !is.null(params$switch) && params$switch %in% 
+              c("both", "y")
+          inside_y <- (calc_element("strip.placement.y", theme) %||% 
+              "inside") == "inside"
+          shift_y <- if (inside_y) 
+              1
+          else 2
+          if (switch_y) {
+              space <- if (!inside_y & table_has_grob(table, "axis-l")) 
+                  padding
+              table <- seam_table(table, strips$y$left, side = "left", 
+                  name = "strip-l", shift = shift_y, z = 2, clip = "off", 
+                  spacing = space)
+          }
+          else {
+              space <- if (!inside_y & table_has_grob(table, "axis-r")) 
+                  padding
+              table <- seam_table(table, strips$y$right, side = "right", 
+                  name = "strip-r", shift = shift_y, z = 2, clip = "off", 
+                  spacing = space)
+          }
+          table
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::FacetGrid[[m]])$f))
+    Output
+      {
+          labeller <- match.fun(params$labeller)
+          cols <- intersect(names(layout), names(params$cols))
+          if (length(cols) > 0) {
+              col_vars <- unique0(layout[cols])
+              attr(col_vars, "type") <- "cols"
+              attr(col_vars, "facet") <- "grid"
+              cols <- data_frame0(!!!labeller(col_vars))
+          }
+          else {
+              cols <- NULL
+          }
+          rows <- intersect(names(layout), names(params$rows))
+          if (length(rows) > 0) {
+              row_vars <- unique0(layout[rows])
+              attr(row_vars, "type") <- "rows"
+              attr(row_vars, "facet") <- "grid"
+              rows <- data_frame0(!!!labeller(row_vars))
+          }
+          else {
+              rows <- NULL
+          }
+          list(cols = cols, rows = rows)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::CoordCartesian[[m]])$f))
+    Output
+      {
+          list(top = panel_guides_grob(panel_params$guides, position = "top", 
+              theme = theme, labels = panel_params$draw_labels$top), 
+              bottom = panel_guides_grob(panel_params$guides, position = "bottom", 
+                  theme = theme, labels = panel_params$draw_labels$bottom))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::CoordCartesian[[m]])$f))
+    Output
+      {
+          list(left = panel_guides_grob(panel_params$guides, position = "left", 
+              theme = theme, labels = panel_params$draw_labels$left), 
+              right = panel_guides_grob(panel_params$guides, position = "right", 
+                  theme = theme, labels = panel_params$draw_labels$right))
+      }
+
 # upstream complete themes and element grobs match what the full tier covers
 
     Code

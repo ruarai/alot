@@ -247,7 +247,7 @@ expect_layout_matches <- function(built, size = render_size, tol = 0.5, label = 
 # which titles and legends are present, the axis guides, and the coord.
 layout_signature <- function(built, ir) {
   rlang::hash(list(
-    ir$theme, ir$coord$class, ir$facet$class,
+    ir$theme, ir$coord$class, ir$facet$class, ir$facet$params,
     lengths(built@plot@labels[c("title", "subtitle", "caption", "tag")]) > 0,
     lapply(ir$scales[[1]]$axes, function(a) a[c("position", "angle", "n.dodge", "minor.ticks")]),
     vapply(ir$legends, function(l) l$class, character(1)),

@@ -1,6 +1,6 @@
 //! Glue for the page layout (`alot_core::render::layout`).
 
-use alot_core::render::layout::{self, LegendBox, PlotSpec, Tag, TagLocation, TitleGrob, WrapSpec};
+use alot_core::render::layout::{self, AxisSet, FacetSpec, LegendBox, PlotSpec, StripSet, Tag, TagLocation, TitleGrob};
 use extendr_api::prelude::*;
 
 /// The element called exactly `name` (`List::dollar()` matches partially, so
@@ -60,12 +60,15 @@ fn opt_title(l: &List, name: &str) -> Option<Option<TitleGrob>> {
 /// `vertical`, and the label grobs `items`.
 fn axis(spec: &List, name: &str, vertical: bool) -> Option<f64> {
     let Some(a) = field(spec, name) else { return Some(0.0) };
-    let a = List::try_from(a).ok()?;
+    axis_size(&List::try_from(a).ok()?, vertical)
+}
+
+fn axis_size(a: &List, vertical: bool) -> Option<f64> {
     let mut labels = Vec::new();
-    for (_, item) in list_of(&a, "items")?.iter() {
+    for (_, item) in list_of(a, "items")?.iter() {
         labels.push(title(&List::try_from(item).ok()?)?);
     }
-    Some(layout::axis_size(num(&a, "major")?, num(&a, "minor"), &labels, vertical))
+    Some(layout::axis_size(num(a, "major")?, num(a, "minor"), &labels, vertical))
 }
 
 fn legend(spec: &List, name: &str) -> Option<Option<LegendBox>> {
@@ -128,26 +131,90 @@ fn layout_boxes(spec: List, page: &[f64]) -> Robj {
     .into()
 }
 
-/// A `facet_wrap()`: see `layout_wrap()` in R/render-layout.R.
-pub(crate) fn wrap(spec: &List) -> Option<Option<WrapSpec>> {
-    let Some(r) = field(spec, "wrap") else { return Some(None) };
-    let w = List::try_from(r).ok()?;
-    let (rows, cols) = (nums(&w, "rows")?, nums(&w, "cols")?);
-    let sp = nums(&w, "spacing")?;
-    let mut strip = None;
-    if let Some(s) = field(&w, "strips") {
-        let mut h = 0.0f64;
-        for (_, t) in List::try_from(s).ok()?.iter() {
-            h = h.max(title(&List::try_from(t).ok()?)?.height());
+/// The text of each strip of a strip set (`strips`, a list of lists of
+/// title grobs), and the size of one strip cell across the strip:
+/// `max_height()` (horizontal) or `max_width()` of all of them.
+pub(crate) fn strip_titles(set: &List) -> Option<(Vec<Vec<TitleGrob>>, f64)> {
+    let horizontal = flag(set, "horizontal")?;
+    let mut out = Vec::new();
+    let mut size = 0.0f64;
+    for (_, strip) in list_of(set, "strips")?.iter() {
+        let mut texts = Vec::new();
+        for (_, t) in List::try_from(strip).ok()?.iter() {
+            let g = title(&List::try_from(t).ok()?)?;
+            size = size.max(if horizontal { g.height() } else { g.width() });
+            texts.push(g);
         }
-        strip = Some(h);
+        out.push(texts);
     }
-    Some(Some(WrapSpec {
-        nrow: num(&w, "nrow")? as usize,
-        ncol: num(&w, "ncol")? as usize,
-        panels: rows.iter().zip(&cols).map(|(r, c)| (*r as usize - 1, *c as usize - 1)).collect(),
+    Some((out, size))
+}
+
+/// A facet: see `layout_facet()` in R/render-layout.R.
+pub(crate) fn facet(spec: &List) -> Option<Option<FacetSpec>> {
+    let Some(r) = field(spec, "facet") else { return Some(None) };
+    let f = List::try_from(r).ok()?;
+    let (nrow, ncol) = (num(&f, "nrow")? as usize, num(&f, "ncol")? as usize);
+    let (rows, cols) = (nums(&f, "rows")?, nums(&f, "cols")?);
+    if rows.len() != cols.len() || rows.iter().chain(&cols).any(|&v| v < 1.0) {
+        return None;
+    }
+    let panels: Vec<(usize, usize)> = rows.iter().zip(&cols).map(|(r, c)| (*r as usize - 1, *c as usize - 1)).collect();
+    if panels.iter().any(|&(r, c)| r >= nrow || c >= ncol) {
+        return None;
+    }
+    let mut axis_sizes = Vec::new();
+    for (_, a) in list_of(&f, "axes")?.iter() {
+        let a = List::try_from(a).ok()?;
+        let vertical = matches!(field(&a, "side")?.as_str()?, "left" | "right");
+        axis_sizes.push(axis_size(&a, vertical)?);
+    }
+    let mut axes: [AxisSet; 4] = Default::default();
+    for (k, name) in ["axis_t", "axis_b", "axis_l", "axis_r"].iter().enumerate() {
+        let a = list_of(&f, name)?;
+        let woven = flag(&a, "woven")?;
+        let ids: Vec<usize> = nums(&a, "ids")?.iter().map(|&v| v as usize).collect();
+        let n = if woven { nrow * ncol } else if k < 2 { ncol } else { nrow };
+        if ids.len() != n || ids.iter().any(|&i| i > axis_sizes.len()) {
+            return None;
+        }
+        axes[k] = AxisSet { woven, ids };
+    }
+    let mut strips = Vec::new();
+    for (_, s) in list_of(&f, "strips")?.iter() {
+        let s = List::try_from(s).ok()?;
+        let (texts, size) = strip_titles(&s)?;
+        strips.push(StripSet {
+            side: num(&s, "side")? as usize,
+            inside: flag(&s, "inside")?,
+            padding: num(&s, "padding")?,
+            sizes: texts.iter().map(|t| t.len() as f64 * size).collect(),
+        });
+    }
+    let grid = flag(&f, "grid")?;
+    for s in &strips {
+        let n = if !grid { panels.len() } else if s.side < 2 { ncol } else { nrow };
+        if s.side > 3 || s.sizes.len() != n {
+            return None;
+        }
+    }
+    let sp = nums(&f, "spacing")?;
+    let (widths, heights) = (nums(&f, "widths")?, nums(&f, "heights")?);
+    if widths.len() != ncol || heights.len() != nrow {
+        return None;
+    }
+    Some(Some(FacetSpec {
+        grid,
+        nrow,
+        ncol,
+        panels,
+        widths,
+        heights,
+        respect: flag(&f, "respect")?,
         spacing: (*sp.first()?, *sp.get(1)?),
-        strip,
+        axes,
+        axis_sizes,
+        strips,
     }))
 }
 
@@ -177,8 +244,7 @@ pub(crate) fn build(spec: &List) -> Option<layout::Table> {
         tag: tag(spec)?,
         margin: nums(spec, "margin")?.try_into().ok()?,
         background: flag(spec, "background")?,
-        wrap: wrap(spec)?,
-        has_axis: ["axis_t", "axis_b", "axis_l", "axis_r"].map(|n| field(spec, n).is_some()),
+        facet: facet(spec)?,
     };
     Some(layout::plot_table(&s))
 }

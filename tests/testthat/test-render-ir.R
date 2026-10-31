@@ -109,9 +109,9 @@ test_that("alot_render_coverage() reports the tier alot_png() would use", {
   expect_identical(cov$tier, "full")
   expect_identical(nrow(cov$full), 0L)
   # Reasons from the page layout are reported too.
-  cov <- alot_render_coverage(base + ggplot2::facet_wrap(~cyl, scales = "free"))
+  cov <- alot_render_coverage(base + ggplot2::facet_wrap(~cyl) + ggplot2::theme(strip.text = ggplot2::element_blank()))
   expect_identical(cov$tier, "hybrid")
-  expect_identical(cov$full$reason, "free scales")
+  expect_identical(cov$full$reason, "blank strips")
   cov <- alot_render_coverage(base + ggplot2::theme(legend.position = "inside") + ggplot2::aes(colour = qsec))
   expect_identical(cov$tier, "hybrid")
   cov <- alot_render_coverage(ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg)) + ggplot2::geom_area())

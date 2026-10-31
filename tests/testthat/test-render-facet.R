@@ -1,6 +1,8 @@
-# Fixed-scale facet_wrap() in the full tier (R5.2): the panel table, axes on
-# the outer panels (and beside empty slots), strips on top and panel spacing,
-# against ggplot2 on ragg and grid's boxes.
+# Facets in the full tier: facet_wrap() (R5.2) and facet_grid() (R6.3), the
+# panel table, axes on the outer panels (beside empty slots, on every panel
+# with free scales or `axes`), strips at every position, inside or outside,
+# `switch`, free scales and `space = "free"`, against ggplot2 on ragg and
+# grid's boxes.
 
 skip_on_cran()
 library(ggplot2)
@@ -71,27 +73,116 @@ test_that("points, legends and scales across panels", {
   check_facet(base + facet_wrap(vars(cyl), labeller = "label_value", strip.position = "top"), "strip position top")
 })
 
+test_that("free scales and axes on every panel", {
+  check_facet(base + facet_wrap(~cyl, scales = "free"), "free")
+  check_facet(base + facet_wrap(~cyl, scales = "free_x"), "free x")
+  check_facet(base + facet_wrap(~cyl, scales = "free_y", ncol = 2), "free y, empty slot")
+  check_facet(base + facet_wrap(~carb, scales = "free", ncol = 4), "free, empty slots")
+  check_facet(base + facet_wrap(~cyl, nrow = 1, scales = "free_x", space = "free_x"), "free space x")
+  check_facet(base + facet_wrap(~cyl, ncol = 1, scales = "free_y", space = "free_y"), "free space y")
+  check_facet(base + facet_wrap(~cyl, axes = "all"), "axes all")
+  check_facet(base + facet_wrap(~carb, ncol = 4, axes = "all_x"), "axes all x, empty slots")
+  check_facet(base + facet_wrap(~carb, ncol = 4, axes = "all", axis.labels = "margins"), "axis labels at the margins")
+  check_facet(base + facet_wrap(~carb, ncol = 4, axes = "all_y", axis.labels = "all_x", dir = "v"), "axis labels by column")
+  check_facet(base + facet_wrap(~cyl, scales = "free") + scale_x_continuous(position = "top") + scale_y_continuous(position = "right"), "free, axes top and right")
+  check_facet(ggplot(mtcars, aes(factor(gear), mpg)) + geom_point() + facet_wrap(~cyl, scales = "free_x"), "free discrete x")
+  check_facet(ggplot(mtcars, aes(wt, mpg, label = rownames(mtcars))) + geom_text(size = 2) + facet_wrap(~cyl, scales = "free"), "free scales, text")
+  check_facet(ggplot(mtcars, aes(factor(gear))) + geom_bar(fill = "steelblue") + facet_wrap(~cyl, scales = "free_y"), "free y, bars")
+  check_facet(ggplot(economics_long, aes(date, value)) + geom_line() + facet_wrap(~variable, scales = "free_y", ncol = 1), "free y, lines",
+    size = list(width = 400, height = 600))
+})
+
+test_that("facet_grid()", {
+  check_facet(base + facet_grid(am ~ cyl), "rows and columns")
+  check_facet(base + facet_grid(. ~ cyl), "columns")
+  check_facet(base + facet_grid(cyl ~ .), "rows")
+  check_facet(base + facet_grid(rows = vars(am), cols = vars(gear)), "vars")
+  check_facet(base + facet_grid(vs + am ~ cyl), "two row variables")
+  check_facet(base + facet_grid(am ~ cyl + vs, labeller = label_both), "two column variables, label_both")
+  check_facet(base + facet_grid(vs + am ~ cyl, labeller = labeller(.multi_line = FALSE)), "one line for two variables")
+  check_facet(base + facet_grid(am ~ cyl, margins = TRUE), "margins")
+  check_facet(base + facet_grid(am ~ cyl, as.table = FALSE), "bottom to top")
+  check_facet(base + facet_grid(am ~ cyl, scales = "free"), "free")
+  check_facet(base + facet_grid(am ~ cyl, scales = "free_x", space = "free_x"), "free space x")
+  check_facet(base + facet_grid(cyl ~ am, scales = "free", space = "free"), "free space")
+  check_facet(base + facet_grid(am ~ cyl, axes = "all"), "axes all")
+  check_facet(base + facet_grid(am ~ cyl, axes = "all", axis.labels = "margins"), "axis labels at the margins")
+  check_facet(base + facet_grid(am ~ cyl, axes = "all_y", axis.labels = "all_x"), "axes all y")
+  check_facet(base + facet_grid(am ~ cyl) + scale_x_continuous(position = "top") + scale_y_continuous(position = "right"), "axes top and right")
+  check_facet(base + facet_grid(am ~ cyl) + coord_fixed(ratio = 0.1), "fixed ratio")
+  check_facet(base + facet_grid(am ~ cyl, scales = "free", space = "free") + coord_fixed(ratio = 0.1), "free space, fixed ratio")
+  check_facet(base + facet_grid(am ~ cyl) + theme(aspect.ratio = 0.5), "aspect ratio")
+  check_facet(base + facet_grid(am ~ cyl) + theme(panel.spacing.x = unit(1, "cm")), "spacing")
+  check_facet(ggplot(mtcars, aes(wt, mpg, colour = factor(gear))) + geom_point() + facet_grid(am ~ cyl) + labs(title = "T"), "legend and title")
+  check_facet(ggplot(mtcars, aes(factor(gear))) + geom_bar() + facet_grid(am ~ cyl, scales = "free_y"), "bars")
+  check_facet(base + facet_grid(am ~ cyl), "150 dpi", size = list(width = 600, height = 450, res = 150))
+  for (theme in list(theme_bw(), theme_classic(), theme_dark(), theme_linedraw())) {
+    check_facet(base + facet_grid(am ~ cyl) + theme, "complete theme")
+  }
+})
+
+test_that("strip positions, switch and placement", {
+  for (pos in c("top", "bottom", "left", "right")) {
+    check_facet(base + facet_wrap(~cyl, strip.position = pos), paste("strips", pos))
+    check_facet(base + facet_wrap(~cyl, strip.position = pos) + theme(strip.placement = "outside"), paste("strips", pos, "outside"))
+    check_facet(base + facet_wrap(~carb, ncol = 4, strip.position = pos, scales = "free"), paste("strips", pos, "free"))
+  }
+  check_facet(base + facet_wrap(~cyl, strip.position = "bottom") + theme(strip.placement = "outside", strip.switch.pad.wrap = unit(1, "cm")),
+    "outside, padding")
+  check_facet(base + facet_wrap(~cyl, strip.position = "left") + scale_y_continuous(position = "right") + theme(strip.placement = "outside"),
+    "outside, no axis there")
+  check_facet(base + facet_wrap(~cyl + am, strip.position = "left"), "two variables left")
+  check_facet(base + facet_wrap(~cyl + am, strip.position = "right"), "two variables right")
+  check_facet(base + facet_wrap(~cyl + am), "two variables top")
+  check_facet(base + facet_wrap(~cyl + am, strip.position = "bottom"), "two variables bottom")
+  for (sw in c("x", "y", "both")) {
+    check_facet(base + facet_grid(am ~ cyl, switch = sw), paste("switch", sw))
+    check_facet(base + facet_grid(am ~ cyl, switch = sw) + theme(strip.placement = "outside"), paste("switch", sw, "outside"))
+  }
+  check_facet(base + facet_grid(vs + am ~ cyl, switch = "y"), "two variables left, grid")
+  check_facet(base + facet_grid(am ~ cyl) + theme(strip.placement = "outside"), "outside, top and right")
+  check_facet(base + facet_grid(am ~ cyl, switch = "both") + theme(strip.placement = "outside", strip.switch.pad.grid = unit(0.5, "cm")),
+    "outside, padding, grid")
+  check_facet(base + facet_grid(am ~ cyl, switch = "x") + scale_x_continuous(position = "top") + theme(strip.placement = "outside"),
+    "outside, no axis there, grid")
+  check_facet(base + facet_grid(am ~ cyl) + theme(strip.text.y = element_text(angle = 0)), "horizontal row strips")
+  check_facet(base + facet_grid(am ~ cyl) + theme(strip.background.y = element_rect(fill = "yellow"), strip.text.x = element_text(size = 14)),
+    "strip elements")
+  check_facet(base + facet_grid(am ~ cyl) + theme(strip.clip = "off"), "unclipped strips")
+  # Strip text larger than its strip, clipped to it.
+  check_facet(base + facet_wrap(~carb, ncol = 4) + coord_fixed(), "clipped strip text")
+  check_facet(base + facet_grid(am ~ cyl, labeller = labeller(am = c(`0` = "automatic transmission", `1` = "manual"))) +
+    theme(strip.text.y = element_text(size = 30)), "clipped row strips")
+  check_facet(base + facet_grid(vs + am ~ gear, margins = TRUE), "margins, clipped")
+  check_facet(ggplot(mpg, aes(drv, model)) + geom_point() + facet_grid(manufacturer ~ ., scales = "free", space = "free") +
+    theme(strip.text.y = element_text(angle = 0)), "free space, many rows", size = list(width = 500, height = 700))
+})
+
 test_that("facets alot doesn't draw fall back", {
   declined <- function(p) {
     b <- suppressWarnings(ggplot_build(p))
     attr(layout_boxes_rust(b, 400, 300, 96), "reason")
   }
-  expect_match(declined(base + facet_wrap(~cyl, scales = "free")), "free scales")
-  expect_match(declined(base + facet_wrap(~cyl, scales = "free_x")), "free scales")
-  expect_match(declined(base + facet_wrap(~cyl, space = "free_x", scales = "free_x")), "free scales")
-  expect_match(declined(base + facet_wrap(~cyl, axes = "all")), "axes on every panel")
-  # Strip text wider than its strip, which ggplot2 clips.
-  b <- suppressWarnings(ggplot_build(base + facet_wrap(~carb, ncol = 4) + coord_fixed()))
-  expect_match(attr(render_full(b, render_size), "reason"), "not one the Rust drawer reads")
-  expect_match(declined(base + facet_wrap(~cyl, strip.position = "bottom")), "strips not on top")
-  expect_match(declined(base + facet_wrap(~cyl, strip.position = "left")), "strips not on top")
-  expect_match(declined(base + facet_wrap(~cyl) + theme(strip.placement = "outside")), "strips not on top")
-  expect_match(declined(base + facet_wrap(~cyl + gear)), "more than one variable")
   expect_match(declined(ggplot(data.frame(x = 1:6, y = 1:6, g = c("a", "a", "b", "b", NA, "c")), aes(x, y)) + geom_point() + facet_wrap(~g)), "plain text")
   b <- suppressWarnings(ggplot_build(base + facet_wrap(~cyl, labeller = label_bquote(alpha^.(cyl)))))
   expect_false(is.null(attr(render_full(b, render_size), "reason")))
-  expect_match(declined(base + facet_grid(. ~ cyl)), "more than one panel")
+  expect_match(declined(base + facet_grid(am ~ cyl, labeller = label_bquote(rows = alpha^.(am)))), "not plain text")
   expect_match(declined(base + facet_wrap(~cyl) + theme(strip.text = element_blank())), "blank strips")
+  expect_match(declined(base + facet_grid(am ~ cyl) + theme(strip.text.y = element_blank())), "blank strips")
+  # ggplot2 warns and leaves these axes out.
+  expect_match(declined(base + facet_wrap(~carb, ncol = 4, strip.position = "bottom") + theme(strip.placement = "outside")), "outside strips")
+  # ggplot2 aborts on these.
+  expect_match(declined(base + facet_wrap(~cyl, scales = "free") + coord_fixed()), "fixed coord")
   b <- suppressWarnings(ggplot_build(base + facet_wrap(~cyl) + coord_flip()))
   expect_false(is.null(attr(render_full(b, render_size), "reason")))
+})
+
+test_that("facets laid out but drawn by the hybrid tier match grid's layout", {
+  for (p in list(
+    base + facet_wrap(~cyl, scales = "free") + coord_flip(),
+    base + facet_grid(am ~ cyl, scales = "free_y") + coord_flip()
+  )) {
+    b <- suppressWarnings(ggplot_build(p))
+    expect_null(expect_layout_matches(b))
+  }
 })

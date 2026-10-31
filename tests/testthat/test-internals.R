@@ -293,9 +293,9 @@ test_that("upstream guide assembly matches what the legend drawers mirror", {
 })
 
 test_that("upstream facet_wrap() assembly matches what the Rust layout mirrors", {
-  # layout_wrap() (R/render-layout.R) and WrapSpec in
-  # alot-core/src/render/layout.rs mirror these for fixed scales and strips
-  # on top. If these fail, update the mirror, then the snapshots.
+  # layout_facet() (R/render-layout.R) and FacetSpec in
+  # alot-core/src/render/layout.rs mirror these. If these fail, update the
+  # mirror, then the snapshots.
   gg_fn <- function(f) utils::getFromNamespace(f, "ggplot2")
   for (f in c("weave_tables_row", "weave_tables_col", "weave_axes", "measure_axes", "convertInd", "build_strip", "assemble_strips", "render_axes", "censor_labels", "max_height")) {
     expect_snapshot(print(body(gg_fn(f))))
@@ -305,6 +305,23 @@ test_that("upstream facet_wrap() assembly matches what the Rust layout mirrors",
   }
   for (m in c("draw_panels", "attach_axes", "attach_strips", "format_strip_labels")) {
     expect_snapshot(print(body(environment(ggplot2::FacetWrap[[m]])$f)))
+  }
+})
+
+test_that("upstream facet_grid() assembly matches what the Rust layout mirrors", {
+  # layout_facet() (R/render-layout.R) and FacetSpec in
+  # alot-core/src/render/layout.rs mirror these (R6.3), with the helpers of
+  # the facet_wrap() snapshots above. If these fail, update the mirror, then
+  # the snapshots.
+  gg_fn <- function(f) utils::getFromNamespace(f, "ggplot2")
+  for (f in c("seam_table", "table_has_grob", "panel_cols", "panel_rows", "panel_guides_grob")) {
+    expect_snapshot(print(body(gg_fn(f))))
+  }
+  for (m in c("attach_axes", "attach_strips", "format_strip_labels")) {
+    expect_snapshot(print(body(environment(ggplot2::FacetGrid[[m]])$f)))
+  }
+  for (m in c("render_axis_h", "render_axis_v")) {
+    expect_snapshot(print(body(environment(ggplot2::CoordCartesian[[m]])$f)))
   }
 })
 

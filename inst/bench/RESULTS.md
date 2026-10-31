@@ -1163,3 +1163,22 @@ joins in parallel chunks (exact) gave 187 to 125 ms for the joins alone in a
 stand-alone benchmark and no change in the plot: the stage is limited by
 memory traffic (the outline is over 100 MB). Streaming edges into each band
 instead of materialising the outline is the remaining exact option.
+
+## R6.3: facets in full (2026-10-31)
+
+`render_full()` against ggplot2's gtable drawn on `ragg::agg_capture()` (the
+build is not timed), release build, 1600 × 1000 at 150 dpi, medians of 5–7
+runs. `grid_free_1e6` is the new `render-suite.R` case: `facet_grid(a ~ b,
+scales = "free", space = "free_x")`, 3 × 4 panels, 1e6 points.
+
+| Plot | Full tier | ggplot2 + ragg | Full tier before R6.3 |
+|---|---:|---:|---:|
+| `grid_free_1e6` | 194 ms | 3778 ms | (hybrid) |
+| README plot, 1e6 rows | 146 ms | 2840 ms | 147 ms |
+| README plot, 10 rows | 52 ms | 245 ms | 53 ms |
+| `facets_400` (`facet_wrap()`, 400 panels) | 926 ms | 11685 ms | 909 ms |
+
+The fixed-scale cases are unchanged (the "before" column is the parent
+commit, run alongside). Per-panel work stays per distinct pair of scales:
+panel backgrounds, grid lines, ranges and axes are resolved once per pair
+and shared.

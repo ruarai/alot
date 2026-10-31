@@ -68,6 +68,12 @@ fn text_rect(x: f64, y: f64, w: f64, h: f64, hj: f64, vj: f64, rot: f64) -> Quad
 impl Title {
     /// Draws the labels in `cell` (device pixels, y down).
     pub fn draw(&self, p: &mut Painter, cell: &Rect) -> Option<()> {
+        let clip = p.page_clip();
+        self.draw_clipped(p, cell, clip)
+    }
+
+    /// Draws the labels in `cell`, clipped to ragg's clip box `clip`.
+    pub fn draw_clipped(&self, p: &mut Painter, cell: &Rect, clip: [i32; 4]) -> Option<()> {
         let g = &self.grob;
         let (w, h) = (cell.x1 - cell.x0, cell.y1 - cell.y0);
         let n = self.labels.len();
@@ -96,7 +102,7 @@ impl Title {
             }
             runs.push(Run { x: px, y: py, hjust: g.hjust, vjust: g.vjust, rot: g.angle, text });
         }
-        p.text(&runs, &self.style)
+        p.text_clipped(&runs, &self.style, clip)
     }
 }
 

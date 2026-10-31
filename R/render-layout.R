@@ -1,9 +1,9 @@
 # The input to the Rust page layout (alot-core/src/render/layout.rs) for a
-# single-panel plot: the sizes ggplot_gtable() (ggplot2 R/plot-build.R)
+# plot: the sizes ggplot_gtable() (ggplot2 R/plot-build.R)
 # gives the rows and columns of its table, measured from the render IR's
 # theme, labels and axis guides, with string metrics from text_metrics().
-# Mirrors FacetNull$draw_panels() (R/facet-null.R), Facet$draw_labels()
-# (R/facet-.R), GuideAxis$measure_grobs() (R/guide-axis.R), titleGrob()
+# Mirrors FacetNull$draw_panels() (R/facet-null.R), the facets'
+# draw_panels() (layout_facet()), Facet$draw_labels() (R/facet-.R), GuideAxis$measure_grobs() (R/guide-axis.R), titleGrob()
 # (R/margins.R) and table_add_tag() (R/plot-build.R).
 
 # Where grid reads a unit that alot doesn't convert (relative and
@@ -114,8 +114,10 @@ layout_label_angle <- function(position, angle) {
 
 # The axis at `position` as GuideAxis$draw() builds it: the tick lengths
 # and one titleGrob() per dodge row or column of labels. NULL for no axis.
-layout_axis <- function(ir, built, position, res) {
-  scale <- ir$scales[[1]]
+# `panel`: the panel whose scales it shows; `draw`: whether it draws its
+# labels (censor_labels(), ggplot2 R/facet-.R), NULL for the panel's own.
+layout_axis <- function(ir, built, position, res, panel = 1L, draw = NULL) {
+  scale <- ir$scales[[ir$layout$scales[panel]]]
   at <- Filter(function(a) identical(a$position, position), scale$axes)
   if (length(at) == 0) {
     return(NULL)
@@ -148,7 +150,7 @@ layout_axis <- function(ir, built, position, res) {
     text$hjust <- h$hjust
     text$vjust <- h$vjust
   }
-  draw <- built@layout$panel_params[[1]]$draw_labels[[position]]
+  draw <- draw %||% built@layout$panel_params[[panel]]$draw_labels[[position]]
   labels <- character()
   if (".type" %in% names(key)) {
     type <- key$.type
@@ -226,8 +228,8 @@ layout_spec_ <- function(built, ir, res, legends) {
   plot <- built@plot
   layout <- built@layout
   theme <- ir$theme
-  if (!ir$facet$class %in% c("FacetNull", "FacetWrap")) {
-    layout_decline("more than one panel")
+  if (!ir$facet$class %in% c("FacetNull", "FacetWrap", "FacetGrid")) {
+    layout_decline("a facet alot doesn't lay out")
   }
   if (!ir$coord$class %in% c("CoordCartesian", "CoordFlip", "CoordFixed", "CoordTransform")) {
     layout_decline("coord not laid out")
@@ -239,15 +241,16 @@ layout_spec_ <- function(built, ir, res, legends) {
     legends <- legend_boxes(built, res)
   }
 
-  wrap <- if (ir$facet$class == "FacetWrap") layout_wrap(built, ir, res)
   aspect <- plot@theme$aspect.ratio %||% layout$coord$aspect(layout$panel_params[[1]])
-  spec <- list(
-    aspect = if (is.null(aspect)) NA_real_ else as.numeric(aspect),
-    axis_l = layout_axis(ir, built, "left", res), axis_r = layout_axis(ir, built, "right", res),
-    axis_t = layout_axis(ir, built, "top", res), axis_b = layout_axis(ir, built, "bottom", res)
-  )
-
-  spec$wrap <- wrap
+  spec <- list(aspect = if (is.null(aspect)) NA_real_ else as.numeric(aspect))
+  if (ir$facet$class == "FacetNull") {
+    spec$axis_l <- layout_axis(ir, built, "left", res)
+    spec$axis_r <- layout_axis(ir, built, "right", res)
+    spec$axis_t <- layout_axis(ir, built, "top", res)
+    spec$axis_b <- layout_axis(ir, built, "bottom", res)
+  } else {
+    spec$facet <- layout_facet(built, ir, res)
+  }
 
   # Layout$render(): the axis titles, [[1]] top or left, [[2]] bottom or right.
   labels <- layout$coord$labels(
@@ -285,39 +288,207 @@ layout_spec_ <- function(built, ir, res, legends) {
   spec[!vapply(spec, is.null, logical(1))]
 }
 
-# FacetWrap$draw_panels() (ggplot2 R/facet-wrap.R, R/facet-.R) for fixed
-# scales and strips on top, inside: the panels' grid, `panel.spacing` and
-# the strips' text and background. Everything else declines.
-layout_wrap <- function(built, ir, res) {
-  params <- built@layout$facet_params
+# Facet$draw_panels() (ggplot2 R/facet-.R) for facet_wrap() and
+# facet_grid(): init_gtable()'s panel sizes, which axis attach_axes() puts
+# beside which panel (FacetWrap$attach_axes(), R/facet-wrap.R;
+# FacetGrid$attach_axes(), R/facet-grid-.R), and the strips of
+# attach_strips() as build_strip() and assemble_strips() (R/labeller.R)
+# make them. FacetSpec (alot-core/src/render/layout.rs) builds the table
+# from these. Cases where ggplot2 aborts or warns decline.
+layout_facet <- function(built, ir, res) {
+  layout <- built@layout
+  params <- layout$facet_params
   theme <- ir$theme
-  if (any(unlist(params$free)) || any(unlist(params$space_free))) {
-    layout_decline("free scales")
+  coord <- layout$coord
+  grid <- ir$facet$class == "FacetGrid"
+  free <- params$free %||% list(x = FALSE, y = FALSE)
+  space <- params$space_free %||% list(x = FALSE, y = FALSE)
+  draw_axes <- params$draw_axes %||% list(x = FALSE, y = FALSE)
+  axis_labels <- params$axis_labels %||% list(x = TRUE, y = TRUE)
+
+  # FacetWrap$draw_panels(): the layout by row, then column, with
+  # coord_flip()'s scales switched back.
+  lay <- layout$layout
+  if (!grid) {
+    if (inherits(coord, "CoordFlip")) {
+      lay[c("SCALE_X", "SCALE_Y")] <- lay[c("SCALE_Y", "SCALE_X")]
+    }
+    lay <- lay[order(lay$ROW, lay$COL), , drop = FALSE]
   }
-  if (any(unlist(params$draw_axes)) || !all(unlist(params$axis_labels))) {
-    layout_decline("axes on every panel")
+
+  # Facet$draw_panels() and init_gtable(): the panels' null sizes.
+  aspect <- built@plot@theme$aspect.ratio
+  if (!is.null(aspect) && (space$x || space$y)) {
+    layout_decline("free space with an aspect ratio")
   }
-  if (!identical(params$strip.position %||% "top", "top") || !identical(theme[["strip.placement.x"]] %||% "inside", "inside")) {
-    layout_decline("strips not on top, inside")
+  if (!coord$is_free()) {
+    if (space$x && space$y) {
+      aspect <- aspect %||% coord$ratio
+    } else if (free$x || free$y) {
+      layout_decline("free scales with a fixed coord")
+    }
   }
+  ranges <- layout$panel_params
+  aspect <- aspect %||% coord$aspect(ranges[[1]])
+  dim <- c(max(lay$ROW), max(lay$COL))
+  widths <- rep(1, dim[2])
+  heights <- rep(abs(aspect %||% 1), dim[1])
+  if (space$x) {
+    widths <- vapply(as.integer(lay$PANEL[lay$ROW == 1]), function(i) diff(ranges[[i]]$x.range), numeric(1))
+  }
+  if (space$y) {
+    heights <- vapply(as.integer(lay$PANEL[lay$COL == 1]), function(i) diff(ranges[[i]]$y.range), numeric(1)) * abs(aspect %||% 1)
+  }
+
+  # attach_axes(): render_axes() of censor_labels()' ranges. Axes are
+  # measured once per scale, position and label drawing; `axis_id()` gives
+  # each a 1-based id (0 for none, a zeroGrob()).
+  ranges <- gg_censor_labels(ranges, lay, axis_labels)
+  axes <- list()
+  ids <- integer()
+  axis_id <- function(k, position) {
+    draw <- ranges[[k]]$draw_labels[[position]]
+    key <- paste(ir$layout$scales[k], position, isFALSE(draw))
+    if (!is.na(ids[key])) {
+      return(ids[[key]])
+    }
+    a <- layout_axis(ir, built, position, res, panel = k, draw = draw)
+    id <- 0L
+    if (!is.null(a)) {
+      axes[[length(axes) + 1L]] <<- a
+      id <- length(axes)
+    }
+    ids[[key]] <<- id
+    id
+  }
+  n <- nrow(lay)
+  if (!grid) {
+    # FacetWrap$attach_axes()
+    x_order <- if (axis_labels$x) lay$SCALE_X else seq_len(n)
+    y_order <- if (axis_labels$y) lay$SCALE_Y else seq_len(n)
+    slot <- cbind(lay$ROW, lay$COL)
+    side <- function(position, order) {
+      m <- matrix(0L, dim[1], dim[2])
+      m[slot] <- vapply(order, axis_id, integer(1), position = position)
+      m
+    }
+    original <- list(
+      top = side("top", x_order), bottom = side("bottom", x_order),
+      left = side("left", y_order), right = side("right", y_order)
+    )
+    m <- original
+    if (!(free$x || draw_axes$x)) {
+      m$top[-1, ] <- 0L
+      m$bottom[-dim[1], ] <- 0L
+    }
+    if (!(free$y || draw_axes$y)) {
+      m$left[, -1] <- 0L
+      m$right[, -dim[2]] <- 0L
+    }
+    empty <- matrix(TRUE, dim[1], dim[2])
+    empty[slot] <- FALSE
+    if (any(empty)) {
+      # Axes go back beside empty slots, unless outside strips are there
+      # (ggplot2 warns and leaves them out).
+      inside <- (theme[["strip.placement"]] %||% "inside") == "inside"
+      strip <- params$strip.position %||% "top"
+      back <- list(
+        bottom = which(apply(empty, 2, function(x) c(diff(x) == 1, FALSE))),
+        top = which(apply(empty, 2, function(x) c(FALSE, diff(x) == -1))),
+        right = which(t(apply(empty, 1, function(x) c(diff(x) == 1, FALSE)))),
+        left = which(t(apply(empty, 1, function(x) c(FALSE, diff(x) == -1))))
+      )
+      for (pos in names(back)) {
+        idx <- back[[pos]]
+        if (length(idx) == 0) next
+        fixed <- if (pos %in% c("top", "bottom")) !free$x else !free$y
+        if (strip == pos && !inside && fixed && any(original[[pos]][idx] > 0)) {
+          layout_decline("outside strips where axes go beside empty panels")
+        }
+        m[[pos]][idx] <- original[[pos]][idx]
+      }
+    }
+    woven <- function(mat) list(woven = 1, ids = as.numeric(t(mat)))
+    sets <- list(axis_t = woven(m$top), axis_b = woven(m$bottom), axis_l = woven(m$left), axis_r = woven(m$right))
+  } else {
+    # FacetGrid$attach_axes(): one axis per column (row) seamed outside,
+    # or woven beside every panel with `axes`.
+    cols <- if (axis_labels$x) which(lay$ROW == 1) else seq_len(n)
+    x_order <- if (axis_labels$x) lay$COL else as.integer(lay$PANEL[order(lay$ROW, lay$COL)])
+    rows <- if (axis_labels$y) which(lay$COL == 1) else seq_len(n)
+    y_order <- if (axis_labels$y) lay$ROW else as.integer(lay$PANEL[order(lay$ROW, lay$COL)])
+    side <- function(position, which, order, weave) {
+      v <- vapply(which, axis_id, integer(1), position = position)
+      if (weave) list(woven = 1, ids = as.numeric(v[order])) else list(woven = 0, ids = as.numeric(v))
+    }
+    sets <- list(
+      axis_t = side("top", cols, x_order, draw_axes$x), axis_b = side("bottom", cols, x_order, draw_axes$x),
+      axis_l = side("left", rows, y_order, draw_axes$y), axis_r = side("right", rows, y_order, draw_axes$y)
+    )
+  }
+
+  # attach_strips()
+  clip <- c("on", "off", "inherit")[pmatch(theme[["strip.clip"]][[1]], c("on", "off", "inherit"), nomatch = 3)]
+  placement <- function(position) {
+    (theme[[if (position %in% c("top", "bottom")) "strip.placement.x" else "strip.placement.y"]] %||% "inside") == "inside"
+  }
+  strip_set <- function(labels, position, padding) {
+    if (is.null(labels) || nrow(labels) == 0 || ncol(labels) == 0) {
+      layout_decline("facets without strip labels")
+    }
+    horizontal <- position %in% c("top", "bottom")
+    element <- as_element(theme[[paste0("strip.text.", if (horizontal) "x." else "y.", position)]])
+    if (layout_blank(element)) {
+      layout_decline("blank strips")
+    }
+    # build_strip(): right strips take the variables in reverse.
+    if (position == "right") {
+      labels <- labels[rev(seq_along(labels))]
+    }
+    by_var <- lapply(labels, function(v) {
+      if (!(is.character(v) || is.factor(v))) {
+        layout_decline("strip labels that are not plain text")
+      }
+      out <- legend_labels(element, as.character(v), res)
+      if (length(out) != length(v)) {
+        layout_decline("strip labels alot doesn't measure")
+      }
+      out
+    })
+    bg <- theme[[paste0("strip.background.", if (horizontal) "x" else "y")]]
+    list(
+      side = match(position, c("top", "bottom", "left", "right")) - 1, inside = as.numeric(placement(position)),
+      padding = padding, horizontal = as.numeric(horizontal),
+      strips = lapply(seq_len(nrow(labels)), function(i) unname(lapply(by_var, `[[`, i))),
+      bg = if (!layout_blank(bg)) full_rect(bg, res), clip = as.numeric(clip == "on")
+    )
+  }
+  if (!grid) {
+    pad <- layout_px(theme[["strip.switch.pad.wrap"]], res)
+    strips <- list(strip_set(ir$strips$facets, params$strip.position %||% "top", pad))
+  } else {
+    pad <- layout_px(theme[["strip.switch.pad.grid"]], res)
+    switch <- params$switch %||% "none"
+    strips <- list()
+    if (!is.null(ir$strips$cols)) {
+      strips[[length(strips) + 1L]] <- strip_set(ir$strips$cols, if (switch %in% c("both", "x")) "bottom" else "top", pad)
+    }
+    if (!is.null(ir$strips$rows)) {
+      strips[[length(strips) + 1L]] <- strip_set(ir$strips$rows, if (switch %in% c("both", "y")) "left" else "right", pad)
+    }
+  }
+
   panels <- ir$layout$panels
-  labels <- ir$strips$facets
-  if (is.null(labels) || ncol(labels) != 1) {
-    layout_decline("strips of more than one variable")
-  }
-  element <- as_element(theme[["strip.text.x.top"]])
-  bg <- theme[["strip.background.x"]]
-  if (layout_blank(element)) {
-    layout_decline("blank strips")
-  }
-  strips <- legend_labels(element, as.character(labels[[1]]), res)
-  if (length(strips) != nrow(panels)) {
-    layout_decline("strip labels alot doesn't measure")
-  }
-  list(
-    nrow = as.numeric(max(panels$ROW)), ncol = as.numeric(max(panels$COL)), rows = as.numeric(panels$ROW), cols = as.numeric(panels$COL),
-    spacing = c(layout_px(theme[["panel.spacing.x"]], res), layout_px(theme[["panel.spacing.y"]], res)),
-    strips = strips, strip_bg = if (!layout_blank(bg)) full_rect(bg, res), strip_clip = as.numeric(identical(theme[["strip.clip"]][[1]], "on"))
+  c(
+    list(
+      grid = as.numeric(grid), nrow = as.numeric(dim[1]), ncol = as.numeric(dim[2]),
+      rows = as.numeric(panels$ROW), cols = as.numeric(panels$COL),
+      widths = as.numeric(widths), heights = as.numeric(heights), respect = as.numeric(!is.null(aspect)),
+      spacing = c(layout_px(theme[["panel.spacing.x"]], res), layout_px(theme[["panel.spacing.y"]], res)),
+      axes = axes
+    ),
+    sets,
+    list(strips = strips)
   )
 }
 

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use crate::render::agg::{Cap, Join, Rule};
 use crate::render::axis::Axis;
 use crate::render::display::{DisplayList, Item, Rect};
-use crate::render::layout::{Box as Cell, Table, WrapSpec, WRAP_SIDES};
+use crate::render::layout::{Box as Cell, Grob, Table};
 use crate::render::legend::LegendGroup;
 use crate::render::panel::Panel;
 use crate::render::paths::{PathBatch, PathSpec, Stroke};
@@ -239,18 +239,62 @@ fn bar_image(c: &Rect, colours: &[[u8; 4]], horizontal: bool, clip: [i32; 4]) ->
     Some(text::Image { x0: i0 as i32, y0: j0 as i32, w: iw, h: ih, px })
 }
 
-/// What a `facet_wrap()` draws beyond its panels.
-pub struct WrapDraw {
-    pub spec: WrapSpec,
-    /// The axis at each side (top, bottom, left, right), drawn on the
-    /// panels `WrapSpec::axis_cells()` says.
-    pub axes: [Option<Axis>; 4],
-    /// The strip text of each panel, in `spec.panels` order.
-    pub strips: Vec<Title>,
-    /// `strip.background.x`.
-    pub strip_bg: Option<RectEl>,
+/// The strips of one side of a facet (`build_strip()` and
+/// `assemble_strips()`, ggplot2 R/labeller.R): each strip a gtable of one
+/// cell per facet variable, each cell the strip background under its text.
+pub struct StripDraw {
+    /// Top or bottom: the variables' cells stack down; left or right: they
+    /// sit side by side.
+    pub horizontal: bool,
+    /// The cells' size across the strip (`max_height()` or `max_width()`
+    /// of all the strips' text).
+    pub size: f64,
+    /// Each strip's text, one per cell in the strip gtable's order.
+    pub strips: Vec<Vec<Title>>,
+    /// `strip.background.x` or `.y`.
+    pub bg: Option<RectEl>,
     /// `strip.clip` is "on".
-    pub strip_clip: bool,
+    pub clip: bool,
+}
+
+impl StripDraw {
+    /// Draws strip `i` in `cell`, its cells centred along the strip's
+    /// depth as grid places a layout of absolute sizes.
+    fn draw(&self, p: &mut Painter, i: usize, cell: &Rect) -> Option<()> {
+        let texts = self.strips.get(i)?;
+        let total = self.size * texts.len() as f64;
+        for (j, text) in texts.iter().enumerate() {
+            let off = j as f64 * self.size;
+            let sub = if self.horizontal {
+                let y0 = cell.y0 + (cell.y1 - cell.y0 - total) / 2.0 + off;
+                Rect { x0: cell.x0, y0, x1: cell.x1, y1: y0 + self.size }
+            } else {
+                let x0 = cell.x0 + (cell.x1 - cell.x0 - total) / 2.0 + off;
+                Rect { x0, y0: cell.y0, x1: x0 + self.size, y1: cell.y1 }
+            };
+            // The strip's gtable clips each cell's grobs to the cell: the
+            // background to the cell, the text to ragg's clip box for it.
+            if self.clip {
+                p.push_clip(sub);
+            }
+            if let Some(bg) = &self.bg {
+                p.rect(&sub, bg);
+            }
+            if self.clip {
+                p.pop_clip();
+            }
+            let clip = if self.clip { p.text_clip_box(&sub) } else { p.page_clip() };
+            text.draw_clipped(p, &sub, clip)?;
+        }
+        Some(())
+    }
+}
+
+/// What a `facet_wrap()` or `facet_grid()` draws beyond its panels: the
+/// axes and strips its table's cells name (`layout::Grob`).
+pub struct FacetDraw {
+    pub axes: Vec<Axis>,
+    pub strips: Vec<StripDraw>,
 }
 
 /// What a plot's cells draw.
@@ -266,7 +310,7 @@ pub struct PageSpec {
     pub panels: Vec<(String, Panel)>,
     /// Axes by cell name: "axis-t", "axis-l", "axis-r", "axis-b".
     pub axes: Vec<(String, Axis)>,
-    pub wrap: Option<WrapDraw>,
+    pub facet: Option<FacetDraw>,
     /// Titles by cell name (axis titles, title, subtitle, caption, tag).
     pub titles: Vec<(String, Title)>,
     /// Legend boxes by cell name ("guide-box-right", ...).
@@ -278,16 +322,8 @@ fn rect_of(b: &Cell) -> Rect {
     Rect { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1 }
 }
 
-/// The two numbers ending a woven cell's name, `axis-t-<a>-<b>`.
-fn woven_index(name: &str) -> Option<(usize, usize)> {
-    let mut it = name.rsplit('-');
-    let b = it.next()?.parse().ok()?;
-    let a = it.next()?.parse().ok()?;
-    Some((a, b))
-}
-
 /// Draws the page in gtable's order (R/plot-build.R, R/facet-null.R,
-/// R/facet-wrap.R): the background, the panels, the strips and axes
+/// R/facet-.R): the background, the panels, the strips and axes
 /// (`z` 2 and 3), then the labels, legends and titles in the order they
 /// were added. `None` if something can't be drawn as ragg does.
 pub fn draw_page(spec: &PageSpec, fonts: &[Font]) -> Option<DisplayList> {
@@ -304,33 +340,16 @@ pub fn draw_page(spec: &PageSpec, fonts: &[Font]) -> Option<DisplayList> {
             panel.draw(&mut p, &rect_of(b))?;
         }
     }
-    if let Some(w) = &spec.wrap {
-        let flags = w.spec.axis_cells(std::array::from_fn(|k| w.axes[k].is_some()));
-        for b in boxes.iter().filter(|b| b.name.starts_with("strip-t-")) {
-            let (col, row) = woven_index(&b.name)?;
-            let Some(k) = w.spec.panels.iter().position(|&(r, c)| r + 1 == row && c + 1 == col) else { continue };
-            let cell = rect_of(b);
-            // The strip's gtable clips its grobs to the strip.
-            if w.strip_clip {
-                if w.strips[k].grob.width() > cell.x1 - cell.x0 + 1e-6 {
-                    return None;
-                }
-                p.push_clip(cell);
-            }
-            if let Some(bg) = &w.strip_bg {
-                p.rect(&cell, bg);
-            }
-            w.strips[k].draw(&mut p, &cell)?;
-            if w.strip_clip {
-                p.pop_clip();
+    if let Some(f) = &spec.facet {
+        // Strips (z = 2), then axes (z = 3), each in the order added.
+        for (c, b) in spec.table.cells.iter().zip(&boxes) {
+            if let Grob::Strip(k, i) = c.grob {
+                f.strips.get(k)?.draw(&mut p, i, &rect_of(b))?;
             }
         }
-        for b in boxes.iter().filter(|b| b.name.starts_with("axis-")) {
-            let side = WRAP_SIDES.iter().position(|s| b.name.as_bytes()[5] == s.as_bytes()[0])?;
-            let (a, c) = woven_index(&b.name)?;
-            let (row, col) = if side < 2 { (c, a) } else { (a, c) };
-            if flags[side][row - 1][col - 1] {
-                w.axes[side].as_ref()?.draw(&mut p, &rect_of(b))?;
+        for (c, b) in spec.table.cells.iter().zip(&boxes) {
+            if let Grob::Axis(i) = c.grob {
+                f.axes.get(i)?.draw(&mut p, &rect_of(b))?;
             }
         }
     }
@@ -339,7 +358,7 @@ pub fn draw_page(spec: &PageSpec, fonts: &[Font]) -> Option<DisplayList> {
             axis.draw(&mut p, &rect_of(b))?;
         }
     }
-    let early = ["background", "panel", "spacer", "axis-", "strip-t-"];
+    let early = ["background", "panel", "spacer", "axis-", "strip-"];
     for b in boxes.iter().filter(|b| !early.iter().any(|e| b.name.starts_with(e))) {
         if let Some((_, title)) = spec.titles.iter().find(|(n, _)| *n == b.name) {
             title.draw(&mut p, &rect_of(b))?;

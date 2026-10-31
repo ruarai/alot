@@ -71,9 +71,9 @@ full_rect <- function(el, res, fill = el$fill %||% NA) {
 # lines (minor y, minor x, major y, major x) as break positions in npc, and
 # the border. With `panel.ontop`, Coord$draw_panel() draws the background
 # and grid over the layers.
-full_panel <- function(built, ir, res) {
+full_panel <- function(built, ir, res, panel = 1L) {
   layout <- built@layout
-  pp <- layout$panel_params[[1]]
+  pp <- layout$panel_params[[panel]]
   coord <- layout$coord
   theme <- ir$theme
   x_major <- pp$x$mapped_breaks()
@@ -101,14 +101,29 @@ full_panel <- function(built, ir, res) {
   )
 }
 
+# The panels in layout order: one full_panel() per distinct pair of
+# scales.
+full_panels <- function(built, ir, res) {
+  scales <- ir$layout$scales
+  first <- match(seq_len(max(scales)), scales)
+  lapply(first, function(i) full_panel(built, ir, res, i))[scales]
+}
+
 # The layers as rs_render_page() reads them, each a list with its `kind`
 # ("points", "rects", "paths" or "text"), in layer order. Layers without
 # rows draw nothing. `ir`'s layer data has missing rows removed and shapes
-# translated. Positions rescale linearly (hybrid_decline() checked), and
-# fixed scales give every panel the same ranges.
+# translated. Positions rescale linearly (hybrid_decline() checked): the
+# ranges are one pair for every panel, or a pair per panel where scales
+# are free.
 full_layers <- function(built, ir, res) {
-  pp <- built@layout$panel_params[[1]]
-  ranges <- list(x_range = as.double(linear_range(pp$x)), y_range = as.double(linear_range(pp$y)))
+  pps <- built@layout$panel_params
+  scales <- ir$layout$scales
+  first <- match(seq_len(max(scales)), scales)
+  pair <- function(aes) {
+    r <- lapply(pps[first], function(pp) as.double(linear_range(pp[[aes]])))
+    if (length(r) == 1) r[[1]] else unlist(r[scales])
+  }
+  ranges <- list(x_range = pair("x"), y_range = pair("y"))
   n_panels <- nrow(ir$layout$panels)
   out <- list()
   for (i in seq_along(ir$layers)) {
@@ -118,7 +133,7 @@ full_layers <- function(built, ir, res) {
       points = full_points(layer$data, ranges, n_panels, res),
       rects = full_rects(built@plot@layers[[i]], layer$data, ranges, n_panels, res),
       paths = full_paths(built@plot@layers[[i]], layer$data, ranges, n_panels, res),
-      text = full_text(built@plot@layers[[i]], layer$data, built@layout$coord, pp, n_panels, res)
+      text = full_text(built@plot@layers[[i]], layer$data, built@layout$coord, pps, scales, n_panels, res)
     )
     if (!is.null(spec)) out[[length(out) + 1L]] <- c(list(kind = layer$kind), spec)
   }
@@ -266,10 +281,17 @@ text_decline <- function(data, params) {
 # fontsize = size * size.unit, fontfamily, fontface, lineheight)). Sizes
 # and line heights are in device pixels as text_raster() (R/render-text.R)
 # gives them.
-full_text <- function(layer, data, coord, pp, n_panels, res) {
+full_text <- function(layer, data, coord, pps, scales, n_panels, res) {
   params <- layer$computed_geom_params
   label <- gg_validate_labels(as.character(data$label))
-  tr <- coord$transform(data[c("x", "y")], pp)
+  # Each panel's rows through its scales (Coord$transform() per panel, as
+  # Layer$draw_geom() hands GeomText$draw_panel() a panel at a time).
+  key <- scales[as.integer(data$PANEL)]
+  tr <- data[c("x", "y")]
+  for (k in unique(key)) {
+    rows <- which(key == k)
+    tr[rows, ] <- coord$transform(data[rows, c("x", "y")], pps[[match(k, scales)]])
+  }
   hjust <- as.double(gg_compute_just(data$hjust, tr$x, tr$y, data$angle))
   vjust <- as.double(gg_compute_just(data$vjust, tr$y, tr$x, data$angle))
   fontsize <- data$size * gg_resolve_text_unit(params$size.unit %||% "mm")
@@ -323,7 +345,7 @@ full_decline <- function(built, ir) {
   if (!ir$coord$class %in% c("CoordCartesian", "CoordFixed") || !identical(ir$coord$reverse %||% "none", "none")) {
     return("coord not drawn yet")
   }
-  caps <- vapply(ir$scales[[1]]$axes, function(a) !identical(a$cap %||% "none", "none"), logical(1))
+  caps <- unlist(lapply(ir$scales, function(s) vapply(s$axes, function(a) !identical(a$cap %||% "none", "none"), logical(1))))
   if (any(caps)) {
     return("axis cap")
   }
@@ -352,7 +374,7 @@ page_spec <- function(built, ir, size) {
   list(
     page = page_px(size), bg = bg, layout = layout,
     background = full_rect(ir$theme[["plot.background"]], res),
-    panels = rep(list(full_panel(built, ir, res)), nrow(ir$layout$panels)),
+    panels = full_panels(built, ir, res),
     layers = full_layers(built, ir, res)
   )
 }
