@@ -37,15 +37,20 @@ p <- ggplot(d, aes(income, spend, colour = age, shape = segment)) +
   scale_colour_viridis_c() +
   facet_wrap(~region)
 
-system.time(ggplot_build(p))     # 0.49 s
-system.time(alot::alot_build(p)) # 0.25 s, same result
+size <- list(width = 1600, height = 1000, units = "px", dpi = 150)
+
+# ggplot2 drawing on ragg: 3.87 s
+system.time(do.call(ggsave, c(list("ggplot2.png", p, device = ragg::agg_png), size)))
+# alot: 0.65 s
+system.time(do.call(alot::alot_png, c(list(p, "alot.png"), size)))
 ```
 
-That is about 2× faster. The position transform, training and mapping
-steps and the colour and shape scales all run in Rust; the stat, position
-and facet steps fall back to ggplot2. Times are medians of 5 interleaved
-runs on a release build (AMD EPYC 9474F, R 4.6.1, ggplot2 4.0.3). See
-[inst/bench/RESULTS.md](inst/bench/RESULTS.md) for per-step numbers.
+That is about 6× faster from ggplot to PNG file. `alot_png()` builds the
+plot with `alot_build()` (about 2× faster than `ggplot_build()` here), lays
+it out with ggplot2, draws the points in Rust, and encodes the PNG in
+Rust. Times are medians of 5 interleaved runs on a release build (AMD EPYC
+9474F, 16 threads, R 4.6.1, ggplot2 4.0.3, ragg 1.5.2). See
+[inst/bench/RESULTS.md](inst/bench/RESULTS.md) for per-stage numbers.
 
 ## Tests
 
