@@ -140,7 +140,7 @@ drawDetails.alot_page <- function(x, recording) {
     return(quiet(draw_gtable(x$built)))
   }
   built <- x$built
-  bg <- gg_get_plot_background(built@plot, NULL)
+  bg <- plot_background(built)
   out <- quiet(render_raster(built, list(width = w, height = h, units = "px", res = res, bg = bg, scaling = 1)))
   if (is.null(out$raster)) {
     return(quiet(draw_gtable(built)))
