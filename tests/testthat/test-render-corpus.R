@@ -89,19 +89,6 @@ render_corpus_check <- function(id, p) {
   suppressMessages(expect_render_close(b, max = max, share = share, tier = cov$tier, label = id, reference = reference))
 }
 
-# What the page layout depends on besides label text and breaks: the theme,
-# which titles and legends are present, the axis guides, and the coord.
-layout_signature <- function(built, ir) {
-  rlang::hash(list(
-    ir$theme, ir$coord$class, ir$facet$class,
-    lengths(built@plot@labels[c("title", "subtitle", "caption", "tag")]) > 0,
-    lapply(ir$scales[[1]]$axes, function(a) a[c("position", "angle", "n.dodge", "minor.ticks")]),
-    vapply(ir$legends, function(l) l$class, character(1)),
-    built@layout$coord$aspect(built@layout$panel_params[[1]]),
-    is.null(built@layout$panel_params[[1]]$draw_labels)
-  ))
-}
-
 # As run_corpus_block() in test-corpus.R, checking the listed plots only.
 run_render_block <- function(code, ids) {
   env <- new.env(parent = asNamespace("ggplot2"))

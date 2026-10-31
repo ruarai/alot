@@ -32,7 +32,8 @@ render_reference <- function(built, size = render_size) {
 
 # Per-pixel largest channel difference between two nativeRasters.
 render_px_diff <- function(a, b) {
-  apply(abs(raster_channels(a) - raster_channels(b)), 2, max)
+  d <- abs(raster_channels(a) - raster_channels(b))
+  pmax(d[1, ], d[2, ], d[3, ], d[4, ])
 }
 
 # Compares alot's drawing of `p` (a ggplot or a built plot) in `tier` with
@@ -42,12 +43,17 @@ render_px_diff <- function(a, b) {
 # reference, result and diff PNGs to a temporary directory (under
 # ALOT_RENDER_DIFF_DIR if set). `label` names
 # the plot in failure messages. `reference`, a nativeRaster, replaces the live
-# reference (see render_cached_reference()).
-expect_render_close <- function(p, ..., max = 32, share = 0.01, tier = "full", label = NULL, reference = NULL) {
+# reference (see render_cached_reference()); `cache_key`, a value that
+# changes whenever the plot does (a test file's checksum and the case's
+# label), caches it under ALOT_RENDER_CACHE.
+expect_render_close <- function(p, ..., max = 32, share = 0.01, tier = "full", label = NULL, reference = NULL, cache_key = NULL) {
   size <- utils::modifyList(render_size, list(...))
   if (ggplot2::is_ggplot(p)) {
     set.seed(1)
     p <- ggplot2::ggplot_build(p)
+  }
+  if (is.null(reference) && !is.null(cache_key)) {
+    reference <- render_cached_reference(list(render_cache_context(size), cache_key), function() render_reference(p, size))
   }
   ref <- reference %||% render_reference(p, size)
   fallback <- NULL
@@ -190,7 +196,10 @@ expect_layout_close <- function(object, expected, tol = 0.5) {
 # as list(position = c(width, height)) for the positions that have one, and
 # the boxes of the top-level table, from one gtable. The Rust layout takes
 # these where it doesn't mirror the plot's legends (R5.3).
-grid_layout <- function(built, size = render_size) {
+grid_layout <- function(built, size = render_size, cache_key = NULL) {
+  if (!is.null(cache_key)) {
+    return(render_cached_reference(list("layout", render_cache_context(size), cache_key), function() grid_layout(built, size)))
+  }
   do.call(ragg::agg_capture, size)
   on.exit(grDevices::dev.off())
   gtable <- ggplot2::ggplot_gtable(built)
@@ -213,9 +222,9 @@ grid_layout <- function(built, size = render_size) {
 # Whether alot's layout of `built` (a built plot) matches grid's within
 # `tol` pixels, or why alot declines it: returns NULL when it matches,
 # otherwise the reason (a string); fails the expectation on a mismatch.
-expect_layout_matches <- function(built, size = render_size, tol = 0.5, label = NULL) {
+expect_layout_matches <- function(built, size = render_size, tol = 0.5, label = NULL, cache_key = NULL) {
   ir <- render_ir(built)
-  info <- grid_layout(built, size)
+  info <- grid_layout(built, size, cache_key)
   # alot's own legend boxes where it lays them out, grid's otherwise.
   mine <- layout_boxes_rust(built, size$width, size$height, size$res, ir)
   if (length(mine) == 0) {
@@ -234,6 +243,58 @@ expect_layout_matches <- function(built, size = render_size, tol = 0.5, label = 
   NULL
 }
 
+# What the page layout depends on besides label text and breaks: the theme,
+# which titles and legends are present, the axis guides, and the coord.
+layout_signature <- function(built, ir) {
+  rlang::hash(list(
+    ir$theme, ir$coord$class, ir$facet$class,
+    lengths(built@plot@labels[c("title", "subtitle", "caption", "tag")]) > 0,
+    lapply(ir$scales[[1]]$axes, function(a) a[c("position", "angle", "n.dodge", "minor.ticks")]),
+    vapply(ir$legends, function(l) l$class, character(1)),
+    built@layout$coord$aspect(built@layout$panel_params[[1]]),
+    is.null(built@layout$panel_params[[1]]$draw_labels)
+  ))
+}
+
+# Signatures of the pages whose layout expect_layout_sampled() has checked in
+# this process.
+layout_seen <- new.env()
+
+# expect_layout_matches() for the first plot of each page structure (see
+# layout_signature(), plus the panel count, the facet's parameters and the
+# page size) in this process: a layer changes what is drawn in the panel,
+# not where grid puts the cells. ALOT_LAYOUT_ALL=1 checks every plot. Each
+# check builds a gtable and walks it with grid, which is slow.
+expect_layout_sampled <- function(built, size = render_size, label = NULL, cache_key = NULL) {
+  ir <- render_ir(built)
+  signature <- rlang::hash(list(layout_signature(built, ir), nrow(ir$layout$panels), ir$facet$params, size))
+  if (!identical(Sys.getenv("ALOT_LAYOUT_ALL"), "1") && !is.null(layout_seen[[signature]])) {
+    return(invisible(NULL))
+  }
+  layout_seen[[signature]] <- TRUE
+  testthat::expect_null(expect_layout_matches(built, size, label = label, cache_key = cache_key))
+}
+
+# A key for caching the references of one test case under ALOT_RENDER_CACHE
+# (render_cached_reference()): the test file's checksum (so editing a file
+# renews its references), the case's label, and a hash of what the built
+# plot `b` draws from: its data, layer parameters, theme, labels, coord and
+# facet. Anything the hash can't see (it only ever misses the cache, never
+# matches a different plot's) is covered by the file checksum.
+render_case_key <- function(file, label, b) {
+  layers <- lapply(b@plot@layers, function(l) {
+    paste(class(l$geom)[1], class(l$stat)[1], class(l$position)[1], paste(deparse(l$geom_params), collapse = ""),
+      paste(deparse(l$aes_params), collapse = ""), paste(deparse(l$stat_params), collapse = ""))
+  })
+  # Facet parameters hold quosures and environments, which don't hash
+  # stably: their atomic values and the names of the others.
+  facet <- lapply(b@layout$facet_params, function(x) if (is.atomic(x)) x else if (is.list(x)) names(x) else class(x))
+  list(
+    unname(tools::md5sum(testthat::test_path(file))), label,
+    rlang::hash(list(b@data, layers, b@plot@theme, b@plot@labels, class(b@layout$coord), facet, b@layout$layout))
+  )
+}
+
 # A reference raster cached on disk under the directory in the environment
 # variable ALOT_RENDER_CACHE (off if unset): `key` names the plot (a string
 # that changes whenever the plot, the page, or anything the reference
@@ -246,7 +307,7 @@ render_cached_reference <- function(key, build) {
   }
   dir.create(dir, showWarnings = FALSE, recursive = TRUE)
   path <- file.path(dir, paste0(rlang::hash(key), ".rds"))
-  hit <- tryCatch(readRDS(path), error = function(e) NULL)
+  hit <- if (file.exists(path)) tryCatch(readRDS(path), error = function(e) NULL)
   if (!is.null(hit)) {
     return(hit)
   }
@@ -258,9 +319,22 @@ render_cached_reference <- function(key, build) {
 # What a cached reference depends on besides the plot: the page, R and the
 # packages that draw it, and the fonts it resolves.
 render_cache_context <- function(size = render_size) {
+  deps <- render_cache_deps()
+  list(size, deps)
+}
+
+render_cache_deps <- local({
+  memo <- NULL
+  function() {
+    memo <<- memo %||% render_cache_deps_compute()
+    memo
+  }
+})
+
+render_cache_deps_compute <- function() {
   fonts <- systemfonts::match_fonts(c("", "sans", "serif", "mono"))
   list(
-    size, R.version.string,
+    R.version.string,
     as.character(utils::packageVersion("ggplot2")), as.character(utils::packageVersion("ragg")),
     as.character(utils::packageVersion("systemfonts")), as.character(utils::packageVersion("textshaping")),
     fonts$path, unname(tools::md5sum(unique(fonts$path)))

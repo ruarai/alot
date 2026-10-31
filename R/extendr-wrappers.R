@@ -215,6 +215,25 @@ rs_all_na_logical <- function(x) .Call(wrap__all_na_logical, x)
 #' @noRd
 rs_columns_complete <- function(cols, threads) .Call(wrap__columns_complete, cols, threads)
 
+#' Whether every row of each column in `cols` equals the first row of its
+#' group (`group`: integer or double, no NA), as
+#' `vctrs::vec_equal(v, v[first[g]], na_equal = TRUE)` checks in
+#' `paths_decline()`. Strings compare by CHARSXP, which R caches, so equal
+#' strings in different encodings count as different (the layer then
+#' declines, which is safe). `NULL` (decline to R's check) for other
+#' types.
+#' @noRd
+rs_constant_by_group <- function(group, cols) .Call(wrap__constant_by_group, group, cols)
+
+#' A path layer's drawing order and paths, as `panel_group_order()` and
+#' `full_paths()` (R/render-full.R) compute them: the rows ordered by
+#' panel then group (stable), those of groups with at least two rows
+#' kept. Returns `order` (1-based rows), `first` (1-based first row of each
+#' kept group) and `path` (0-based index into `first` of each kept row).
+#' `NULL` (decline) for an NA group or panel.
+#' @noRd
+rs_path_groups <- function(panel, group) .Call(wrap__path_groups, panel, group)
+
 #' Renders rows `rows` (1-based) of a point layer, one panel's, to a nativeRaster
 #' of `dims` (width, height) pixels. `rect` is the panel's (left, top,
 #' width, height) in canvas pixels, which also clips each point; positions are rescaled from

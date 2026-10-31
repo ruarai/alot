@@ -1142,5 +1142,24 @@ build is not timed), release build, 1600 × 1000 at 150 dpi, one run each:
 | `geom_col()`, 2000 bars | 40 ms | 78 ms |
 | `geom_text()`, 5000 labels | 50 ms | 111 ms |
 
-Every drawer is faster than ragg drawing the same marks. Not tuned (R7.2's
-job): the line's time is mostly the group ordering in R and the stroker.
+Every drawer is faster than ragg drawing the same marks. These are single
+cold runs; the 1e6-row line's steady-state median (5 runs) is 398 ms.
+
+### Line follow-up: R-side preparation in Rust
+
+Profiling the 1e6-row line showed the R-side preparation was about 60% of
+the render. The check that aesthetics are constant along each line
+(`paths_decline()`) and the grouping and ordering of `full_paths()` now run
+in Rust (`rs_constant_by_group()`, `rs_path_groups()`). Steady-state median
+of 5 runs: 398 ms before, 280 ms after, with identical pixels. What remains
+is `rs_render_page()` (about 230 ms at 8 threads, 460 ms at 1), dominated by
+the serial stroke outline of one long path and memory traffic.
+
+Tried and dropped: collapsing runs of vertices in one pixel column to their
+first, lowest, highest and last took the draw from about 280 to 75 ms, but
+1.4% of pixels differed from ragg by more than 32 (max 235). AGG sums every
+edge's signed area, so merging segments is not exact. Computing the stroke
+joins in parallel chunks (exact) gave 187 to 125 ms for the joins alone in a
+stand-alone benchmark and no change in the plot: the stage is limited by
+memory traffic (the outline is over 100 MB). Streaming edges into each band
+instead of materialising the outline is the remaining exact option.

@@ -173,14 +173,21 @@ full_paths <- function(layer, data, ranges, n_panels, res) {
   if (nrow(data) == 0) {
     return(NULL)
   }
-  pg <- panel_group_order(data)
-  key <- pg$key
-  order <- pg$order[tabulate(key)[key[pg$order]] >= 2]
+  groups <- rs_path_groups(as.integer(data$PANEL), data$group)
+  if (is.null(groups)) {
+    pg <- panel_group_order(data)
+    key <- pg$key
+    order <- pg$order[tabulate(key)[key[pg$order]] >= 2]
+    first <- order[!duplicated(key[order])]
+    path <- match(key[order], key[first]) - 1L
+  } else {
+    order <- groups$order
+    first <- groups$first
+    path <- groups$path
+  }
   if (length(order) == 0) {
     return(NULL)
   }
-  first <- order[!duplicated(key[order])]
-  path <- match(key[order], key[first]) - 1L
   colour <- point_colours(data$colour[first], data$alpha[first])
   if (is.null(colour)) {
     layout_decline("a line colour alot doesn't parse")
@@ -193,8 +200,12 @@ full_paths <- function(layer, data, ranges, n_panels, res) {
     cap = as.numeric(match(params$lineend %||% "butt", c("round", "butt", "square")) - 1L),
     join = as.numeric(match(params$linejoin %||% "round", c("round", "mitre", "bevel")) - 1L),
     mitre = as.double(params$linemitre %||% 10), res = res,
-    rows = layer_panel_rows(data$PANEL, n_panels, order),
-    path_rows = unname(lapply(split(path, factor(as.integer(data$PANEL)[order], levels = seq_len(n_panels))), function(p) if (length(p)) p))
+    rows = if (n_panels == 1) list(order) else layer_panel_rows(data$PANEL, n_panels, order),
+    path_rows = if (n_panels == 1) {
+      list(path)
+    } else {
+      unname(lapply(split(path, factor(as.integer(data$PANEL)[order], levels = seq_len(n_panels))), function(p) if (length(p)) p))
+    }
   ))
 }
 

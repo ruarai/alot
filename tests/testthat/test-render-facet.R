@@ -9,8 +9,9 @@ withr::local_options(alot.full_tier = TRUE)
 check_facet <- function(p, label, ..., max = 32, size = list()) {
   set.seed(1)
   b <- suppressWarnings(suppressMessages(ggplot_build(p)))
-  do.call(expect_render_close, c(list(b), size, list(..., max = max, tier = "full", label = label)))
-  expect_null(expect_layout_matches(b, utils::modifyList(render_size, size), label = label))
+  key <- render_case_key("test-render-facet.R", label, b)
+  do.call(expect_render_close, c(list(b), size, list(..., max = max, tier = "full", label = label, cache_key = key)))
+  expect_null(expect_layout_matches(b, utils::modifyList(render_size, size), label = label, cache_key = key))
 }
 
 base <- ggplot(mtcars, aes(wt, mpg)) + geom_point()

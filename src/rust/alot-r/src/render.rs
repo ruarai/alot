@@ -155,6 +155,108 @@ fn columns_complete(cols: List, threads: i32) -> bool {
     par_all(n, threads, |lo, hi| parts.iter().all(|c| ok(c, lo, hi)))
 }
 
+
+/// A group column as bit patterns: doubles and integers compare by value
+/// (`-0` and `0` equal), `None` if it has an NA or is another type.
+fn group_keys(group: &Robj) -> Option<Vec<u64>> {
+    if let Some(v) = group.as_real_slice() {
+        v.iter().map(|&x| (!x.is_nan()).then(|| if x == 0.0 { 0.0f64.to_bits() } else { x.to_bits() })).collect()
+    } else if let Some(v) = group.as_integer_slice() {
+        v.iter().map(|&x| (x != i32::MIN).then(|| (x as f64).to_bits())).collect()
+    } else {
+        None
+    }
+}
+
+/// Whether every row of each column in `cols` equals the first row of its
+/// group (`group`: integer or double, no NA), as
+/// `vctrs::vec_equal(v, v[first[g]], na_equal = TRUE)` checks in
+/// `paths_decline()`. Strings compare by CHARSXP, which R caches, so equal
+/// strings in different encodings count as different (the layer then
+/// declines, which is safe). `NULL` (decline to R's check) for other
+/// types.
+/// @noRd
+#[extendr(r_name = "rs_constant_by_group")]
+fn constant_by_group(group: Robj, cols: List) -> Robj {
+    let Some(keys) = group_keys(&group) else { return Robj::from(()) };
+    let n = keys.len();
+    // The first row of each row's group.
+    let mut first = vec![0u32; n];
+    let mut seen: HashMap<u64, u32> = HashMap::new();
+    let mut last: Option<(u64, u32)> = None;
+    for (i, &k) in keys.iter().enumerate() {
+        first[i] = match last {
+            Some((lk, lf)) if lk == k => lf,
+            _ => *seen.entry(k).or_insert(i as u32),
+        };
+        last = Some((k, first[i]));
+    }
+    let robjs: Vec<Robj> = cols.values().collect();
+    for c in &robjs {
+        let ok = if let Some(v) = c.as_real_slice() {
+            v.len() == n && v.iter().zip(&first).all(|(&x, &f)| {
+                let y = v[f as usize];
+                x == y || (x.is_nan() && y.is_nan())
+            })
+        } else if let Some(v) = c.as_integer_slice() {
+            v.len() == n && v.iter().zip(&first).all(|(&x, &f)| x == v[f as usize])
+        } else if let Some(v) = c.as_logical_slice() {
+            let v = unsafe { std::slice::from_raw_parts(v.as_ptr() as *const i32, v.len()) };
+            v.len() == n && v.iter().zip(&first).all(|(&x, &f)| x == v[f as usize])
+        } else if c.is_string() && c.len() == n && n > 0 {
+            let v = unsafe { std::slice::from_raw_parts(STRING_PTR_RO(c.get()) as *const usize, n) };
+            v.iter().zip(&first).all(|(&x, &f)| x == v[f as usize])
+        } else {
+            return Robj::from(());
+        };
+        if !ok {
+            return Robj::from(false);
+        }
+    }
+    Robj::from(true)
+}
+
+/// A path layer's drawing order and paths, as `panel_group_order()` and
+/// `full_paths()` (R/render-full.R) compute them: the rows ordered by
+/// panel then group (stable), those of groups with at least two rows
+/// kept. Returns `order` (1-based rows), `first` (1-based first row of each
+/// kept group) and `path` (0-based index into `first` of each kept row).
+/// `NULL` (decline) for an NA group or panel.
+/// @noRd
+#[extendr(r_name = "rs_path_groups")]
+fn path_groups(panel: &[i32], group: Robj) -> Robj {
+    let Some(keys) = group_keys(&group) else { return Robj::from(()) };
+    let n = keys.len();
+    if panel.len() != n || panel.iter().any(|&p| p == i32::MIN) {
+        return Robj::from(());
+    }
+    // Group values order numerically, not by bit pattern.
+    let value = |i: usize| f64::from_bits(keys[i]);
+    let cmp = |&a: &u32, &b: &u32| {
+        let (a, b) = (a as usize, b as usize);
+        panel[a].cmp(&panel[b]).then(value(a).partial_cmp(&value(b)).unwrap())
+    };
+    let mut order: Vec<u32> = (0..n as u32).collect();
+    if !order.windows(2).all(|w| cmp(&w[0], &w[1]) != std::cmp::Ordering::Greater) {
+        order.sort_by(cmp);
+    }
+    let (mut kept, mut first, mut path) = (Vec::with_capacity(n), Vec::new(), Vec::with_capacity(n));
+    let mut k = 0;
+    while k < n {
+        let mut e = k + 1;
+        while e < n && cmp(&order[k], &order[e]) == std::cmp::Ordering::Equal {
+            e += 1;
+        }
+        if e - k >= 2 {
+            first.push(order[k] as i32 + 1);
+            kept.extend(order[k..e].iter().map(|&i| i as i32 + 1));
+            path.extend(std::iter::repeat((first.len() - 1) as i32).take(e - k));
+        }
+        k = e;
+    }
+    list!(order = kept, first = first, path = path).into()
+}
+
 /// Whether `x` is a logical vector of NAs only (an NA colour column),
 /// without allocating as `all(is.na(x))` does.
 /// @noRd
@@ -498,6 +600,8 @@ extendr_module! {
     fn point_shapes_supported;
     fn all_na_logical;
     fn columns_complete;
+    fn constant_by_group;
+    fn path_groups;
     fn render_points;
     fn render_rects;
     fn render_paths;

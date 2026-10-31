@@ -24,8 +24,9 @@ check_page <- function(p, label, ..., max = 32, size = list()) {
   local_full_tier()
   set.seed(1)
   b <- suppressWarnings(suppressMessages(ggplot_build(p)))
-  do.call(expect_render_close, c(list(b), size, list(..., max = max, tier = "full", label = label)))
-  expect_null(expect_layout_matches(b, utils::modifyList(render_size, size), label = label))
+  key <- render_case_key("test-render-panel.R", label, b)
+  do.call(expect_render_close, c(list(b), size, list(..., max = max, tier = "full", label = label, cache_key = key)))
+  expect_null(expect_layout_matches(b, utils::modifyList(render_size, size), label = label, cache_key = key))
 }
 
 test_that("theme_grey() draws the background, grid lines, axes and titles as ggplot2 does", {

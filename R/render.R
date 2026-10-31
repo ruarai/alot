@@ -464,13 +464,15 @@ paths_decline <- function(data, params) {
     return("unsupported linetype")
   }
   # Constant along each line: every row equals its group's first row.
-  g <- vctrs::vec_group_id(data$group)
-  first <- match(seq_len(attr(g, "n")), g)
-  for (col in c("colour", "linewidth", "linetype", "alpha")) {
-    v <- data[[col]]
-    if (!all(vctrs::vec_equal(v, v[first[g]], na_equal = TRUE))) {
-      return("aesthetics vary along a line")
-    }
+  cols <- unclass(data)[c("colour", "linewidth", "linetype", "alpha")]
+  constant <- rs_constant_by_group(data$group, cols)
+  if (is.null(constant)) {
+    g <- vctrs::vec_group_id(data$group)
+    first <- match(seq_len(attr(g, "n")), g)
+    constant <- all(vapply(cols, function(v) all(vctrs::vec_equal(v, v[first[g]], na_equal = TRUE)), logical(1)))
+  }
+  if (!constant) {
+    return("aesthetics vary along a line")
   }
   line_params_decline(params)
 }

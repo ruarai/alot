@@ -35,7 +35,11 @@ NOT_CRAN=true Rscript -e 'pkgload::load_all(); testthat::test_dir("tests/testtha
 NOT_CRAN=true Rscript -e 'pkgload::load_all(); testthat::test_file("tests/testthat/test-scale-train.R", load_package = "none")'
 ```
 
-Run independent test files in parallel where it saves time, e.g. the corpus
+`NOT_CRAN=true Rscript tools/test-parallel.R [workers] [filter]` runs the test
+files in parallel (one process each) and prints a summary per file; it skips
+the two corpora. Set `ALOT_RENDER_CACHE=/tmp/alot-dev-cache` (the default directory to use
+in development) to cache ggplot2's reference renders and layouts between
+runs: reruns of unchanged render tests are then much faster. Run independent test files in parallel where it saves time, e.g. the corpus
 subset alongside the other files, or a long file such as `test-corpus.R` on
 its own. Build once first (`pkgload::load_all()`), then start each process
 with `pkgload::load_all(compile = FALSE)` so they don't race to rebuild the
@@ -54,7 +58,7 @@ wait
 corpus of about 1,700 plots that ignores `ALOT_CORPUS`. By default it runs
 one plot in eight (`ALOT_RENDER_SAMPLE`); `ALOT_RENDER_FULL=1` runs all of
 them, `ALOT_RENDER_CORPUS=<regex>` runs every plot in the matching files, and
-`ALOT_RENDER_CACHE=<dir>` caches ggplot2's reference renders locally between
+`ALOT_RENDER_CACHE=/tmp/alot-dev-cache` caches ggplot2's reference renders locally between
 runs. `NOT_CRAN=true Rscript tools/render-corpus-sharded.R [shards]` splits
 it across processes. The page-layout check runs once per distinct structure
 (`ALOT_LAYOUT_ALL=1` for every plot). The full render corpus dominates the

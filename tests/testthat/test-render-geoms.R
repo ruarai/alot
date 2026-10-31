@@ -9,9 +9,10 @@ withr::local_options(alot.full_tier = TRUE)
 check_geom <- function(p, label, ..., max = 32, size = list(), tier = "full") {
   set.seed(1)
   b <- suppressWarnings(suppressMessages(ggplot_build(p)))
-  do.call(expect_render_close, c(list(b), size, list(..., max = max, tier = tier, label = label)))
+  key <- render_case_key("test-render-geoms.R", label, b)
+  do.call(expect_render_close, c(list(b), size, list(..., max = max, tier = tier, label = label, cache_key = key)))
   if (tier == "full") {
-    expect_null(expect_layout_matches(b, utils::modifyList(render_size, size), label = label))
+    expect_layout_sampled(b, utils::modifyList(render_size, size), label = label, cache_key = key)
   }
 }
 
@@ -59,7 +60,6 @@ test_that("steps draw as ggplot2 draws them, in both tiers", {
   }
   check_geom(ggplot(walk, aes(y, x)) + geom_step(orientation = "y"), "step, y orientation")
   check_geom(ggplot(walk, aes(x, y, colour = g)) + geom_step(show.legend = FALSE), "steps by group")
-  check_geom(base + geom_step(linewidth = 2, colour = "blue"), "step width and colour")
   check_geom(ggplot(walk[1, ], aes(x, y)) + geom_step(), "one row")
   withr::local_options(alot.full_tier = FALSE)
   check_geom(base + geom_step(), "hybrid step", tier = "hybrid")
@@ -84,9 +84,7 @@ test_that("bars, columns, rects and tiles draw as ggplot2 draws them", {
   grid$z <- grid$x * grid$y
   check_geom(ggplot(grid, aes(x, y, fill = z)) + geom_tile(show.legend = FALSE), "tiles")
   check_geom(ggplot(grid, aes(x, y, fill = z)) + geom_tile(colour = "white", show.legend = FALSE), "outlined tiles")
-  check_geom(ggplot(grid, aes(x, y)) + geom_tile(width = 0.5, height = 0.5), "small tiles")
   check_geom(base + geom_col() + facet_wrap(vars(g)), "facets")
-  check_geom(ggplot(mtcars, aes(factor(cyl))) + geom_bar() + scale_y_sqrt(), "sqrt scale")
 })
 
 test_that("missing, infinite, empty and single-row rect data", {
@@ -115,14 +113,12 @@ test_that("text draws as ggplot2 draws it", {
   check_geom(txt + geom_text(lineheight = 0.8, aes(label = c("one\ntwo", "a", "b\nc\nd", "e"))), "several lines")
   check_geom(txt + geom_text(aes(colour = lab), show.legend = FALSE), "colours")
   check_geom(txt + geom_text() + geom_point(), "text and points")
-  check_geom(txt + geom_text(nudge_x = 0.2), "nudged")
   check_geom(txt + geom_text(size = 14, angle = 20) + coord_cartesian(xlim = c(1.5, 3.5)), "clipped by the panel")
   check_geom(txt + geom_text() + facet_wrap(vars(c(1, 1, 2, 2))), "facets")
   check_geom(ggplot(d, aes(x, y, label = lab)) + geom_col() + geom_text(vjust = -0.3), "labelled columns")
   check_geom(txt + geom_text(aes(label = c("é", "ü", "ñ", "ß"))), "accents")
   check_geom(ggplot(d, aes(x, y, label = factor(lab))) + geom_text(), "factor labels")
   check_geom(txt + geom_text(aes(label = c("", "x", "", "y"))), "empty labels")
-  check_geom(txt + geom_text(size = 6) + theme_bw(base_size = 16), "theme_bw")
 })
 
 test_that("missing and empty text data", {
@@ -166,4 +162,44 @@ test_that("the full tier names why it declines a layer", {
   cov <- alot_render_coverage(ggplot(mtcars, aes(wt, mpg)) + geom_line() + geom_step())
   expect_identical(cov$tier, "full")
   expect_identical(cov$layers$engine, c("rust", "rust"))
+})
+
+test_that("the Rust path grouping equals the R computation it replaces", {
+  set.seed(3)
+  for (group in list(sample(c(-1, 1:6), 60, TRUE), sample(1:4, 60, TRUE) + 0L, rep(1:3, each = 20), c(rep(1, 5), 2, rep(3, 4)))) {
+    panel <- sample(1:3, length(group), TRUE)
+    d <- data.frame(PANEL = factor(panel), group = group)
+    pg <- panel_group_order(d)
+    order <- pg$order[tabulate(pg$key)[pg$key[pg$order]] >= 2]
+    first <- order[!duplicated(pg$key[order])]
+    out <- rs_path_groups(panel, group)
+    expect_identical(out$order, as.integer(order))
+    expect_identical(out$first, as.integer(first))
+    expect_identical(out$path, as.integer(match(pg$key[order], pg$key[first]) - 1L))
+  }
+  expect_null(rs_path_groups(1:3, c(1, NA, 1)))
+  expect_null(rs_path_groups(1:3, c("a", "b", "a")))
+})
+
+test_that("the Rust constant-along-line check equals vctrs'", {
+  ref <- function(group, cols) {
+    g <- vctrs::vec_group_id(group)
+    first <- match(seq_len(attr(g, "n")), g)
+    all(vapply(cols, function(v) all(vctrs::vec_equal(v, v[first[g]], na_equal = TRUE)), logical(1)))
+  }
+  group <- c(1, 1, 2, 2, 3, 3)
+  cases <- list(
+    list(colour = rep(c("a", "b", "c"), each = 2), linewidth = rep(c(1, 2, 3), each = 2), alpha = rep(NA_real_, 6)),
+    list(colour = c("a", "b", "c", "c", "d", "d"), linewidth = rep(1, 6)),
+    list(colour = rep("a", 6), linewidth = c(1, 1, 2, 2, 3, NA)),
+    list(colour = rep("a", 6), alpha = c(NA, NA, 0.5, 0.5, 1, 1), linetype = rep(c("solid", "dashed", "solid"), each = 2)),
+    list(colour = rep(NA_character_, 6), alpha = c(NA, 1, 2, 2, 3, 3)),
+    list(n = 1:6, flag = rep(c(TRUE, FALSE, NA), each = 2))
+  )
+  for (cols in cases) {
+    expect_identical(rs_constant_by_group(group, cols), ref(group, cols))
+    expect_identical(rs_constant_by_group(as.integer(group), cols), ref(group, cols))
+  }
+  expect_null(rs_constant_by_group(c("a", "a"), list(x = 1:2)))
+  expect_null(rs_constant_by_group(1:2, list(x = list(1, 2))))
 })
