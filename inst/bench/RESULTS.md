@@ -519,6 +519,44 @@ free 722 → 470 ms (1.54×), grid free 572 → 299 ms (1.91×), wrap fixed
   (`expand_limits_scale`, `get_breaks_minor`) and the `ggproto()` calls
   per COORD, which must stay to give each panel its own objects.
 
+### T5.4 Panel guides, trained per axis (2026-10-31) — kept
+
+`inst/bench/panel-guides.R`: the `setup_panel_guides` step, sequential with
+interleaved reps and a gc before each.
+
+| case | panels | ggplot2_ms | alot_ms | speedup |
+| --- | ---: | ---: | ---: | --- |
+| wrap_free_point | 100 | 241.6 | 92.7 | 2.61x |
+| grid_free_point | 100 | 243.7 | 47.9 | 5.09x |
+| wrap_fixed_point | 100 | 2.9 | 2.0 | 1.42x |
+| wrap_free_point | 400 | 1,052 | 391 | 2.69x |
+| grid_free_point (20 × 20) | 400 | 1,057 | 173 | 6.12x |
+
+Whole build (`facet-scaling.R`, `ALOT_BENCH_CORES=1`, 100 panels): wrap free
+748 → 340 ms (2.20×), grid free 596 → 111 ms (5.37×), wrap fixed 29 → 21 ms
+(1.38×). Together with T5.3 the free cases were about 1.0× before.
+
+- **Kept.**
+- ggplot2 trains and transforms two axis guides per COORD through ggproto
+  (`inject`, `fetch_ggproto`, `Map`, `coord$transform`, `coord_munch`), about
+  2.4 ms per COORD. With default axis guides on CoordCartesian or CoordFixed
+  the x guide's params depend on the x view scale alone, apart from the key's
+  `y` column, which is the y scale's rescaling of ±Inf (0 or 1). The guides
+  are therefore trained once per distinct SCALE_X and SCALE_Y, and the ±Inf
+  column is filled in per COORD. This alone helps the grid case (20 + 20
+  scales, 400 COORDs); the free `facet_wrap` case has no repeats, so its
+  gain comes from replacing the generic path: `extract_key` is inlined (the
+  `$<-`/`data_frame` calls dominated), the key, decor and ±Inf go through one
+  `rescale()`, and the hash is taken directly.
+- `coord$setup_panel_guides` still runs per COORD (about a third of what is
+  left): the Guides objects capture the frame of that call, including the
+  panel's scales, and `expect_equal()` compares those frames, so they can't
+  be cloned.
+- Declines (falls back whole): user guides on the plot or a scale, secondary
+  axes, `cap`, minor ticks, non-axis guides, no breaks, a non-finite or
+  zero-width range (where rescaling ±Inf is no longer 0 or 1), `reverse`,
+  other coords, overridden coord or facet methods.
+
 ## Phase 2 prototype: README plot to PNG (2026-10-30)
 
 Experimental (branch `proto/phase2-points`). `inst/bench/render-readme.R`

@@ -1470,6 +1470,316 @@
           }
       }
 
+# upstream panel guides setup matches the version alot mirrors
+
+    Code
+      print(body_of(ggplot2::Layout, "setup_panel_guides"))
+    Output
+      {
+          index <- vec_unique_loc(self$layout$COORD)
+          order <- vec_match(self$layout$COORD, self$layout$COORD[index])
+          self$panel_params <- lapply(self$panel_params[index], self$coord$setup_panel_guides, 
+              guides, self$coord_params)
+          self$panel_params <- lapply(self$panel_params, self$coord$train_panel_guides, 
+              layers, self$coord_params)[order]
+          invisible()
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::Coord, "setup_panel_guides"))
+    Output
+      {
+          aesthetics <- c("x", "y", "x.sec", "y.sec")
+          names(aesthetics) <- aesthetics
+          is_sec <- grepl("sec$", aesthetics)
+          scales <- panel_params[aesthetics]
+          guides <- guides$setup(scales, aesthetics, default = params$guide_default %||% 
+              guide_axis(), missing = params$guide_missing %||% guide_none())
+          guide_params <- guides$get_params(aesthetics)
+          scale_position <- lapply(scales, `[[`, "position")
+          guide_position <- lapply(guide_params, `[[`, "position")
+          guide_position[!is_sec] <- Map(function(guide, scale) guide %|W|% 
+              scale, guide = guide_position[!is_sec], scale = scale_position[!is_sec])
+          opposite <- c(top = "bottom", bottom = "top", left = "right", 
+              right = "left")
+          guide_position[is_sec] <- Map(function(sec, prim) sec %|W|% 
+              unname(opposite[prim]), sec = guide_position[is_sec], 
+              prim = guide_position[!is_sec])
+          guide_params <- Map(function(params, pos) {
+              params[["position"]] <- pos
+              params
+          }, params = guide_params, pos = guide_position)
+          guides$update_params(guide_params)
+          panel_params$guides <- guides
+          panel_params
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::Coord, "train_panel_guides"))
+    Output
+      {
+          aesthetics <- c("x", "y", "x.sec", "y.sec")
+          aesthetics <- intersect(aesthetics, names(panel_params$guides$aesthetics))
+          names(aesthetics) <- aesthetics
+          guides <- panel_params$guides$get_guide(aesthetics)
+          empty <- vapply(guides, inherits, logical(1), "GuideNone")
+          guide_params <- panel_params$guides$get_params(aesthetics)
+          aesthetics <- aesthetics[!empty]
+          guide_params[!empty] <- Map(function(guide, guide_param, 
+              scale) {
+              guide_param <- guide$train(guide_param, scale)
+              guide_param <- guide$transform(guide_param, self, panel_params)
+              guide_param <- guide$get_layer_key(guide_param, layers)
+              guide_param
+          }, guide = guides[!empty], guide_param = guide_params[!empty], 
+              scale = panel_params[aesthetics])
+          panel_params$guides$update_params(guide_params)
+          panel_params
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::CoordCartesian, "transform"))
+    Output
+      {
+          reverse <- panel_params$reverse %||% "none"
+          x <- panel_params$x[[switch(reverse, xy = , x = "reverse", 
+              "rescale")]]
+          y <- panel_params$y[[switch(reverse, xy = , y = "reverse", 
+              "rescale")]]
+          data <- transform_position(data, x, y)
+          transform_position(data, squish_infinite, squish_infinite)
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::Guide, "train"))
+    Output
+      {
+          params$aesthetic <- aesthetic %||% scale$aesthetics[1]
+          params$key <- inject(self$extract_key(scale, !!!params))
+          if (is.null(params$key)) {
+              return(NULL)
+          }
+          params$decor <- inject(self$extract_decor(scale, !!!params))
+          params <- self$extract_params(scale, params, ...)
+          params$hash <- hash(lapply(unname(self$hashables), eval_tidy, 
+              data = params))
+          params
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::Guide, "extract_key"))
+    Output
+      {
+          breaks <- scale$get_breaks()
+          if (length(breaks) == 0) {
+              return(NULL)
+          }
+          mapped <- scale$map(breaks)
+          labels <- scale$get_labels(breaks)
+          key <- data_frame(`:=`(!!aesthetic, mapped))
+          key$.value <- breaks
+          key$.label <- labels
+          if (is.numeric(breaks)) {
+              range <- scale$continuous_range %||% scale$get_limits()
+              key <- key[is.finite(oob_censor_any(breaks, range)), 
+                  , drop = FALSE]
+          }
+          else {
+              key
+          }
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::GuideAxis, "extract_key"))
+    Output
+      {
+          major <- Guide$extract_key(scale, aesthetic, ...)
+          if (is.null(major) && is.null(scale$scale$get_breaks())) {
+              major <- data_frame0()
+          }
+          if (!minor.ticks) {
+              return(major)
+          }
+          minor_breaks <- scale$get_breaks_minor()
+          minor_breaks <- setdiff(minor_breaks, major$.value)
+          minor_breaks <- minor_breaks[is.finite(minor_breaks)]
+          if (length(minor_breaks) < 1) {
+              return(major)
+          }
+          minor <- data_frame0(`:=`(!!aesthetic, scale$map(minor_breaks)))
+          minor$.value <- minor_breaks
+          minor$.type <- "minor"
+          if (nrow(major) > 0) {
+              major$.type <- "major"
+              if (!vec_is(minor$.value, major$.value)) {
+                  minor$.value <- NULL
+              }
+              vec_rbind(major, minor)
+          }
+          else {
+              minor
+          }
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::GuideAxis, "extract_decor"))
+    Output
+      {
+          value <- c(-Inf, Inf)
+          has_key <- !(is.null(key) || nrow(key) < 1)
+          if (cap %in% c("both", "upper") && has_key) {
+              value[2] <- max(key[[aesthetic]])
+          }
+          if (cap %in% c("both", "lower") && has_key) {
+              value[1] <- min(key[[aesthetic]])
+          }
+          opposite <- setdiff(c("x", "y"), aesthetic)
+          data_frame(`:=`(!!aesthetic, value))
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::GuideAxis, "extract_params"))
+    Output
+      {
+          params$name <- paste0(params$name, "_", params$aesthetic)
+          params
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::GuideAxis, "transform"))
+    Output
+      {
+          key <- params$key
+          position <- params$position
+          check <- FALSE
+          aesthetic <- names(key)[!grepl("^\\.", names(key))]
+          ortho <- setdiff(c("x", "y"), params$aesthetic)
+          override <- switch(position %||% "", bottom = , left = -Inf, 
+              Inf)
+          if (!(panel_params$reverse %||% "none") %in% c("xy", ortho)) {
+              override <- -override
+          }
+          if (!(is.null(position) || nrow(key) == 0)) {
+              check <- TRUE
+              if (!all(c("x", "y") %in% aesthetic)) {
+                  key[[ortho]] <- override
+              }
+              key <- coord$transform(key, panel_params)
+              params$key <- key
+          }
+          if (!is.null(params$decor)) {
+              if (!ortho %in% names(params$decor)) {
+                  params$decor[[ortho]] <- override
+              }
+              params$decor <- coord_munch(coord, params$decor, panel_params)
+              if (!coord$is_linear()) {
+                  params$decor$x <- switch(position, left = 1, right = 0, 
+                      params$decor$x)
+                  params$decor$y <- switch(position, top = 0, bottom = 1, 
+                      params$decor$y)
+              }
+          }
+          if (!check) {
+              return(params)
+          }
+          breaks_are_unique <- !duplicated(key$.value)
+          if (empty(key) || sum(breaks_are_unique) == 1) {
+              return(params)
+          }
+          if (position %in% c("top", "bottom")) {
+              position_aes <- "x"
+          }
+          else if (position %in% c("left", "right")) {
+              position_aes <- "y"
+          }
+          else {
+              return(params)
+          }
+          if (length(unique(key[[position_aes]][breaks_are_unique])) == 
+              1) {
+              cli::cli_warn(c("Position guide is perpendicular to the intended axis.", 
+                  i = "Did you mean to specify a different guide {.arg position}?"))
+          }
+          return(params)
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::Facet, "setup_panel_params"))
+    Output
+      {
+          panel_params
+      }
+
+---
+
+    Code
+      print(body_of(utils::getFromNamespace("ViewScale", "ggplot2"), m))
+    Output
+      {
+          self$breaks
+      }
+
+---
+
+    Code
+      print(body_of(utils::getFromNamespace("ViewScale", "ggplot2"), m))
+    Output
+      {
+          self$scale$get_labels(breaks)
+      }
+
+---
+
+    Code
+      print(body_of(utils::getFromNamespace("ViewScale", "ggplot2"), m))
+    Output
+      {
+          if (self$is_discrete()) {
+              self$scale$map(x, self$limits)
+          }
+          else {
+              x
+          }
+      }
+
+---
+
+    Code
+      print(body_of(utils::getFromNamespace("ViewScale", "ggplot2"), m))
+    Output
+      {
+          self$scale_is_discrete
+      }
+
+---
+
+    Code
+      print(body_of(utils::getFromNamespace("ViewScale", "ggplot2"), m))
+    Output
+      {
+          self$scale$rescale(x, self$limits, self$continuous_range)
+      }
+
 # upstream panel params setup matches the version alot mirrors
 
     Code

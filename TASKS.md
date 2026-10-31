@@ -395,7 +395,7 @@ All stat kernels use the grouped driver (T0.4) and register under
   objects does not affect another (test). The free-scale facet benchmarks
   improve.
 
-### T5.4 Mirror `setup_panel_guides` and deduplicate per axis
+### T5.4 Mirror `setup_panel_guides` and deduplicate per axis — done
 - **Depends:** T5.3
 - **Do:** Mirror `Layout$setup_panel_guides` and build axis guides once per
   distinct x and y scale, then clone them per panel. Fall back for non-axis

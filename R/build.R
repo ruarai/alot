@@ -73,7 +73,7 @@ build_plot <- function(plot) {
   timed("setup_panel_params", layout_setup_panel_params(layout))
   data <- timed("map_position_2", layout_map_position(layout, data))
 
-  timed("setup_panel_guides", layout$setup_panel_guides(plot@guides, plot@layers))
+  timed("setup_panel_guides", layout_setup_panel_guides(layout, plot@guides, plot@layers))
 
   plot@theme <- timed("plot_theme", gg_plot_theme(plot))
 

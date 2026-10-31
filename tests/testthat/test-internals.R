@@ -136,6 +136,27 @@ test_that("upstream labeling::extended matches the version alot ports", {
   expect_snapshot(print(body(scales::extended_breaks)))
 })
 
+test_that("upstream panel guides setup matches the version alot mirrors", {
+  # Mirrored by layout_setup_panel_guides() and kernel_panel_guides() with its
+  # helpers (R/panel-guides.R). If these fail, update the mirror to match,
+  # then update the snapshots.
+  body_of <- function(obj, name) body(environment(obj[[name]])$f)
+  expect_snapshot(print(body_of(ggplot2::Layout, "setup_panel_guides")))
+  expect_snapshot(print(body_of(ggplot2::Coord, "setup_panel_guides")))
+  expect_snapshot(print(body_of(ggplot2::Coord, "train_panel_guides")))
+  expect_snapshot(print(body_of(ggplot2::CoordCartesian, "transform")))
+  expect_snapshot(print(body_of(ggplot2::Guide, "train")))
+  expect_snapshot(print(body_of(ggplot2::Guide, "extract_key")))
+  expect_snapshot(print(body_of(ggplot2::GuideAxis, "extract_key")))
+  expect_snapshot(print(body_of(ggplot2::GuideAxis, "extract_decor")))
+  expect_snapshot(print(body_of(ggplot2::GuideAxis, "extract_params")))
+  expect_snapshot(print(body_of(ggplot2::GuideAxis, "transform")))
+  expect_snapshot(print(body_of(ggplot2::Facet, "setup_panel_params")))
+  for (m in c("get_breaks", "get_labels", "map", "is_discrete", "rescale")) {
+    expect_snapshot(print(body_of(utils::getFromNamespace("ViewScale", "ggplot2"), m)))
+  }
+})
+
 test_that("upstream panel params setup matches the version alot mirrors", {
   # Mirrored by layout_setup_panel_params(), kernel_panel_params() and its
   # helpers (R/panel-params.R). If these fail, update the mirror to match,

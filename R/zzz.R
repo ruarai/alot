@@ -14,6 +14,9 @@
   for (class in c("CoordCartesian", "CoordFlip", "CoordFixed")) {
     register_kernel("setup_panel_params", class, kernel_panel_params)
   }
+  for (class in c("CoordCartesian", "CoordFixed")) {
+    register_kernel("setup_panel_guides", class, kernel_panel_guides)
+  }
   # Every class whose transform is ggplot2's default_transform.
   for (class in c("ScaleContinuous", "ScaleContinuousPosition", "ScaleContinuousIdentity",
                   "ScaleBinned", "ScaleBinnedPosition")) {
