@@ -2333,6 +2333,146 @@
           }
       }
 
+# upstream step and text drawing match what the full tier mirrors
+
+    Code
+      print(body(environment(ggplot2::GeomStep$draw_panel)$f))
+    Output
+      {
+          data <- flip_data(data, flipped_aes)
+          if (isTRUE(flipped_aes)) {
+              direction <- switch(direction, hv = "vh", vh = "hv", 
+                  direction)
+          }
+          data <- dapply(data, "group", stairstep, direction = direction)
+          data <- flip_data(data, flipped_aes)
+          GeomPath$draw_panel(data, panel_params, coord, lineend = lineend, 
+              linejoin = linejoin, linemitre = linemitre, arrow = arrow, 
+              arrow.fill = arrow.fill)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("stairstep", "ggplot2")))
+    Output
+      {
+          direction <- arg_match0(direction, c("hv", "vh", "mid"))
+          data <- as.data.frame(data)[order(data$x), ]
+          n <- nrow(data)
+          if (n <= 1) {
+              return(data[0, , drop = FALSE])
+          }
+          if (direction == "vh") {
+              xs <- rep(1:n, each = 2)[-2 * n]
+              ys <- c(1, rep(2:n, each = 2))
+          }
+          else if (direction == "hv") {
+              ys <- rep(1:n, each = 2)[-2 * n]
+              xs <- c(1, rep(2:n, each = 2))
+          }
+          else if (direction == "mid") {
+              xs <- rep(1:(n - 1), each = 2)
+              ys <- rep(1:n, each = 2)
+          }
+          if (direction == "mid") {
+              gaps <- data$x[-1] - data$x[-n]
+              mid_x <- data$x[-n] + gaps/2
+              x <- c(data$x[1], mid_x[xs], data$x[n])
+              y <- c(data$y[ys])
+              data_attr <- data[c(1, xs, n), setdiff(names(data), c("x", 
+                  "y"))]
+          }
+          else {
+              x <- data$x[xs]
+              y <- data$y[ys]
+              data_attr <- data[xs, setdiff(names(data), c("x", "y"))]
+          }
+          data_frame0(x = x, y = y, data_attr)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomText$draw_panel)$f))
+    Output
+      {
+          lab <- data$label
+          if (parse) {
+              lab <- parse_safe(as.character(lab))
+          }
+          lab <- validate_labels(lab)
+          data <- coord$transform(data, panel_params)
+          data$vjust <- compute_just(data$vjust, data$y, data$x, data$angle)
+          data$hjust <- compute_just(data$hjust, data$x, data$y, data$angle)
+          size.unit <- resolve_text_unit(size.unit)
+          textGrob(lab, data$x, data$y, default.units = "native", hjust = data$hjust, 
+              vjust = data$vjust, rot = data$angle, gp = gg_par(col = alpha(data$colour, 
+                  data$alpha), fontsize = data$size * size.unit, fontfamily = data$family, 
+                  fontface = data$fontface, lineheight = data$lineheight), 
+              check.overlap = check_overlap)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("compute_just", "ggplot2")))
+    Output
+      {
+          if (!is.character(just)) {
+              return(just)
+          }
+          if (any(grepl("outward|inward", just))) {
+              angle <- angle%%360
+              angle <- ifelse(angle > 180, angle - 360, angle)
+              angle <- ifelse(angle < -180, angle + 360, angle)
+              rotated_forward <- grepl("outward|inward", just) & (angle > 
+                  45 & angle < 135)
+              rotated_backwards <- grepl("outward|inward", just) & 
+                  (angle < -45 & angle > -135)
+              ab <- ifelse(rotated_forward | rotated_backwards, b, 
+                  a)
+              just_swap <- rotated_backwards | abs(angle) > 135
+              inward <- (just == "inward" & !just_swap | just == "outward" & 
+                  just_swap)
+              just[inward] <- c("left", "middle", "right")[just_dir(ab[inward])]
+              outward <- (just == "outward" & !just_swap) | (just == 
+                  "inward" & just_swap)
+              just[outward] <- c("right", "middle", "left")[just_dir(ab[outward])]
+          }
+          unname(c(left = 0, center = 0.5, right = 1, bottom = 0, middle = 0.5, 
+              top = 1)[just])
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("resolve_text_unit", "ggplot2")))
+    Output
+      {
+          unit <- arg_match0(unit, c("mm", "pt", "cm", "in", "pc"))
+          switch(unit, mm = .pt, cm = .pt * 10, `in` = 72.27, pc = 12, 
+              1)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("validate_labels", "ggplot2")))
+    Output
+      {
+          if (!obj_is_list(labels)) {
+              return(labels)
+          }
+          labels[lengths(labels) == 0L] <- ""
+          if (any(vapply(labels, is.language, logical(1)))) {
+              inject(expression(!!!labels))
+          }
+          else {
+              unlist(labels)
+          }
+      }
+
 # upstream theme and label resolution match what the render IR mirrors
 
     Code

@@ -41,10 +41,11 @@ render_ir <- function(built) {
   layers <- lapply(seq_along(plot@layers), function(i) {
     layer <- plot@layers[[i]]
     data <- suppressWarnings(hybrid_data(layer, built@data[[i]]))
-    reason <- hybrid_decline(layer, data, layout)
+    kind <- full_kind(layer)
+    reason <- hybrid_decline(layer, data, layout, kind)
     geom <- class(layer$geom)[1]
     if (!is.null(reason)) support$add("layer", geom, reason)
-    list(geom = geom, kind = hybrid_kind(layer), data = data, reason = reason %||% NA_character_)
+    list(geom = geom, kind = kind, data = data, reason = reason %||% NA_character_)
   })
 
   coord <- layout$coord

@@ -56,3 +56,10 @@ gg_validate_path     <- function(...) gg("validate_path")(...)
 gg_translate_shape_string <- function(...) gg("translate_shape_string")(...)
 gg_combine_elements  <- function(...) gg("combine_elements")(...)
 gg_is_theme_element  <- function(...) gg("is_theme_element")(...)
+
+# geom_step() and geom_text() helpers (ggplot2 R/geom-path.R, R/geom-text.R).
+gg_stairstep         <- function(...) gg("stairstep")(...)
+gg_flip_data         <- function(...) gg("flip_data")(...)
+gg_compute_just      <- function(...) gg("compute_just")(...)
+gg_resolve_text_unit <- function(...) gg("resolve_text_unit")(...)
+gg_validate_labels   <- function(...) gg("validate_labels")(...)

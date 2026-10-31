@@ -208,6 +208,18 @@ test_that("upstream path drawing matches what the hybrid tier mirrors", {
   expect_snapshot(print(body(environment(ggplot2::GeomPolygon$draw_panel)$f)))
 })
 
+test_that("upstream step and text drawing match what the full tier mirrors", {
+  # step_data() (R/render.R) mirrors GeomStep$draw_panel(); full_text()
+  # (R/render-full.R) mirrors GeomText$draw_panel(). If these fail, update
+  # the mirror, then the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::GeomStep$draw_panel)$f)))
+  expect_snapshot(print(body(utils::getFromNamespace("stairstep", "ggplot2"))))
+  expect_snapshot(print(body(environment(ggplot2::GeomText$draw_panel)$f)))
+  expect_snapshot(print(body(utils::getFromNamespace("compute_just", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("resolve_text_unit", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("validate_labels", "ggplot2"))))
+})
+
 test_that("upstream theme and label resolution match what the render IR mirrors", {
   # resolve_theme() (R/render-ir.R) mirrors calc_element() and
   # combine_elements(); ir_labels() mirrors Layout$render()'s axis titles.

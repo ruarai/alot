@@ -131,7 +131,7 @@ test_that("unsupported layers and coords keep ggplot2's pointsGrob, with a reaso
       ),
     "no rows" = ggplot2::ggplot(d[0, ], ggplot2::aes(x, y)) + ggplot2::geom_point(),
     "x or y is AsIs" = ggplot2::ggplot(d[1, ]) + ggplot2::geom_point(ggplot2::aes(x = I(0.5), y = I(0.5))),
-    "no Rust drawer for this geom" = base + ggplot2::geom_step()
+    "no Rust drawer for this geom" = base + ggplot2::geom_area()
   )
   for (reason in names(cases)) {
     p <- cases[[reason]]
@@ -152,10 +152,10 @@ test_that("rows with missing values are removed as ggplot2 does", {
 })
 
 test_that("alot_render_coverage() reports each layer", {
-  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_step() + ggplot2::geom_point()
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_area() + ggplot2::geom_point()
   cov <- alot_render_coverage(p)
   expect_equal(cov$tier, "hybrid")
-  expect_equal(cov$layers$geom, c("GeomStep", "GeomPoint"))
+  expect_equal(cov$layers$geom, c("GeomArea", "GeomPoint"))
   expect_equal(cov$layers$engine, c("ggplot2", "rust"))
   expect_equal(cov$layers$reason, c("no Rust drawer for this geom", NA))
 })
@@ -182,7 +182,7 @@ test_that("alot_png() writes a PNG and closes its device", {
 })
 
 test_that("alot_png() draws unsupported plots with ggplot2", {
-  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_step()
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_area()
   file <- withr::local_tempfile(fileext = ".png")
   before <- grDevices::dev.cur()
   rlang::local_options(rlib_message_verbosity = "verbose")
@@ -326,7 +326,7 @@ test_that("alot_png() restores the current device", {
   withr::defer(grDevices::graphics.off())
   alot_png(p, withr::local_tempfile(fileext = ".png"), width = 2, height = 2, dpi = 50)
   expect_equal(grDevices::dev.cur(), dev)
-  suppressMessages(alot_png(ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_step(),
+  suppressMessages(alot_png(ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_area(),
     withr::local_tempfile(fileext = ".png"), width = 2, height = 2, dpi = 50))
   expect_equal(grDevices::dev.cur(), dev)
 })
@@ -475,7 +475,7 @@ test_that("unsupported path layers keep ggplot2's grobs, with a reason", {
     "aesthetics vary along a line" = base + ggplot2::geom_path(ggplot2::aes(colour = hp)),
     "coord is not an unreversed coord_cartesian()" = base + ggplot2::geom_line() + ggplot2::coord_flip(),
     "NA in x or y" = ggplot2::ggplot(na, ggplot2::aes(x, y)) + ggplot2::geom_polygon(),
-    "no Rust drawer for this geom" = base + ggplot2::geom_step()
+    "no Rust drawer for this geom" = base + ggplot2::geom_area()
   )
   for (reason in names(cases)) {
     p <- cases[[reason]]

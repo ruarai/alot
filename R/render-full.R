@@ -8,8 +8,7 @@
 # Mirrors Coord$draw_panel(), Coord$render_bg()/render_fg() and
 # guide_grid() (ggplot2 R/coord-.R, R/guides-grid.R), GuideAxis
 # (R/guide-axis.R) and the plot background of ggplot_gtable()
-# (R/plot-build.R). Only geom_point() and geom_blank() layers are drawn so
-# far (R5.1); other layers decline.
+# (R/plot-build.R). The layers drawn are those of full_geoms().
 
 # Pixels of a page of `size` (agg_capture()'s arguments): ragg's get_dims()
 # (ragg R/aaa.R).
@@ -96,44 +95,207 @@ full_panel <- function(built, ir, res) {
   )
 }
 
-# The point layers as rs_render_page() reads them, mirroring
-# draw_points_layer() (R/render.R) and GeomPoint$draw_panel() (ggplot2
-# R/geom-point.R): `ir`'s layer data has missing rows removed and shapes
+# The layers as rs_render_page() reads them, each a list with its `kind`
+# ("points", "rects", "paths" or "text"), in layer order. Layers without
+# rows draw nothing. `ir`'s layer data has missing rows removed and shapes
 # translated. Positions rescale linearly (hybrid_decline() checked), and
-# fixed scales give every panel the same ranges. Each layer carries its
-# rows' `panel` (1-based, layout order) for Rust to deal them out.
-full_points <- function(built, ir, res) {
+# fixed scales give every panel the same ranges.
+full_layers <- function(built, ir, res) {
   pp <- built@layout$panel_params[[1]]
-  x_range <- as.double(linear_range(pp$x))
-  y_range <- as.double(linear_range(pp$y))
+  ranges <- list(x_range = as.double(linear_range(pp$x)), y_range = as.double(linear_range(pp$y)))
   n_panels <- nrow(ir$layout$panels)
   out <- list()
-  for (layer in ir$layers) {
-    data <- layer$data
-    if (is.null(layer$kind) || layer$kind != "points" || nrow(data) == 0) next
-    colour <- point_colours(data$colour, data$alpha)
-    fill <- if (!is.null(colour)) point_colours(as.character(data$fill), data$alpha)
-    if (is.null(fill)) {
-      layout_decline("a point colour alot doesn't parse")
-    }
-    out[[length(out) + 1L]] <- list(
-      x = as.double(data$x), y = as.double(data$y), x_range = x_range, y_range = y_range,
-      shape = as.double(data$shape), size = as.double(data$size), stroke = as.double(data$stroke),
-      colour = colour, fill = fill, consts = c(ggplot2::.pt, ggplot2::.stroke, res),
-      panel = if (n_panels > 1) as.integer(data$PANEL)
+  for (i in seq_along(ir$layers)) {
+    layer <- ir$layers[[i]]
+    if (is.null(layer$kind) || nrow(layer$data) == 0) next
+    spec <- switch(layer$kind,
+      points = full_points(layer$data, ranges, n_panels, res),
+      rects = full_rects(built@plot@layers[[i]], layer$data, ranges, n_panels, res),
+      paths = full_paths(built@plot@layers[[i]], layer$data, ranges, n_panels, res),
+      text = full_text(built@plot@layers[[i]], layer$data, built@layout$coord, pp, n_panels, res)
     )
+    if (!is.null(spec)) out[[length(out) + 1L]] <- c(list(kind = layer$kind), spec)
   }
   out
 }
 
-# Why the full tier can't draw `built`, or NULL: it draws geom_point() and
-# geom_blank() layers, and only the cartesian axes and guides above.
+# The rows of each panel (1-based, in the order given), NULL for a panel
+# without rows, from the PANEL value of each row.
+layer_panel_rows <- function(panel, n_panels, rows = seq_along(panel)) {
+  by <- split(rows, factor(as.integer(panel)[rows], levels = seq_len(n_panels)))
+  unname(lapply(by, function(r) if (length(r)) r))
+}
+
+# A point layer (draw_points_layer(), R/render.R, and GeomPoint$draw_panel(),
+# ggplot2 R/geom-point.R). Each layer carries its rows' `panel` (1-based,
+# layout order) for Rust to deal them out.
+full_points <- function(data, ranges, n_panels, res) {
+  colour <- point_colours(data$colour, data$alpha)
+  fill <- if (!is.null(colour)) point_colours(as.character(data$fill), data$alpha)
+  if (is.null(fill)) {
+    layout_decline("a point colour alot doesn't parse")
+  }
+  c(ranges, list(
+    x = as.double(data$x), y = as.double(data$y),
+    shape = as.double(data$shape), size = as.double(data$size), stroke = as.double(data$stroke),
+    colour = colour, fill = fill, consts = c(ggplot2::.pt, ggplot2::.stroke, res),
+    panel = if (n_panels > 1) as.integer(data$PANEL)
+  ))
+}
+
+# A rect layer, mirroring draw_rects_layer() (R/render.R) and
+# GeomRect$draw_panel() (ggplot2 R/geom-rect.R): rectGrob(col = colour,
+# fill = fill_alpha(fill, alpha)); the outline keeps its colour's own
+# alpha, and gg_par(lwd = linewidth) is linewidth * .pt (no stroke for
+# blank line types).
+full_rects <- function(layer, data, ranges, n_panels, res) {
+  params <- layer$computed_geom_params
+  colour <- point_colours(as.character(data$colour), NA)
+  fill <- if (!is.null(colour)) point_colours(as.character(data$fill), data$alpha)
+  if (is.null(fill)) {
+    layout_decline("a rect colour alot doesn't parse")
+  }
+  c(ranges, list(
+    xmin = data$xmin, xmax = data$xmax, ymin = data$ymin, ymax = data$ymax,
+    colour = colour, fill = fill, lwd = as.double(data$linewidth * ggplot2::.pt * rect_linetype(data$linetype)),
+    join = as.numeric(match(params$linejoin %||% "mitre", c("mitre", "round", "bevel")) - 1L), res = res,
+    rows = layer_panel_rows(data$PANEL, n_panels)
+  ))
+}
+
+# A path layer, mirroring draw_paths_layer() (R/render.R) and
+# GeomPath$draw_panel() (ggplot2 R/geom-path.R): one polyline per group in
+# group order, styled from its first row, groups of one row dropped.
+# geom_step() draws its stairsteps the same way (GeomStep$draw_panel()).
+full_paths <- function(layer, data, ranges, n_panels, res) {
+  params <- layer$computed_geom_params
+  if (inherits(layer$geom, "GeomStep")) data <- step_data(data, params)
+  if (nrow(data) == 0) {
+    return(NULL)
+  }
+  pg <- panel_group_order(data)
+  key <- pg$key
+  order <- pg$order[tabulate(key)[key[pg$order]] >= 2]
+  if (length(order) == 0) {
+    return(NULL)
+  }
+  first <- order[!duplicated(key[order])]
+  path <- match(key[order], key[first]) - 1L
+  colour <- point_colours(data$colour[first], data$alpha[first])
+  if (is.null(colour)) {
+    layout_decline("a line colour alot doesn't parse")
+  }
+  codes <- lty_code(data$linetype[first])
+  c(ranges, list(
+    x = data$x, y = data$y, colour = colour,
+    lwd = ifelse(codes < 0, 0, data$linewidth[first] * ggplot2::.pt),
+    lty = as.double(pmax(codes, 0)),
+    cap = as.numeric(match(params$lineend %||% "butt", c("round", "butt", "square")) - 1L),
+    join = as.numeric(match(params$linejoin %||% "round", c("round", "mitre", "bevel")) - 1L),
+    mitre = as.double(params$linemitre %||% 10), res = res,
+    rows = layer_panel_rows(data$PANEL, n_panels, order),
+    path_rows = unname(lapply(split(path, factor(as.integer(data$PANEL)[order], levels = seq_len(n_panels))), function(p) if (length(p)) p))
+  ))
+}
+
+# Fontface codes of grid's gpar(fontface =): 1 plain, 2 bold, 3 italic, 4
+# bold italic; NA for what alot doesn't mirror (the symbol face and so on).
+text_face <- function(face) {
+  if (is.numeric(face)) {
+    return(ifelse(face %in% 1:4, as.integer(face), NA_integer_))
+  }
+  match(as.character(face), c("plain", "bold", "italic", "bold.italic"))
+}
+
+# Why a geom_text() layer isn't drawn in Rust, or NULL. Layers that
+# decline here are drawn by ggplot2 (hybrid tier).
+text_decline <- function(data, params) {
+  cols <- c("x", "y", "label", "colour", "family", "size", "angle", "hjust", "vjust", "alpha", "fontface", "lineheight")
+  if (!all(cols %in% names(data))) {
+    return("missing text aesthetics")
+  }
+  if (isTRUE(params$parse)) {
+    return("parsed labels (plotmath)")
+  }
+  if (isTRUE(params$check_overlap)) {
+    return("check_overlap")
+  }
+  if (!(params$size.unit %||% "mm") %in% c("mm", "pt", "cm", "in", "pc")) {
+    return("unsupported size.unit")
+  }
+  if (!is.double(data$x) || !is.double(data$y) || inherits(data$x, "AsIs") || inherits(data$y, "AsIs")) {
+    return("x or y is not double")
+  }
+  if (!is.character(data$label) && !is.factor(data$label)) {
+    return("labels are not character")
+  }
+  if (!is.character(data$family) || anyNA(text_face(data$fontface))) {
+    return("a font alot doesn't mirror")
+  }
+  if (!is_colour_vector(data$colour)) {
+    return("colour is not a colour vector")
+  }
+  num <- c("size", "angle", "lineheight")
+  if (!all(vapply(data[num], is.numeric, logical(1))) || anyNA(data[num]) || !(is.numeric(data$hjust) || is.character(data$hjust)) ||
+    !(is.numeric(data$vjust) || is.character(data$vjust))) {
+    return("size, angle, lineheight, hjust or vjust is not numeric")
+  }
+  NULL
+}
+
+# A text layer, mirroring GeomText$draw_panel() (ggplot2 R/geom-text.R):
+# positions transformed by the coord (npc), justification resolved by
+# compute_just(), and textGrob(gp = gg_par(col = alpha(colour, alpha),
+# fontsize = size * size.unit, fontfamily, fontface, lineheight)). Sizes
+# and line heights are in device pixels as text_raster() (R/render-text.R)
+# gives them.
+full_text <- function(layer, data, coord, pp, n_panels, res) {
+  params <- layer$computed_geom_params
+  label <- gg_validate_labels(as.character(data$label))
+  tr <- coord$transform(data[c("x", "y")], pp)
+  hjust <- as.double(gg_compute_just(data$hjust, tr$x, tr$y, data$angle))
+  vjust <- as.double(gg_compute_just(data$vjust, tr$y, tr$x, data$angle))
+  fontsize <- data$size * gg_resolve_text_unit(params$size.unit %||% "mm")
+  colour <- point_colours(as.character(data$colour), data$alpha)
+  font <- text_fonts(data$family, text_face(data$fontface))
+  key <- paste(font$path, font$index)
+  distinct <- !duplicated(key)
+  if (is.null(colour) || anyNA(font$path) || anyNA(c(hjust, vjust, tr$x, tr$y, fontsize)) || anyNA(label)) {
+    layout_decline("text alot doesn't draw as ragg does")
+  }
+  for (k in which(distinct)) {
+    covered <- rs_text_covered(enc2utf8(unique(label[key == key[k]])), font$path[k], font$index[k])
+    if (!all(covered)) {
+      layout_decline(sprintf("glyph missing from the font in \"%s\"", unique(label[key == key[k]])[!covered][1]))
+    }
+  }
+  list(
+    label = enc2utf8(label), x = as.double(tr$x), y = as.double(tr$y), hjust = hjust, vjust = vjust, rot = as.double(data$angle),
+    font = match(key, key[distinct]), font_path = font$path[distinct], font_index = as.integer(font$index[distinct]),
+    size = as.double(fontsize * res / 72), line = as.double(data$lineheight * 1.2 * fontsize * res / 72), colour = colour,
+    rows = layer_panel_rows(data$PANEL, n_panels)
+  )
+}
+
+# The geoms the full tier draws (R6.1); a geom keeping one of their
+# draw_panel methods under another class is not drawn (full_kind() would
+# say so, the geoms are compared by identity).
+full_geoms <- function() {
+  list(
+    ggplot2::GeomPoint, ggplot2::GeomRect, ggplot2::GeomTile, ggplot2::GeomBar,
+    ggplot2::GeomCol, ggplot2::GeomPath, ggplot2::GeomLine, ggplot2::GeomStep, ggplot2::GeomText
+  )
+}
+
+# Why the full tier can't draw `built`, or NULL: it draws the layers of
+# full_geoms() and geom_blank(), and only the cartesian axes and guides
+# above.
 full_decline <- function(built, ir) {
   drawn <- vapply(built@plot@layers, function(l) {
-    ir_is_ggplot2(l$geom, "GeomBlank") || identical(l$geom, ggplot2::GeomPoint)
+    ir_is_ggplot2(l$geom, "GeomBlank") || any(vapply(full_geoms(), identical, logical(1), l$geom))
   }, logical(1))
   if (!all(drawn)) {
-    return("layers other than geom_point() and geom_blank()")
+    return("layers other than geom_point(), geom_line() and the other core geoms")
   }
   support <- ir$support
   # Layers without rows draw nothing.
@@ -174,7 +336,7 @@ page_spec <- function(built, ir, size) {
     page = page_px(size), bg = bg, layout = layout,
     background = full_rect(ir$theme[["plot.background"]], res),
     panels = rep(list(full_panel(built, ir, res)), nrow(ir$layout$panels)),
-    points = full_points(built, ir, res)
+    layers = full_layers(built, ir, res)
   )
 }
 
@@ -194,7 +356,9 @@ render_full <- function(built, size) {
   for (i in seq_along(built@plot@layers)) {
     layer <- built@plot@layers[[i]]
     data <- built@data[[i]]
-    if (identical(layer$geom, ggplot2::GeomPoint) && !gg_empty(data)) point_handle_na(layer, data)
+    if (is.null(full_kind(layer)) || gg_empty(data)) next
+    data <- point_handle_na(layer, data)
+    if (identical(full_kind(layer), "paths") && nrow(data) > 0) path_messages(layer, data)
   }
   out
 }

@@ -1129,3 +1129,18 @@ Rust time is the blank page (grid lines and panel backgrounds of six panels,
 the clear and the raster conversion); the text is about 5 ms. Dealing the
 points out to panels in Rust instead of `split()` and subsetting in R took
 `full_points()` + page spec from 70 ms to 34 ms.
+
+## R6.1: core geoms in the full tier (2026-10-31)
+
+`render_full()` against ggplot2's gtable drawn on `ragg::agg_capture()` (the
+build is not timed), release build, 1600 × 1000 at 150 dpi, one run each:
+
+| Plot | Full tier | ggplot2 + ragg |
+|---|---:|---:|
+| `geom_line()`, 1e6 rows | 616 ms | 1704 ms |
+| `geom_tile()`, 1000 × 1000 | 386 ms | 947 ms |
+| `geom_col()`, 2000 bars | 40 ms | 78 ms |
+| `geom_text()`, 5000 labels | 50 ms | 111 ms |
+
+Every drawer is faster than ragg drawing the same marks. Not tuned (R7.2's
+job): the line's time is mostly the group ordering in R and the stroker.

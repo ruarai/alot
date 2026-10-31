@@ -2,8 +2,10 @@
 //! `guide_grid()`, `Coord$render_bg()` and `Coord$render_fg()`), drawn in
 //! the panel's cell and clipped to it when the coord's `clip` is "on".
 
-use crate::render::display::Rect;
 use crate::render::display::Item;
+use crate::render::display::Rect;
+use crate::render::layers::{PathLayer, RectLayer, TextLayer};
+use crate::render::paths::PathBatch;
 use crate::render::page::{LineStyle, Painter, RectEl};
 use crate::render::points::{Point, PointBatch};
 
@@ -69,6 +71,14 @@ impl PointLayer {
     }
 }
 
+/// A layer's drawing, in the order the layers were added.
+pub enum Layer {
+    Points(PointLayer),
+    Rects(RectLayer),
+    Paths(PathLayer),
+    Text(TextLayer),
+}
+
 pub struct Panel {
     pub clip: bool,
     /// `panel.background`.
@@ -76,13 +86,15 @@ pub struct Panel {
     /// In drawing order: minor y, minor x, major y, major x.
     pub grid: Vec<GridLines>,
     /// The layers, in order, drawn over the grid.
-    pub points: Vec<PointLayer>,
+    pub layers: Vec<Layer>,
     /// `panel.border`.
     pub border: Option<RectEl>,
 }
 
 impl Panel {
-    pub fn draw(&self, p: &mut Painter, c: &Rect) {
+    /// Draws the panel in cell `c`; `None` if a layer's text can't be drawn
+    /// as ragg does.
+    pub fn draw(&self, p: &mut Painter, c: &Rect) -> Option<()> {
         if self.clip {
             p.push_clip(*c);
         }
@@ -107,8 +119,20 @@ impl Panel {
                 .collect();
             p.lines(lines, &g.style);
         }
-        for layer in &self.points {
-            p.list.push(Item::Points(layer.batch(c, p.threads)));
+        // ragg's clip box for text: the panel's, or the page.
+        let clip = if self.clip { p.text_clip_box(c) } else { p.page_clip() };
+        for layer in &self.layers {
+            match layer {
+                Layer::Points(l) => p.list.push(Item::Points(l.batch(c, p.threads))),
+                Layer::Rects(l) => p.list.push(Item::Rects(l.batch(c))),
+                Layer::Paths(l) => {
+                    let specs = l.specs(c);
+                    if !specs.is_empty() {
+                        p.list.push(Item::Paths(PathBatch::new(&specs)));
+                    }
+                }
+                Layer::Text(l) => l.draw(p, c, clip)?,
+            }
         }
         if let Some(border) = &self.border {
             p.rect(c, border);
@@ -116,5 +140,6 @@ impl Panel {
         if self.clip {
             p.pop_clip();
         }
+        Some(())
     }
 }

@@ -233,8 +233,9 @@ hybrid_layer <- function(layer) {
   )
 }
 
-# Which Rust drawer a layer's geom has: GeomPoint's draw_panel, GeomRect's
-# (inherited by GeomTile, GeomBar and GeomCol), GeomPath's (GeomLine) or
+# Which Rust drawer a layer's geom has in the hybrid tier: GeomPoint's
+# draw_panel, GeomRect's (inherited by GeomTile, GeomBar and GeomCol),
+# GeomPath's (GeomLine), GeomStep's (stairsteps, then GeomPath's) or
 # GeomPolygon's.
 hybrid_kind <- function(layer) {
   geom <- layer$geom
@@ -245,24 +246,36 @@ hybrid_kind <- function(layer) {
     identical(environment(geom$draw_panel)$f, environment(parent$draw_panel)$f)
   }
   kinds <- list(
-    rects = list(c("GeomRect", "GeomTile", "GeomBar", "GeomCol"), ggplot2::GeomRect),
-    paths = list(c("GeomPath", "GeomLine"), ggplot2::GeomPath),
-    polygons = list("GeomPolygon", ggplot2::GeomPolygon)
+    list("rects", c("GeomRect", "GeomTile", "GeomBar", "GeomCol"), ggplot2::GeomRect),
+    list("paths", c("GeomPath", "GeomLine"), ggplot2::GeomPath),
+    list("paths", "GeomStep", ggplot2::GeomStep),
+    list("polygons", "GeomPolygon", ggplot2::GeomPolygon)
   )
-  for (kind in names(kinds)) {
-    k <- kinds[[kind]]
-    if (class(geom)[1] %in% k[[1]] && same_draw(k[[2]])) {
-      return(kind)
+  for (k in kinds) {
+    if (class(geom)[1] %in% k[[2]] && same_draw(k[[3]])) {
+      return(k[[1]])
     }
   }
   NULL
+}
+
+# The drawer the full tier has for a layer's geom: the hybrid tier's, and
+# GeomText's draw_panel (text is drawn by ggplot2 in the hybrid tier).
+full_kind <- function(layer) {
+  kind <- hybrid_kind(layer)
+  if (is.null(kind) && identical(layer$geom, ggplot2::GeomText) &&
+    identical(environment(layer$geom$draw_panel)$f, environment(ggplot2::GeomText$draw_panel)$f)) {
+    "text"
+  } else {
+    kind
+  }
 }
 
 # A layer's data as its geom draws it: Layer$draw_geom() removes missing
 # values first (ggplot2 R/layer.R), and GeomPoint$draw_panel() translates
 # shape names (R/geom-point.R).
 hybrid_data <- function(layer, data) {
-  kind <- hybrid_kind(layer)
+  kind <- full_kind(layer)
   if (is.null(kind) || gg_empty(data)) {
     return(data)
   }
@@ -286,8 +299,7 @@ point_handle_na <- function(layer, data) {
 # Why the hybrid tier draws a layer with ggplot2, or NULL if Rust draws it,
 # given the layer's data from hybrid_data(). draw_points_layer() makes the
 # same check, so coverage and drawing agree.
-hybrid_decline <- function(layer, data, layout) {
-  kind <- hybrid_kind(layer)
+hybrid_decline <- function(layer, data, layout, kind = hybrid_kind(layer)) {
   if (is.null(kind)) {
     return("no Rust drawer for this geom")
   }
@@ -306,7 +318,8 @@ hybrid_decline <- function(layer, data, layout) {
     points = points_decline(data),
     rects = rects_decline(data, layer$computed_geom_params),
     paths = paths_decline(data, layer$computed_geom_params),
-    polygons = polygons_decline(data, layer$computed_geom_params)
+    polygons = polygons_decline(data, layer$computed_geom_params),
+    text = text_decline(data, layer$computed_geom_params)
   )
   if (!is.null(reason)) {
     return(reason)
@@ -607,6 +620,36 @@ path_grobs <- function(kind, shared, data, layout, prefix) {
   })
 }
 
+# Stairsteps for GeomStep$draw_panel (ggplot2 R/geom-path.R): the data as
+# GeomPath$draw_panel gets it. Mirrors the dapply() of stairstep() by group,
+# with the orientation flipped as the geom does.
+step_data <- function(data, params) {
+  flipped <- isTRUE(params$flipped_aes)
+  direction <- params$direction %||% "hv"
+  data <- gg_flip_data(data, flipped)
+  if (flipped) {
+    direction <- switch(direction, hv = "vh", vh = "hv", direction)
+  }
+  data <- gg_dapply(data, "group", gg_stairstep, direction = direction)
+  gg_flip_data(data, flipped)
+}
+
+# GeomPath$draw_panel()'s message for groups of one row, once per panel as
+# ggplot2 gives it. Steps have none: stairstep() drops such groups first.
+path_messages <- function(layer, data) {
+  if (inherits(layer$geom, "GeomStep")) {
+    return(invisible())
+  }
+  for (d in split(data$group, data$PANEL)) {
+    if (length(d) && !anyDuplicated(d)) {
+      cli::cli_inform(c(
+        "{.fn {gg_snake_class(layer$geom)}}: Each group consists of only one observation.",
+        i = "Do you need to adjust the {.field group} aesthetic?"
+      ))
+    }
+  }
+}
+
 # Mirrors GeomPath$draw_panel (ggplot2 R/geom-path.R) for coord_cartesian
 # when aesthetics are constant along each line: one polyline per group, in
 # group order, styled from its first row; groups of one row are dropped.
@@ -619,15 +662,8 @@ draw_paths_layer <- function(data, layout, layer) {
   if (!is.null(hybrid_decline(layer, data, layout))) {
     return(layer$geom$draw_layer(data, params, layout, layout$coord))
   }
-  # draw_panel's message, once per panel as ggplot2 gives it.
-  for (d in split(data$group, data$PANEL)) {
-    if (length(d) && !anyDuplicated(d)) {
-      cli::cli_inform(c(
-        "{.fn {gg_snake_class(layer$geom)}}: Each group consists of only one observation.",
-        i = "Do you need to adjust the {.field group} aesthetic?"
-      ))
-    }
-  }
+  path_messages(layer, data)
+  if (inherits(layer$geom, "GeomStep")) data <- step_data(data, params)
   pg <- panel_group_order(data)
   key <- pg$key
   order <- pg$order[tabulate(key)[key[pg$order]] >= 2]

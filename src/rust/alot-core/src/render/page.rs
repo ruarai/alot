@@ -41,7 +41,7 @@ pub struct RectEl {
 
 /// A theme `element_text`'s font and colour: an index into the page's
 /// fonts, the size and line height in pixels.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextStyle {
     pub font: usize,
     pub size: f64,
@@ -109,16 +109,39 @@ impl<'f, 'a> Painter<'f, 'a> {
         }
     }
 
-    /// Text runs in one style. `None` if ragg's drawing of them isn't
-    /// mirrored (a glyph missing from the font).
+    pub fn page_clip(&self) -> [i32; 4] {
+        self.page_clip
+    }
+
+    /// ragg's clip box (inclusive) for a clip to `r`, as
+    /// `text_clip()` in R/render-text.R gets it from grid's clip rectangle:
+    /// limited to the page, then truncated.
+    pub fn text_clip_box(&self, r: &Rect) -> [i32; 4] {
+        let [_, _, x1, y1] = self.page_clip;
+        let (w, h) = (x1 as f64 + 1.0, y1 as f64 + 1.0);
+        [
+            r.x0.max(0.0).trunc() as i32,
+            r.y0.max(0.0).trunc() as i32,
+            (r.x1.min(w).trunc() as i32).min(x1),
+            (r.y1.min(h).trunc() as i32).min(y1),
+        ]
+    }
+
+    /// Text runs in one style, clipped to the page. `None` if ragg's
+    /// drawing of them isn't mirrored (a glyph missing from the font).
     pub fn text(&mut self, runs: &[Run], st: &TextStyle) -> Option<()> {
+        self.text_clipped(runs, st, self.page_clip)
+    }
+
+    /// Text runs in one style, clipped to `clip` (ragg's inclusive clip box).
+    pub fn text_clipped(&mut self, runs: &[Run], st: &TextStyle, clip: [i32; 4]) -> Option<()> {
         if runs.is_empty() || st.colour[3] == 0 {
             return Some(());
         }
         let font = self.fonts.get(st.font)?;
         let key = (st.font, st.size.to_bits());
         let hinted = self.hinted.entry(key).or_insert_with(|| Hinted::new(font, st.size));
-        let image = text::draw_runs(font, hinted.as_mut()?, st.size, st.line, runs, st.colour, self.page_clip)?;
+        let image = text::draw_runs(font, hinted.as_mut()?, st.size, st.line, runs, st.colour, clip)?;
         if let Some(image) = image {
             self.list.push(Item::Image(image));
         }
@@ -260,7 +283,7 @@ pub fn draw_page(spec: &PageSpec, fonts: &[Font]) -> Option<DisplayList> {
     }
     for (name, panel) in &spec.panels {
         if let Some(b) = find(name) {
-            panel.draw(&mut p, &rect_of(b));
+            panel.draw(&mut p, &rect_of(b))?;
         }
     }
     if let Some(w) = &spec.wrap {

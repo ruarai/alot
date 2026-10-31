@@ -96,6 +96,6 @@ test_that("point plots the full tier doesn't draw decline to another tier", {
 test_that("the full tier names why it declines a point plot", {
   b <- ggplot_build(base + geom_point(shape = "a"))
   expect_match(attr(render_full(b, render_size), "reason"), "character pch|unsupported shape")
-  b <- ggplot_build(base + geom_point() + geom_line())
+  b <- ggplot_build(base + geom_point() + geom_smooth(method = "lm", formula = y ~ x))
   expect_match(attr(render_full(b, render_size), "reason"), "layers other than")
 })
