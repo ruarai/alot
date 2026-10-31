@@ -429,7 +429,7 @@ All stat kernels use the grouped driver (T0.4) and register under
 - **Done when:** the ranked list is in `RESULTS.md`, and any new tasks are
   in this file and in the run order.
 
-### T6.2 Overhead around the position scale kernels
+### T6.2 Overhead around the position scale kernels — done
 - **Depends:** T1.1, T1.2
 - **Touches:** `R/kernels-scale.R`, `R/layout.R`, `R/convert.R`
 - **Do:**

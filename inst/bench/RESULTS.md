@@ -596,6 +596,42 @@ whole `alot_build()` vs `ggplot_build()`:
   own `setup_panel_params`/`setup_panel_guides` object construction per
   COORD, which must stay to give each panel its own objects (T5.3, T5.4).
 
+### T6.2 Overhead around the position scale kernels (2026-10-31)
+
+README plot (1e6 rows, `facet_wrap`, log x, continuous colour, discrete
+shape), kernels on, release build, median of 7 `step_times()` runs.
+
+Profile split of one layer's data (ms), before the change:
+
+| piece | ms |
+|---|---:|
+| `match(layer_data$PANEL, panels$PANEL)` (factor, 1e6 rows) | 12–14 |
+| `rs_train_continuous_grouped()` per variable (Rust) | 4 |
+| `rs_map_continuous()` per variable (Rust) | 3 |
+| `panels$SCALE_X[match_id]`, `as.integer()`, `rebuild`/assignment | 1–2 |
+
+`train_position_1` was 37 ms in `facet_train_scales()` (one `match()` plus
+two Rust trains) and `layout_map_position()` 39 ms (one `match()` plus two
+maps). The factor `match()` was a third of each: it converts every row to a
+string. `match_panel()` matches the 6 levels and indexes by the codes
+instead (2 ms); it equals `match()` for any factor, with NA codes kept.
+
+| step | before | after |
+|---|---:|---:|
+| train_position_1 | 32.2 | 18.0 |
+| map_position_1 | 34.4 | 22.2 |
+| train_position_2 | 28.4 | 25.6 |
+| map_position_2 | 21.7 | 11.2 |
+
+- What remains in train/map is the Rust compute (4 ms per variable train,
+  3 ms per map) plus the data-frame column assignment. Called alone,
+  `facet_train_scales()` on the final data takes 14 ms, but inside
+  `train_position_2` it measures 25 ms; the difference is the garbage
+  collection of the previous steps' columns, which lands in that step, not
+  work the step does.
+- Columns are converted once per variable already (`as.integer(scale_id)` is
+  free for the integer match result), so no further conversion was found.
+
 ## Phase 2 prototype: README plot to PNG (2026-10-30)
 
 Experimental (branch `proto/phase2-points`). `inst/bench/render-readme.R`

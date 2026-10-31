@@ -70,7 +70,7 @@ facet_train_scales <- function(x_scales, y_scales, panels, data) {
     if (!is.null(x_scales)) {
       x_vars <- intersect(x_scales[[1]]$aesthetics, names(layer_data))
       if (length(x_vars) > 0) {
-        match_id <- match(layer_data$PANEL, panels$PANEL)
+        match_id <- match_panel(layer_data$PANEL, panels$PANEL)
         scales_train(layer_data, x_vars, panels$SCALE_X[match_id], x_scales)
       }
     }
@@ -79,7 +79,7 @@ facet_train_scales <- function(x_scales, y_scales, panels, data) {
       y_vars <- intersect(y_scales[[1]]$aesthetics, names(layer_data))
       if (length(y_vars) > 0) {
         if (is.null(match_id)) {
-          match_id <- match(layer_data$PANEL, panels$PANEL)
+          match_id <- match_panel(layer_data$PANEL, panels$PANEL)
         }
         scales_train(layer_data, y_vars, panels$SCALE_Y[match_id], y_scales)
       }
@@ -130,7 +130,7 @@ layout_map_position <- function(layout, data) {
 
     x_vars <- intersect(layout$panel_scales_x[[1]]$aesthetics, names(layer_data))
     if (length(x_vars) > 0) {
-      match_id <- match(layer_data$PANEL, panels$PANEL)
+      match_id <- match_panel(layer_data$PANEL, panels$PANEL)
       names(x_vars) <- x_vars
       SCALE_X <- panels$SCALE_X[match_id]
       new_x <- scales_map(layer_data, x_vars, SCALE_X, layout$panel_scales_x)
@@ -140,7 +140,7 @@ layout_map_position <- function(layout, data) {
     y_vars <- intersect(layout$panel_scales_y[[1]]$aesthetics, names(layer_data))
     if (length(y_vars) > 0) {
       if (is.null(match_id)) {
-        match_id <- match(layer_data$PANEL, panels$PANEL)
+        match_id <- match_panel(layer_data$PANEL, panels$PANEL)
       }
       names(y_vars) <- y_vars
       SCALE_Y <- panels$SCALE_Y[match_id]
@@ -182,4 +182,15 @@ scales_map <- function(data, vars, scale_id, scales) {
       }
     )
   })
+}
+
+# match(x, table) for the PANEL columns of Layout$train_position and
+# map_position (ggplot2 R/layout.R). match() on a factor converts all of its
+# 1e6 values to strings, so for a factor the levels are matched instead and
+# indexed by the codes. NA codes stay NA, as long as `table` holds no NA.
+match_panel <- function(x, table) {
+  if (!is.factor(x) || anyNA(table)) {
+    return(match(x, table))
+  }
+  match(levels(x), as.character(table))[as.integer(x)]
 }

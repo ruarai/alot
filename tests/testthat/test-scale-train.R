@@ -201,3 +201,17 @@ test_that("unsupported discrete input and scales fall back to ggplot2", {
   expect_true(all(cov$path[cov$class == "ScaleDiscretePositionSub"] == "ggplot2"))
   expect_build_equal(p)
 })
+
+test_that("match_panel() equals match() on PANEL columns", {
+  panels <- factor(c("3", "1", "2"), levels = c("1", "2", "3"))
+  for (x in list(
+    factor(c("1", "2", NA, "3", "2"), levels = c("1", "2", "3")),
+    factor(c("a", "1"), levels = c("a", "1")),
+    factor(character(), levels = c("1", "2")),
+    factor(c("2", "2"), levels = c("3", "2", "1")),
+    c("1", "9", NA), 1:3
+  )) {
+    expect_identical(match_panel(x, panels), match(x, panels))
+  }
+  expect_identical(match_panel(factor("1"), factor(c("1", NA))), match(factor("1"), factor(c("1", NA))))
+})
