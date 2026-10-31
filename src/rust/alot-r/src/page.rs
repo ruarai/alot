@@ -4,7 +4,7 @@
 use alot_core::render::agg::{Cap, Join};
 use alot_core::render::axis::{Axis, Side, Ticks};
 use alot_core::render::layout::TitleGrob;
-use alot_core::render::legend::{Bar, BarTicks, Body, Guide, Keys, LegendGroup};
+use alot_core::render::legend::{Bar, BarTicks, Bins, Body, Glyph, Guide, Keys, LegendGroup};
 use alot_core::render::page::{draw_page, FacetDraw, LineStyle, PageSpec, RectEl, StripDraw, TextStyle};
 use alot_core::render::layers::{Label, PathLayer, RectLayer, TextLayer};
 use alot_core::render::panel::{GridLines, Layer, Panel, PointLayer};
@@ -383,22 +383,55 @@ fn pair(l: &List, name: &str) -> Option<(f64, f64)> {
     Some((*v.first()?, *v.get(1)?))
 }
 
+/// A key glyph: see `legend_glyph()` in R/render-legend.R.
+fn glyph(l: &List, fonts: &mut Fonts) -> Option<Glyph> {
+    match field(l, "type")?.as_str()? {
+        "point" => Some(Glyph::Point(point_layer(l)?)),
+        "rect" => {
+            let fill = colours(l, "fill")?;
+            let col = colours(l, "col")?;
+            let el = RectEl {
+                fill: *fill.first()?,
+                col: *col.first()?,
+                lwd: num(l, "lwd")?,
+                lty: num(l, "lty")? as u32,
+                join: [Join::Miter, Join::Round, Join::Bevel].get(num(l, "join")? as usize).copied()?,
+            };
+            let cap = [Cap::Round, Cap::Butt, Cap::Square].get(num(l, "cap")? as usize).copied()?;
+            Some(Glyph::Rect { inset: num(l, "inset")?, el, cap })
+        }
+        "path" => {
+            let (x, y) = (nums(l, "x")?, nums(l, "y")?);
+            (x.len() == y.len() && x.len() >= 2).then_some(())?;
+            Some(Glyph::Line { x, y, style: line_style(l)? })
+        }
+        "text" => Some(Glyph::Text(title(l, fonts)?)),
+        _ => None,
+    }
+}
+
+/// Each key's glyphs (`marks`, NULL for a key without any).
+fn glyph_lists(l: &List, fonts: &mut Fonts) -> Option<Vec<Vec<Glyph>>> {
+    let mut marks = Vec::new();
+    for (_, m) in list_of(l, "marks")?.iter() {
+        let mut glyphs = Vec::new();
+        if !m.is_null() {
+            for (_, g) in List::try_from(m).ok()?.iter() {
+                glyphs.push(glyph(&List::try_from(g).ok()?, fonts)?);
+            }
+        }
+        marks.push(glyphs);
+    }
+    Some(marks)
+}
+
 /// A guide: see `legend_guide()` and `legend_bar()` in R/render-legend.R.
 fn guide(l: &List, fonts: &mut Fonts) -> Option<Guide> {
     let body = match field(l, "kind")?.as_str()? {
         "legend" => {
             let dim = nums(l, "dim")?;
             let (key_w, key_h) = (nums(l, "key_w")?, nums(l, "key_h")?);
-            let mut marks = Vec::new();
-            for (_, m) in list_of(l, "marks")?.iter() {
-                let mut layers = Vec::new();
-                if !m.is_null() {
-                    for (_, layer) in List::try_from(m).ok()?.iter() {
-                        layers.push(point_layer(&List::try_from(layer).ok()?)?);
-                    }
-                }
-                marks.push(layers);
-            }
+            let marks = glyph_lists(l, fonts)?;
             let mut labels = Vec::new();
             for (_, t) in list_of(l, "labels")?.iter() {
                 labels.push(title(&List::try_from(t).ok()?, fonts)?);
@@ -415,14 +448,44 @@ fn guide(l: &List, fonts: &mut Fonts) -> Option<Guide> {
                 default: pair(l, "default")?,
                 bg: opt(l, "key_bg", rect_el)?,
                 marks,
+                key_just: match field(l, "key_just") {
+                    None => None,
+                    Some(_) => Some(pair(l, "key_just")?),
+                },
                 labels,
                 spacing: pair(l, "spacing")?,
+            })
+        }
+        "bins" => {
+            let marks = glyph_lists(l, fonts)?;
+            let (key_w, key_h) = (nums(l, "key_w")?, nums(l, "key_h")?);
+            if marks.is_empty() || key_w.len() != marks.len() || key_h.len() != marks.len() {
+                return None;
+            }
+            Body::Bins(Bins {
+                horizontal: flag(l, "horizontal")?,
+                key_size: pair(l, "key_size")?,
+                bg: opt(l, "key_bg", rect_el)?,
+                marks,
+                key_w,
+                key_h,
+                key_just: match field(l, "key_just") {
+                    None => None,
+                    Some(_) => Some(pair(l, "key_just")?),
+                },
+                axis: opt(l, "axis", line_style)?,
+                ticks: opt(l, "ticks", |t| Some((nums(t, "pos")?, num(t, "len")?, line_style(&list_of(t, "style")?)?)))?,
+                labels: opt(l, "bar_labels", |t| title(t, fonts))?,
             })
         }
         "bar" => Body::Bar(Bar {
             size: pair(l, "bar_size")?,
             horizontal: flag(l, "horizontal")?,
             image: colours(l, "image")?,
+            rects: opt(l, "rects", |r| {
+                let (lo, hi) = (nums(r, "lo")?, nums(r, "hi")?);
+                (lo.len() == hi.len()).then(|| lo.into_iter().zip(hi).collect())
+            })?,
             frame: opt(l, "frame", rect_el)?,
             ticks: opt(l, "ticks", |t| {
                 let len = nums(t, "len")?;
@@ -443,17 +506,32 @@ fn guide(l: &List, fonts: &mut Fonts) -> Option<Guide> {
     })
 }
 
-/// A position's legend box: see `legend_box()` in R/render-legend.R.
-pub(crate) fn legend_group(l: &List, fonts: &mut Fonts) -> Option<LegendGroup> {
+/// A position's legend box: see `legend_box()` in R/render-legend.R. A
+/// box background without a fill of its own takes `bg`, the device's
+/// starting fill.
+pub(crate) fn legend_group(l: &List, fonts: &mut Fonts, bg: [u8; 4]) -> Option<LegendGroup> {
     let mut guides = Vec::new();
     for (_, g) in list_of(l, "guides")?.iter() {
         guides.push(guide(&List::try_from(g).ok()?, fonts)?);
     }
+    let background = opt(l, "background", |b| {
+        let mut el = rect_el(b)?;
+        if flag(b, "fill_bg")? {
+            el.fill = bg;
+        }
+        Some(el)
+    })?;
     Some(LegendGroup {
         horizontal: flag(l, "horizontal")?,
         spacing: num(l, "spacing")?,
         box_just: pair(l, "box_just")?,
         global_just: pair(l, "global_just")?,
+        inside: match field(l, "inside") {
+            None => None,
+            Some(_) => Some(pair(l, "inside")?),
+        },
+        margin: nums(l, "margin")?.try_into().ok()?,
+        background,
         guides,
     })
 }
@@ -484,13 +562,20 @@ fn render(spec: &List, threads: i32) -> Option<Robj> {
     if let Some(tag) = opt(&layout, "tag", |t| title(&list_of(t, "item")?, &mut fonts))? {
         titles.push(("tag".to_string(), tag));
     }
+    let bg = rgba(spec, "bg")?;
     let mut legends = Vec::new();
     for (cell, name) in [
         ("legend_right", "guide-box-right"), ("legend_left", "guide-box-left"),
         ("legend_bottom", "guide-box-bottom"), ("legend_top", "guide-box-top"),
     ] {
         if let Some(l) = field(&layout, cell).and_then(|r| List::try_from(r).ok()) {
-            legends.push((name.to_string(), legend_group(&l, &mut fonts)?));
+            legends.push((name.to_string(), legend_group(&l, &mut fonts, bg)?));
+        }
+    }
+    // Inside legends, one box per position, drawn in the panel area.
+    if let Some(inside) = field(&layout, "legend_inside") {
+        for (_, l) in List::try_from(inside).ok()?.iter() {
+            legends.push(("guide-box-inside".to_string(), legend_group(&List::try_from(l).ok()?, &mut fonts, bg)?));
         }
     }
     let mut axes = Vec::new();
@@ -550,7 +635,7 @@ fn render(spec: &List, threads: i32) -> Option<Robj> {
     let page = PageSpec {
         width: w,
         height: h,
-        bg: rgba(spec, "bg")?,
+        bg,
         table: build(&layout)?,
         background: opt(spec, "background", rect_el)?,
         panels,

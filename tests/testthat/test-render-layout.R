@@ -93,5 +93,5 @@ test_that("plots alot doesn't lay out decline with a reason", {
   # A text margin in lines: titleGrob() sizes and places it in different gpars.
   expect_match(reason(base + theme(axis.title.x = element_text(margin = margin(t = 1, unit = "lines")))), "unit lines")
   expect_match(reason(base + labs(title = quote(alpha^2))), "plain text")
-  expect_match(reason(base + aes(colour = qsec) + guides(colour = guide_coloursteps())), "GuideColoursteps")
+  expect_match(reason(base + aes(colour = qsec) + guides(colour = guide_colourbar(display = "gradient"))), "gradient")
 })

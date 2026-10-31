@@ -331,7 +331,8 @@ full_geoms <- function() {
 # above.
 full_decline <- function(built, ir) {
   drawn <- vapply(built@plot@layers, function(l) {
-    ir_is_ggplot2(l$geom, "GeomBlank") || any(vapply(full_geoms(), identical, logical(1), l$geom))
+    geom <- drawn_geom(l$geom)
+    ir_is_ggplot2(geom, "GeomBlank") || any(vapply(full_geoms(), identical, logical(1), geom))
   }, logical(1))
   if (!all(drawn)) {
     return("layers other than geom_point(), geom_line() and the other core geoms")

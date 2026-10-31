@@ -292,6 +292,21 @@ test_that("upstream guide assembly matches what the legend drawers mirror", {
   }
 })
 
+test_that("upstream key glyphs, bins and colour steps match what the legend drawers mirror", {
+  # legend_glyph(), legend_text_glyph(), legend_bar() and legend_bins()
+  # (R/render-legend.R), the glyphs and bins of alot-core/src/render/legend.rs
+  # and drawn_geom() (R/render.R) mirror these (R6.4). If these fail, update
+  # the mirror, then the snapshots.
+  gg_fn <- function(f) utils::getFromNamespace(f, "ggplot2")
+  for (f in c("draw_key_polygon", "draw_key_rect", "draw_key_path", "draw_key_timeseries", "draw_key_text", "draw_key_blank", "set_draw_key")) {
+    expect_snapshot(print(body(gg_fn(f))))
+  }
+  for (m in c("setup_params", "setup_elements", "build_labels", "build_ticks", "build_decor", "measure_grobs")) {
+    expect_snapshot(print(body(environment(ggplot2::GuideBins[[m]])$f)))
+  }
+  expect_snapshot(print(body(environment(ggplot2::GuideColoursteps$build_decor)$f)))
+})
+
 test_that("upstream facet_wrap() assembly matches what the Rust layout mirrors", {
   # layout_facet() (R/render-layout.R) and FacetSpec in
   # alot-core/src/render/layout.rs mirror these. If these fail, update the

@@ -104,5 +104,5 @@ test_that("theme options the full tier doesn't draw decline to another tier, wit
   expect_match(reason(pts + theme(axis.title = element_text(debug = TRUE))), "debug text")
   expect_match(reason(pts + theme(axis.line = element_line(arrow = arrow()))), "arrows")
   expect_match(reason(pts + theme(plot.title = element_text(margin = margin(b = 1, unit = "lines")))), "unit lines")
-  expect_match(reason(plots$legend + theme(legend.box.background = element_rect(colour = "black"))), "legend.box.background")
+  expect_match(reason(plots$legend + theme(legend.spacing.y = unit(1, "null"))), "stretched")
 })

@@ -92,6 +92,18 @@ render_cases <- list(
       ggplot(d, aes(x, y)) + geom_point(size = 0.3) + facet_grid(a ~ b, scales = "free", space = "free_x")
     },
     size = readme_size
+  ),
+  # R6.4: colour steps and size bins (binned scales, so few distinct
+  # point sizes), in a box inside the panel.
+  legends_inside_1e6 = list(
+    plot = function() {
+      d <- data.frame(x = stats::rnorm(1e6), y = stats::rnorm(1e6), z = stats::runif(1e6), w = stats::rexp(1e6))
+      ggplot(d, aes(x, y, colour = z, size = w)) + geom_point(alpha = 0.3) + scale_colour_binned() +
+        scale_size_binned(range = c(0.2, 2)) +
+        theme(legend.position = "inside", legend.position.inside = c(0.95, 0.95), legend.justification.inside = c(1, 1),
+              legend.box.background = element_rect(), legend.box.margin = margin_auto(4))
+    },
+    size = readme_size
   )
 )
 

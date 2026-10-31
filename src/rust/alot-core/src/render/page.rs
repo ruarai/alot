@@ -80,6 +80,12 @@ impl<'f, 'a> Painter<'f, 'a> {
     /// filled path from GERect()'s first corner (grid's left, bottom) up,
     /// right and down, dashed and stroked with grid's default round ends.
     pub fn rect(&mut self, r: &Rect, el: &RectEl) {
+        self.rect_capped(r, el, Cap::Round);
+    }
+
+    /// `rect()` with the line end `cap` for dashed outlines (a legend
+    /// key's `lineend`).
+    pub fn rect_capped(&mut self, r: &Rect, el: &RectEl, cap: Cap) {
         if el.lty != 0 && el.lwd > 0.0 && el.col[3] > 0 {
             let ring = vec![[r.x0, r.y1], [r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1]];
             let spec = PathSpec {
@@ -88,7 +94,7 @@ impl<'f, 'a> Painter<'f, 'a> {
                 fill: el.fill,
                 rule: Rule::NonZero,
                 col: el.col,
-                stroke: Stroke { lwd: el.lwd, lty: el.lty, cap: Cap::Round, join: el.join, mitre: 10.0 },
+                stroke: Stroke { lwd: el.lwd, lty: el.lty, cap, join: el.join, mitre: 10.0 },
             };
             self.list.push(Item::Paths(PathBatch::new(&[spec])));
             return;
@@ -313,7 +319,8 @@ pub struct PageSpec {
     pub facet: Option<FacetDraw>,
     /// Titles by cell name (axis titles, title, subtitle, caption, tag).
     pub titles: Vec<(String, Title)>,
-    /// Legend boxes by cell name ("guide-box-right", ...).
+    /// Legend boxes by cell name ("guide-box-right", ...); several for
+    /// "guide-box-inside", drawn in order.
     pub legends: Vec<(String, LegendGroup)>,
     pub threads: usize,
 }
@@ -363,7 +370,7 @@ pub fn draw_page(spec: &PageSpec, fonts: &[Font]) -> Option<DisplayList> {
         if let Some((_, title)) = spec.titles.iter().find(|(n, _)| *n == b.name) {
             title.draw(&mut p, &rect_of(b))?;
         }
-        if let Some((_, legends)) = spec.legends.iter().find(|(n, _)| *n == b.name) {
+        for (_, legends) in spec.legends.iter().filter(|(n, _)| *n == b.name) {
             legends.draw(&mut p, &rect_of(b))?;
         }
     }

@@ -271,6 +271,8 @@ layout_spec_ <- function(built, ir, res, legends) {
   for (pos in c("right", "left", "bottom", "top")) {
     spec[[paste0("legend_", pos)]] <- legends[[pos]]
   }
+  # Inside legends take no room; the page draws them over the panels.
+  spec$legend_inside <- legends$inside
   spacing <- layout_px(theme[["legend.box.spacing"]] %||% grid::unit(0.2, "cm"), res)
   spec$legend_spacing <- spacing
   spec$legend_plot <- as.numeric(identical(theme[["legend.location"]], "plot"))

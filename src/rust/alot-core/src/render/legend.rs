@@ -1,8 +1,9 @@
 //! Legends (ggplot2 R/guide-legend.R, R/guide-colorbar.R, R/guide-.R,
-//! R/guides-.R): each guide is a gtable of keys (or a colourbar), labels
-//! and a title, padded and backed by `legend.background`, and the guides of
-//! one position are packed into a box (`Guides$package_box()`) that
-//! `table_add_legends()` (R/plot-build.R) puts beside the panel.
+//! R/guide-colorsteps.R, R/guide-bins.R, R/guides-.R): each guide is a
+//! gtable of keys (or a colourbar, or a stack of bins), labels and a title,
+//! padded and backed by `legend.background`, and the guides of one position
+//! are packed into a box (`Guides$package_box()`) that `table_add_legends()`
+//! (R/plot-build.R) puts beside the panel, or over it for inside legends.
 //!
 //! R resolves the theme and measures the text (R/render-legend.R); this
 //! module does what `GuideLegend$measure_grobs()`, `arrange_layout()`,
@@ -10,17 +11,20 @@
 //! the tables as grid does (`layout::Table`) and draws the parts in the
 //! order gtable draws them: background, title, then the rest as added.
 
+use crate::render::agg::{Cap, Join};
 use crate::render::axis::Side;
 use crate::render::display::{Item, Rect};
 use crate::render::layout::{Size, Table};
 use crate::render::page::{LineStyle, Painter, RectEl};
 use crate::render::panel::PointLayer;
+use crate::render::rects::{RectBatch, RectSpec, RectStyle};
 use crate::render::title::Title;
 
 /// A guide's body: a grid of keys with labels, or a colourbar.
 pub enum Body {
     Keys(Keys),
     Bar(Bar),
+    Bins(Bins),
 }
 
 /// `guide_legend()` keys (`GuideLegend$build_decor()`, `build_labels()`).
@@ -36,24 +40,88 @@ pub struct Keys {
     pub default: (f64, f64),
     /// `legend.key`, drawn behind each key's glyphs.
     pub bg: Option<RectEl>,
-    /// The glyphs of each key: layers of one point at the key's centre.
-    pub marks: Vec<Vec<PointLayer>>,
+    /// The glyphs of each key, one per layer that draws one.
+    pub marks: Vec<Vec<Glyph>>,
+    /// `legend.key.justification`: each key (background and glyphs) is
+    /// drawn in a box of its own size, justified in its cell.
+    pub key_just: Option<(f64, f64)>,
     /// One label grob per key; empty for a guide without labels.
     pub labels: Vec<Title>,
     /// `legend.key.spacing.x` and `.y`.
     pub spacing: (f64, f64),
 }
 
-/// `guide_colourbar()` as a raster.
+/// A key glyph (ggplot2 R/legend-draw.R), drawn in the key's box.
+pub enum Glyph {
+    /// `draw_key_point()`: a layer of one point at the key's centre.
+    Point(PointLayer),
+    /// `draw_key_polygon()` and `draw_key_rect()`: a `rectGrob()` centred
+    /// in the key, `inset` pixels narrower and shorter than it, its
+    /// dashes ended with `cap` (the layer's `lineend`).
+    Rect { inset: f64, el: RectEl, cap: Cap },
+    /// `draw_key_path()` (a segment across the middle) and
+    /// `draw_key_timeseries()`: a polyline through points in npc of the
+    /// key.
+    Line { x: Vec<f64>, y: Vec<f64>, style: LineStyle },
+    /// `draw_key_text()`: a title grob in the key.
+    Text(Title),
+}
+
+impl Glyph {
+    fn draw(&self, p: &mut Painter, c: &Rect) -> Option<()> {
+        match self {
+            Glyph::Point(l) => p.list.push(Item::Points(l.batch(c, p.threads))),
+            Glyph::Rect { inset, el, cap } => {
+                let (cx, cy) = ((c.x0 + c.x1) / 2.0, (c.y0 + c.y1) / 2.0);
+                let (hw, hh) = ((c.x1 - c.x0 - inset) / 2.0, (c.y1 - c.y0 - inset) / 2.0);
+                p.rect_capped(&Rect { x0: cx - hw, y0: cy - hh, x1: cx + hw, y1: cy + hh }, el, *cap);
+            }
+            Glyph::Line { x, y, style } => {
+                let (w, h) = (c.x1 - c.x0, c.y1 - c.y0);
+                let line = x.iter().zip(y).map(|(&x, &y)| [c.x0 + x * w, c.y1 - y * h]).collect();
+                p.lines(vec![line], style);
+            }
+            Glyph::Text(t) => t.draw(p, c)?,
+        }
+        Some(())
+    }
+}
+
+/// `guide_colourbar()` as a raster or rectangles, and
+/// `guide_coloursteps()`.
 pub struct Bar {
     /// `legend.key.width` and `.height` (already scaled for the bar).
     pub size: (f64, f64),
     pub horizontal: bool,
     /// The colours from low to high.
     pub image: Vec<[u8; 4]>,
+    /// For rectangles and steps, each colour's span along the bar (npc
+    /// from the bottom or left, low end first); `None` for the raster.
+    pub rects: Option<Vec<(f64, f64)>>,
     pub frame: Option<RectEl>,
     pub ticks: Option<BarTicks>,
     /// One grob with the labels at their breaks.
+    pub labels: Option<Title>,
+}
+
+/// `guide_bins()` (ggplot2 R/guide-bins.R): the keys stacked in one cell,
+/// an axis line along the labels' side, ticks from that side inward and
+/// one label grob.
+pub struct Bins {
+    pub horizontal: bool,
+    /// Every key's size: the largest key's.
+    pub key_size: (f64, f64),
+    /// `legend.key`, the glyphs of each key, each key's own size and
+    /// `legend.key.justification`, as for `Keys`.
+    pub bg: Option<RectEl>,
+    pub marks: Vec<Vec<Glyph>>,
+    pub key_w: Vec<f64>,
+    pub key_h: Vec<f64>,
+    pub key_just: Option<(f64, f64)>,
+    pub axis: Option<LineStyle>,
+    /// Tick positions (npc along the cell, from the bottom or left), their
+    /// length and style.
+    pub ticks: Option<(Vec<f64>, f64, LineStyle)>,
     pub labels: Option<Title>,
 }
 
@@ -87,6 +155,8 @@ enum Part {
     Frame,
     Ticks,
     BarLabels,
+    BinKeys,
+    BinAxis,
 }
 
 /// The size a grob has in a gtable (`width_cm()`, `height_cm()`): a
@@ -97,6 +167,34 @@ fn grob_size(t: &Title) -> (f64, f64) {
     let w = if g.margin_x == g.margin_y || g.margin_x { g.width() } else { 0.0 };
     let h = if g.margin_x == g.margin_y || g.margin_y { g.height() } else { 0.0 };
     (w, h)
+}
+
+/// The widths and heights of a guide of one key cell of `size` and one
+/// label cell of `label` size on side `text` (a colourbar, or bins).
+fn one_cell(text: Side, size: (f64, f64), label: (f64, f64)) -> (Vec<f64>, Vec<f64>) {
+    let (lw, lh) = label;
+    let widths = match text {
+        Side::Left => vec![lw, size.0],
+        Side::Right => vec![size.0, lw],
+        _ => vec![lw.max(size.0)],
+    };
+    let heights = match text {
+        Side::Top => vec![lh, size.1],
+        Side::Bottom => vec![size.1, lh],
+        _ => vec![lh.max(size.1)],
+    };
+    (widths, heights)
+}
+
+/// The key cell's and label cell's (row, column) for `one_cell()`.
+fn one_cell_slots(text: Side) -> (usize, usize, usize, usize) {
+    let (kr, kc) = (if text == Side::Top { 1 } else { 0 }, if text == Side::Left { 1 } else { 0 });
+    let (lr, lc) = match text {
+        Side::Top | Side::Left => (0, 0),
+        Side::Bottom => (1, 0),
+        Side::Right => (0, 1),
+    };
+    (kr, kc, lr, lc)
 }
 
 /// `vec_interleave()` of equal-length vectors, without the last element
@@ -174,25 +272,23 @@ impl Guide {
                 // Keys first, then labels, as the table adds them.
                 cells.sort_by_key(|c| matches!(c.0, Part::Label(_)));
             }
+            Body::Bins(b) => {
+                let n = b.marks.len() as f64;
+                let size = if b.horizontal { (n * b.key_size.0, b.key_size.1) } else { (b.key_size.0, n * b.key_size.1) };
+                let (lw, lh) = b.labels.as_ref().map_or((0.0, 0.0), grob_size);
+                (widths, heights) = one_cell(text, size, (lw, lh));
+                let (kr, kc, lr, lc) = one_cell_slots(text);
+                for part in [Part::BinKeys, Part::BinAxis, Part::Ticks] {
+                    cells.push((part, kr, kc, kr, kc));
+                }
+                if b.labels.is_some() {
+                    cells.push((Part::BarLabels, lr, lc, lr, lc));
+                }
+            }
             Body::Bar(b) => {
                 let (lw, lh) = b.labels.as_ref().map_or((0.0, 0.0), grob_size);
-                widths = match text {
-                    Side::Left => vec![lw, b.size.0],
-                    Side::Right => vec![b.size.0, lw],
-                    _ => vec![lw.max(b.size.0)],
-                };
-                heights = match text {
-                    Side::Top => vec![lh, b.size.1],
-                    Side::Bottom => vec![b.size.1, lh],
-                    _ => vec![lh.max(b.size.1)],
-                };
-                let (kr, kc) = (if text == Side::Top { 1 } else { 0 }, if text == Side::Left { 1 } else { 0 });
-                let (lr, lc) = match text {
-                    Side::Top => (0, 0),
-                    Side::Bottom => (1, 0),
-                    Side::Left => (0, 0),
-                    _ => (0, 1),
-                };
+                (widths, heights) = one_cell(text, b.size, (lw, lh));
+                let (kr, kc, lr, lc) = one_cell_slots(text);
                 for part in [Part::Bar, Part::Frame, Part::Ticks] {
                     cells.push((part, kr, kc, kr, kc));
                 }
@@ -287,15 +383,43 @@ impl Guide {
                 }
                 (Part::Title, _) => self.title.as_ref()?.draw(p, &c)?,
                 (Part::Key(k), Body::Keys(keys)) => {
-                    if let Some(bg) = &keys.bg {
-                        p.rect(&c, bg);
-                    }
-                    for mark in &keys.marks[k] {
-                        p.list.push(Item::Points(mark.batch(&c, p.threads)));
+                    draw_key(p, &c, keys.key_just.map(|j| (j, (keys.key_w[k], keys.key_h[k]))), keys.bg.as_ref(), &keys.marks[k])?;
+                }
+                (Part::BinKeys, Body::Bins(b)) => {
+                    // The keys' gtable, centred in the cell as grid
+                    // places a layout of absolute sizes.
+                    let n = b.marks.len() as f64;
+                    let (w, h) = b.key_size;
+                    let (tw, th) = if b.horizontal { (n * w, h) } else { (w, n * h) };
+                    let (x0, y0) = (c.x0 + (c.x1 - c.x0 - tw) / 2.0, c.y0 + (c.y1 - c.y0 - th) / 2.0);
+                    for (k, marks) in b.marks.iter().enumerate() {
+                        let (kx, ky) = if b.horizontal { (x0 + k as f64 * w, y0) } else { (x0, y0 + k as f64 * h) };
+                        let kc = Rect { x0: kx, y0: ky, x1: kx + w, y1: ky + h };
+                        draw_key(p, &kc, b.key_just.map(|j| (j, (b.key_w[k], b.key_h[k]))), b.bg.as_ref(), marks)?;
                     }
                 }
+                (Part::BinAxis, Body::Bins(b)) => {
+                    if let Some(axis) = &b.axis {
+                        let line = match self.text_position {
+                            Side::Top => vec![[c.x0, c.y0], [c.x1, c.y0]],
+                            Side::Bottom => vec![[c.x0, c.y1], [c.x1, c.y1]],
+                            Side::Left => vec![[c.x0, c.y1], [c.x0, c.y0]],
+                            Side::Right => vec![[c.x1, c.y1], [c.x1, c.y0]],
+                        };
+                        p.lines(vec![line], axis);
+                    }
+                }
+                (Part::Ticks, Body::Bins(b)) => {
+                    if let Some((pos, len, style)) = &b.ticks {
+                        draw_bin_ticks(p, &c, self.text_position, pos, *len, style);
+                    }
+                }
+                (Part::BarLabels, Body::Bins(b)) => b.labels.as_ref()?.draw(p, &c)?,
                 (Part::Label(k), Body::Keys(keys)) => keys.labels[k].draw(p, &c)?,
-                (Part::Bar, Body::Bar(b)) => p.raster(&c, &b.image, b.horizontal),
+                (Part::Bar, Body::Bar(b)) => match &b.rects {
+                    None => p.raster(&c, &b.image, b.horizontal),
+                    Some(rects) => draw_steps(p, &c, b.horizontal, rects, &b.image),
+                },
                 (Part::Frame, Body::Bar(b)) => {
                     if let Some(frame) = &b.frame {
                         p.rect(&c, frame);
@@ -312,6 +436,66 @@ impl Guide {
         }
         Some(())
     }
+}
+
+/// One key's gTree in cell `c` (`GuideLegend$build_decor()`): with
+/// `legend.key.justification` (`just`, with the key's own size) in a
+/// viewport of the key's size justified in the cell; the key background,
+/// then the glyphs.
+fn draw_key(p: &mut Painter, c: &Rect, just: Option<((f64, f64), (f64, f64))>, bg: Option<&RectEl>, marks: &[Glyph]) -> Option<()> {
+    let c = match just {
+        Some(((jx, jy), (w, h))) => {
+            let x0 = c.x0 + jx * (c.x1 - c.x0 - w);
+            let y1 = c.y1 - jy * (c.y1 - c.y0 - h);
+            Rect { x0, y0: y1 - h, x1: x0 + w, y1 }
+        }
+        None => *c,
+    };
+    if let Some(bg) = bg {
+        p.rect(&c, bg);
+    }
+    for mark in marks {
+        mark.draw(p, &c)?;
+    }
+    Some(())
+}
+
+/// `Guide$build_ticks()` for bins: one segment per position, from the
+/// labels' side of the cell `len` inward (drawn from the inner end).
+fn draw_bin_ticks(p: &mut Painter, c: &Rect, side: Side, pos: &[f64], len: f64, style: &LineStyle) {
+    let lines = pos
+        .iter()
+        .map(|&v| {
+            let x = c.x0 + v * (c.x1 - c.x0);
+            let y = c.y1 - v * (c.y1 - c.y0);
+            match side {
+                Side::Right => vec![[c.x1 - len, y], [c.x1, y]],
+                Side::Left => vec![[c.x0 + len, y], [c.x0, y]],
+                Side::Top => vec![[x, c.y0 + len], [x, c.y0]],
+                Side::Bottom => vec![[x, c.y1 - len], [x, c.y1]],
+            }
+        })
+        .collect();
+    p.lines(lines, style);
+}
+
+/// The bar's `rectGrob()` of rectangles or steps: one rect per colour,
+/// filled, without an outline.
+fn draw_steps(p: &mut Painter, c: &Rect, horizontal: bool, rects: &[(f64, f64)], colours: &[[u8; 4]]) {
+    let (w, h) = (c.x1 - c.x0, c.y1 - c.y0);
+    let specs = rects
+        .iter()
+        .zip(colours)
+        .map(|(&(lo, hi), &fill)| {
+            let (x0, y0, x1, y1) = if horizontal {
+                (c.x0 + lo * w, c.y0, c.x0 + hi * w, c.y1)
+            } else {
+                (c.x0, c.y1 - hi * h, c.x1, c.y1 - lo * h)
+            };
+            RectSpec { x0, y0, x1, y1, fill, col: [0; 4], lwd: 0.0 }
+        })
+        .collect();
+    p.list.push(Item::Rects(RectBatch::new(specs, RectStyle { join: Join::Round, mitre: 10.0, snap: true })));
 }
 
 /// `GuideColourbar$build_ticks()`: a segment from each side's edge inward
@@ -348,13 +532,21 @@ pub struct LegendGroup {
     pub box_just: (f64, f64),
     /// `legend.justification.<position>`: where the box sits in its cell.
     pub global_just: (f64, f64),
+    /// For inside legends, `legend.position.inside`: the point of the
+    /// panel area (npc) the box is justified to; `None` outside, where the
+    /// box is justified to the same point of its cell as its justification.
+    pub inside: Option<(f64, f64)>,
+    /// `legend.box.margin` as `[top, right, bottom, left]`.
+    pub margin: [f64; 4],
+    /// `legend.box.background`, behind the guides and the margin.
+    pub background: Option<RectEl>,
     pub guides: Vec<Guide>,
 }
 
 impl LegendGroup {
-    /// The box's width and height: `gtable_width()` and `gtable_height()`
-    /// of the `guide-box`.
-    pub fn size(&self) -> (f64, f64) {
+    /// The guides' extent without the margin: the `guides` viewport's
+    /// width and height.
+    fn inner(&self) -> (f64, f64) {
         let sizes: Vec<(f64, f64)> = self.guides.iter().map(Guide::size).collect();
         let gaps = self.spacing * (sizes.len().saturating_sub(1)) as f64;
         let max = |f: fn(&(f64, f64)) -> f64| sizes.iter().map(f).fold(0.0, f64::max);
@@ -366,11 +558,35 @@ impl LegendGroup {
         }
     }
 
-    /// Draws the box in `cell`, justified by `legend.justification`.
+    /// The box's width and height: `gtable_width()` and `gtable_height()`
+    /// of the `guide-box`, the guides plus `legend.box.margin` (its
+    /// justification margins are `null` and add nothing).
+    pub fn size(&self) -> (f64, f64) {
+        let (w, h) = self.inner();
+        let [t, r, b, l] = self.margin;
+        (w + l + r, h + t + b)
+    }
+
+    /// Draws the box in `cell`. The `guides` viewport, of the guides'
+    /// extent, sits at the box's justification; the gtable laid out in it
+    /// (margins included, `null` justification margins at zero) overflows
+    /// it and is centred on it, as grid centres a layout larger than its
+    /// viewport (grid src/layout.c `subRegion()`).
     pub fn draw(&self, p: &mut Painter, cell: &Rect) -> Option<()> {
-        let (w, h) = self.size();
-        let x0 = cell.x0 + self.global_just.0 * ((cell.x1 - cell.x0) - w);
-        let y0 = cell.y0 + (1.0 - self.global_just.1) * ((cell.y1 - cell.y0) - h);
+        let (w, h) = self.inner();
+        let [mt, mr, mb, ml] = self.margin;
+        let (gx, gy) = self.global_just;
+        let (ax, ay) = self.inside.unwrap_or(self.global_just);
+        let (cw, ch) = (cell.x1 - cell.x0, cell.y1 - cell.y0);
+        // The viewport's top left.
+        let vx = cell.x0 + ax * cw - gx * w;
+        let vy = cell.y1 - ay * ch - (1.0 - gy) * h;
+        if let Some(bg) = &self.background {
+            let (x0, y0) = (vx - (ml + mr) / 2.0, vy - (mt + mb) / 2.0);
+            p.rect(&Rect { x0, y0, x1: x0 + w + ml + mr, y1: y0 + h + mt + mb }, bg);
+        }
+        let x0 = vx + (ml - mr) / 2.0;
+        let y0 = vy + (mt - mb) / 2.0;
         let (bx, by) = self.box_just;
         let mut at = 0.0;
         for g in &self.guides {
@@ -415,6 +631,7 @@ mod tests {
             default: (10.0, 10.0),
             bg: None,
             marks: (0..n).map(|_| Vec::new()).collect(),
+            key_just: None,
             labels: (0..n).map(|i| title(20.0 + i as f64, 8.0)).collect(),
             spacing: (3.0, 0.0),
         }
@@ -460,7 +677,87 @@ mod tests {
         let b = guide(Body::Keys(keys(1, 1, 1, false)), Side::Top, None);
         let (wa, ha) = a.size();
         let (wb, hb) = b.size();
-        let group = LegendGroup { horizontal: false, spacing: 7.0, box_just: (0.0, 1.0), global_just: (0.5, 0.5), guides: vec![a, b] };
+        let group = LegendGroup {
+            horizontal: false, spacing: 7.0, box_just: (0.0, 1.0), global_just: (0.5, 0.5), inside: None,
+            margin: [0.0; 4], background: None, guides: vec![a, b],
+        };
         assert_eq!(group.size(), (wa.max(wb), ha + hb + 7.0));
+        let group = LegendGroup { margin: [1.0, 2.0, 3.0, 4.0], ..group };
+        assert_eq!(group.size(), (wa.max(wb) + 6.0, ha + hb + 7.0 + 4.0));
+    }
+
+    /// Draws with `f` on a `w` x `h` page and returns the pixels
+    /// (`R | G << 8 | B << 16 | A << 24`).
+    fn render(w: usize, h: usize, f: impl FnOnce(&mut Painter)) -> Vec<u32> {
+        let fonts: Vec<crate::render::text::Font> = Vec::new();
+        let mut p = Painter::new(&fonts, w, h);
+        f(&mut p);
+        crate::render::raster::render(&p.list, w, h, &crate::render::raster::Options { threads: 1, band_rows: 8 })
+    }
+
+    const RED: RectEl = RectEl { fill: [255, 0, 0, 255], col: [0; 4], lwd: 0.0, lty: 0, join: Join::Miter };
+
+    #[test]
+    fn an_inside_box_sits_at_its_position_by_its_justification_with_its_margin_around_it() {
+        // One guide of 4 + 30 + 2 = 36 by 1 + 10 + 3 = 14, no labels.
+        let mut k = keys(1, 1, 1, false);
+        k.labels.clear();
+        k.key_w = vec![30.0];
+        let g = guide(Body::Keys(k), Side::Top, None);
+        assert_eq!(g.size(), (36.0, 14.0));
+        let group = LegendGroup {
+            horizontal: false, spacing: 0.0, box_just: (0.0, 1.0), global_just: (1.0, 1.0), inside: Some((1.0, 1.0)),
+            margin: [2.0, 4.0, 2.0, 4.0], background: Some(RED), guides: vec![g],
+        };
+        assert_eq!(group.size(), (44.0, 18.0));
+        let cell = Rect { x0: 10.0, y0: 10.0, x1: 90.0, y1: 50.0 };
+        let img = render(100, 60, |p| {
+            group.draw(p, &cell);
+        });
+        let red = |x: usize, y: usize| img[y * 100 + x] & 0xFF;
+        // The guides' viewport is justified to the cell's top right; the
+        // layout with its margins overflows it, centred: the background
+        // runs from x 90 - 36 - 4 = 50 to 94, y 10 - 2 = 8 to 26.
+        assert!(red(50, 8) > 200 && red(93, 25) > 200);
+        assert!(red(49, 15) == 0 && red(94, 15) == 0 && red(60, 26) == 0 && red(60, 7) == 0);
+    }
+
+    #[test]
+    fn bins_stack_their_keys_in_one_cell_beside_the_labels() {
+        let bins = Bins {
+            horizontal: false, key_size: (10.0, 8.0), bg: Some(RED), marks: (0..3).map(|_| Vec::new()).collect(),
+            key_w: vec![10.0; 3], key_h: vec![8.0; 3], key_just: None, axis: None, ticks: None,
+            labels: Some(title(12.0, 0.0)),
+        };
+        let g = guide(Body::Bins(bins), Side::Top, None);
+        let (t, parts) = g.assemble();
+        assert_eq!(&t.widths[1..3], &[Size::Abs(10.0), Size::Abs(12.0)]);
+        assert_eq!(g.size(), (4.0 + 10.0 + 12.0 + 2.0, 1.0 + 24.0 + 3.0));
+        assert_eq!(&parts[..4], &[Part::BinKeys, Part::BinAxis, Part::Ticks, Part::BarLabels]);
+    }
+
+    #[test]
+    fn steps_run_from_the_bottom_of_a_vertical_bar_and_the_left_of_a_horizontal_one() {
+        let colours = [[255, 0, 0, 255], [0, 0, 255, 255]];
+        let c = Rect { x0: 0.0, y0: 0.0, x1: 20.0, y1: 20.0 };
+        let img = render(20, 20, |p| draw_steps(p, &c, false, &[(0.0, 0.25), (0.25, 1.0)], &colours));
+        assert_eq!(img[18 * 20 + 5] & 0xFF, 255);
+        assert_eq!(img[5 * 20 + 5] >> 16 & 0xFF, 255);
+        let img = render(20, 20, |p| draw_steps(p, &c, true, &[(0.0, 0.25), (0.25, 1.0)], &colours));
+        assert_eq!(img[5 * 20 + 2] & 0xFF, 255);
+        assert_eq!(img[5 * 20 + 15] >> 16 & 0xFF, 255);
+    }
+
+    #[test]
+    fn a_polygon_key_is_inset_by_its_line_width() {
+        let glyph = Glyph::Rect { inset: 6.0, el: RED, cap: Cap::Butt };
+        let img = render(20, 20, |p| {
+            glyph.draw(p, &Rect { x0: 0.0, y0: 0.0, x1: 20.0, y1: 20.0 });
+        });
+        // 3 pixels in on every side.
+        assert_eq!(img[10 * 20 + 2] & 0xFF, 0);
+        assert_eq!(img[10 * 20 + 3] & 0xFF, 255);
+        assert_eq!(img[16 * 20 + 10] & 0xFF, 255);
+        assert_eq!(img[17 * 20 + 10] & 0xFF, 0);
     }
 }

@@ -4426,6 +4426,260 @@
           GuideLegend$measure_grobs(grobs, params, elements)
       }
 
+# upstream key glyphs, bins and colour steps match what the legend drawers mirror
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          lwd <- data$linewidth %||% 0
+          grob <- rectGrob(width = unit(1, "npc") - unit(lwd, "mm"), 
+              height = unit(1, "npc") - unit(lwd, "mm"), gp = gg_par(col = data$colour %||% 
+                  NA, fill = fill_alpha(data$fill %||% "grey20", data$alpha), 
+                  lty = data$linetype %||% 1, lwd = lwd, linejoin = params$linejoin %||% 
+                      "mitre", lineend = params$lineend %||% "butt"))
+          attr(grob, "width") <- lwd/5
+          attr(grob, "height") <- lwd/5
+          grob
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          colour <- if (is.na(data$fill %||% NA)) 
+              data$colour
+          else data$fill
+          rectGrob(gp = gg_par(col = NA, fill = fill_alpha(colour %||% 
+              "grey20", data$alpha), lty = data$linetype %||% 1))
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (is.null(data$linetype)) {
+              data$linetype <- 0
+          }
+          grob <- segmentsGrob(0.1, 0.5, 0.9, 0.5, gp = gg_par(col = alpha(data$colour %||% 
+              data$fill %||% "black", data$alpha), fill = alpha(params$arrow.fill %||% 
+              data$colour %||% data$fill %||% "black", data$alpha), 
+              lwd = data$linewidth %||% 0.5, lty = data$linetype %||% 
+                  1, lineend = params$lineend %||% "butt"), arrow = params[["arrow"]])
+          if (!is.null(params[["arrow"]])) {
+              angle <- deg2rad(params[["arrow"]]$angle)
+              length <- convertUnit(params[["arrow"]]$length[1], "cm", 
+                  valueOnly = TRUE)
+              attr(grob, "width") <- cos(angle) * length * 1.25
+              attr(grob, "height") <- sin(angle) * length * 2
+          }
+          grob
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (is.null(data$linetype)) {
+              data$linetype <- 0
+          }
+          grid::linesGrob(x = c(0, 0.4, 0.6, 1), y = c(0.1, 0.6, 0.4, 
+              0.9), gp = gg_par(col = alpha(data$colour %||% data$fill %||% 
+              "black", data$alpha), fill = alpha(params$arrow.fill %||% 
+              data$colour %||% data$fill %||% "black", data$alpha), 
+              lwd = data$linewidth %||% 0.5, lty = data$linetype %||% 
+                  1, lineend = params$lineend %||% "butt", linejoin = params$linejoin %||% 
+                  "round"), arrow = params[["arrow"]])
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          data <- replace_null(unclass(data), label = "a", angle = 0)
+          hjust <- compute_just(data$hjust %||% 0.5)
+          vjust <- compute_just(data$vjust %||% 0.5)
+          just <- rotate_just(data$angle, hjust, vjust)
+          grob <- titleGrob(data$label, x = unit(just$hjust, "npc"), 
+              y = unit(just$vjust, "npc"), angle = data$angle, hjust = hjust, 
+              vjust = vjust, gp = gg_par(col = alpha(data$colour %||% 
+                  data$fill %||% "black", data$alpha), fontfamily = data$family %||% 
+                  "", fontface = data$fontface %||% 1, fontsize = (data$size %||% 
+                  3.88) * .pt), margin = margin_auto(0.1, unit = "lines"), 
+              margin_x = TRUE, margin_y = TRUE)
+          attr(grob, "width") <- convertWidth(grobWidth(grob), "cm", 
+              valueOnly = TRUE)
+          attr(grob, "height") <- convertHeight(grobHeight(grob), "cm", 
+              valueOnly = TRUE)
+          grob
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          zeroGrob()
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (is.null(draw_key)) {
+              return(geom)
+          }
+          if (is.character(draw_key)) {
+              draw_key <- paste0("draw_key_", draw_key)
+          }
+          draw_key <- match.fun(draw_key)
+          ggproto(NULL, geom, draw_key = draw_key)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideBins[[m]])$f))
+    Output
+      {
+          params <- GuideLegend$setup_params(params)
+          params$nrow <- params$ncol <- params$n_breaks <- params$n_key_layers <- 1
+          params
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideBins[[m]])$f))
+    Output
+      {
+          valid_position <- switch(params$direction, horizontal = c("bottom", 
+              "top"), vertical = c("right", "left"))
+          theme <- replace_null(theme, legend.text.position = valid_position[1], 
+              legend.axis.line = params$default_axis, legend.ticks = params$default_ticks)
+          elements <- GuideLegend$setup_elements(params, elements, 
+              theme)
+          if (!elements$text_position %in% valid_position) {
+              cli::cli_abort(paste0("When {.arg direction} is {.val {params$direction}, ", 
+                  "{.arg legend.text.position} must be one of ", "{.or {.val {valid_position}}}, not {.val {elements$text.position}}."))
+          }
+          elements
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideBins[[m]])$f))
+    Output
+      {
+          n_labels <- length(key$.label)
+          if (n_labels < 1) {
+              return(list(labels = zeroGrob()))
+          }
+          key$.label[c(1, n_labels)[!params$show.limits]] <- ""
+          if (params$direction == "vertical") {
+              key$.value <- 1 - key$.value
+          }
+          list(labels = flip_element_grob(elements$text, label = validate_labels(key$.label), 
+              x = unit(key$.value, "npc"), margin_x = FALSE, margin_y = TRUE, 
+              flip = params$direction == "vertical"))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideBins[[m]])$f))
+    Output
+      {
+          if (params$direction == "vertical") {
+              key$.value <- 1 - key$.value
+          }
+          key$.value[c(1, nrow(key))[!params$show.limits]] <- NA
+          Guide$build_ticks(key$.value, elements, params, elements$text_position)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideBins[[m]])$f))
+    Output
+      {
+          params$n_breaks <- nkeys <- nrow(params$key) - 1
+          dim <- if (params$direction == "vertical") 
+              c(nkeys, 1)
+          else c(1, nkeys)
+          decor <- GuideLegend$build_decor(decor, grobs, elements, 
+              params)
+          sizes <- measure_legend_keys(decor, nkeys, dim, byrow = FALSE, 
+              default_width = elements$width_cm, default_height = elements$height_cm)
+          sizes <- lapply(sizes, function(x) rep_len(max(x), length(x)))
+          n_layers <- length(decor)/nkeys
+          key_id <- rep(seq_len(nkeys), each = n_layers)
+          key_nm <- paste("key", key_id, c("bg", seq_len(n_layers - 
+              1)))
+          if (params$direction == "vertical") {
+              top <- key_id
+              left <- 1
+          }
+          else {
+              top <- 1
+              left <- key_id
+          }
+          gt <- gtable(widths = unit(sizes$widths, "cm"), heights = unit(sizes$heights, 
+              "cm"))
+          gt <- gtable_add_grob(gt, decor, t = top, l = left, name = key_nm, 
+              clip = "off")
+          axis <- switch(elements$text_position, top = list(x = c(0, 
+              1), y = c(1, 1)), bottom = list(x = c(0, 1), y = c(0, 
+              0)), left = list(x = c(0, 0), y = c(0, 1)), right = list(x = c(1, 
+              1), y = c(0, 1)))
+          axis <- element_grob(elements$axis_line, x = axis$x, y = axis$y)
+          list(keys = gt, axis_line = axis, ticks = grobs$ticks)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideBins[[m]])$f))
+    Output
+      {
+          params$sizes <- list(widths = sum(width_cm(grobs$decor$keys)), 
+              heights = sum(height_cm(grobs$decor$keys)))
+          GuideLegend$measure_grobs(grobs, params, elements)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideColoursteps$build_decor)$f))
+    Output
+      {
+          size <- abs(decor$max - decor$min)
+          just <- as.numeric(decor$min > decor$max)
+          gp <- gg_par(col = NA, fill = decor$colour)
+          if (params$direction == "vertical") {
+              grob <- rectGrob(x = 0, y = decor$min, width = 1, height = size, 
+                  vjust = just, hjust = 0, gp = gp)
+          }
+          else {
+              grob <- rectGrob(x = decor$min, y = 0, height = 1, width = size, 
+                  hjust = just, vjust = 0, gp = gp)
+          }
+          frame <- element_grob(elements$frame, fill = NA)
+          list(bar = grob, frame = frame, ticks = grobs$ticks)
+      }
+
 # upstream facet_wrap() assembly matches what the Rust layout mirrors
 
     Code

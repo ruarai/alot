@@ -233,12 +233,23 @@ hybrid_layer <- function(layer) {
   )
 }
 
+# The geom that draws a layer's panels: a layer's `key_glyph` makes its geom
+# a child that only sets `draw_key` (set_draw_key(), ggplot2 R/layer.R),
+# which draws as its parent does.
+drawn_geom <- function(geom) {
+  while (inherits(geom, "ggproto") && is.function(geom$super) &&
+    length(setdiff(ls(geom, all.names = TRUE), c("draw_key", "super"))) == 0) {
+    geom <- geom$super()
+  }
+  geom
+}
+
 # Which Rust drawer a layer's geom has in the hybrid tier: GeomPoint's
 # draw_panel, GeomRect's (inherited by GeomTile, GeomBar and GeomCol),
 # GeomPath's (GeomLine), GeomStep's (stairsteps, then GeomPath's) or
 # GeomPolygon's.
 hybrid_kind <- function(layer) {
-  geom <- layer$geom
+  geom <- drawn_geom(layer$geom)
   if (identical(geom, ggplot2::GeomPoint)) {
     return("points")
   }
@@ -263,8 +274,9 @@ hybrid_kind <- function(layer) {
 # GeomText's draw_panel (text is drawn by ggplot2 in the hybrid tier).
 full_kind <- function(layer) {
   kind <- hybrid_kind(layer)
-  if (is.null(kind) && identical(layer$geom, ggplot2::GeomText) &&
-    identical(environment(layer$geom$draw_panel)$f, environment(ggplot2::GeomText$draw_panel)$f)) {
+  geom <- drawn_geom(layer$geom)
+  if (is.null(kind) && identical(geom, ggplot2::GeomText) &&
+    identical(environment(geom$draw_panel)$f, environment(ggplot2::GeomText$draw_panel)$f)) {
     "text"
   } else {
     kind

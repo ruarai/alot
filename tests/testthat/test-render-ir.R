@@ -112,8 +112,9 @@ test_that("alot_render_coverage() reports the tier alot_png() would use", {
   cov <- alot_render_coverage(base + ggplot2::facet_wrap(~cyl) + ggplot2::theme(strip.text = ggplot2::element_blank()))
   expect_identical(cov$tier, "hybrid")
   expect_identical(cov$full$reason, "blank strips")
-  cov <- alot_render_coverage(base + ggplot2::theme(legend.position = "inside") + ggplot2::aes(colour = qsec))
+  cov <- alot_render_coverage(base + ggplot2::aes(colour = qsec) + ggplot2::guides(colour = ggplot2::guide_colourbar(display = "gradient")))
   expect_identical(cov$tier, "hybrid")
+  expect_match(cov$full$reason, "gradient")
   cov <- alot_render_coverage(ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg)) + ggplot2::geom_area())
   expect_identical(cov$tier, "ggplot2")
   # What alot_png() uses.

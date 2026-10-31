@@ -1182,3 +1182,24 @@ The fixed-scale cases are unchanged (the "before" column is the parent
 commit, run alongside). Per-panel work stays per distinct pair of scales:
 panel backgrounds, grid lines, ranges and axes are resolved once per pair
 and shared.
+
+## R6.4: legends in full (2026-10-31)
+
+`render_full()` against ggplot2's gtable drawn on `ragg::agg_capture()` (the
+build is not timed), release build, 1600 × 1000 at 150 dpi, medians of 5
+runs. `legends_inside_1e6` is the new `render-suite.R` case: 1e6 points with
+`scale_colour_binned()` (colour steps) and `scale_size_binned()` (bins) in a
+box inside the panel, with `legend.box.background` and `legend.box.margin`.
+
+| Plot | Full tier | ggplot2 + ragg | Full tier before R6.4 |
+|---|---:|---:|---:|
+| `legends_inside_1e6` | 141 ms | 6117 ms | (hybrid) |
+| README plot, 1e6 rows | 156 ms | 2790 ms | 153 ms |
+| README plot, 10 rows | 50 ms | 195 ms | 51 ms |
+
+The README cases are unchanged (the "before" column is the parent commit,
+run alongside). The legends themselves cost little: a few dozen marks and
+labels. With a continuous `scale_size()` instead of the binned one the same
+plot takes about 3.5 s in the full tier (against 4.4 s): every point has its
+own size, and drawing 1e6 points of distinct sizes is the point drawer's
+cost, not the legend's; it is left to R7.2.
