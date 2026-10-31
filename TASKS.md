@@ -447,22 +447,6 @@ All stat kernels use the grouped driver (T0.4) and register under
   example plot.
 
 
-### T6.3 Default-aesthetic columns in `compute_geom_2`
-- **Depends:** T6.1
-- **Touches:** `R/kernels-geom.R` (new), `alot-core/src/geom/…` (new)
-- **Do:** `Geom$use_defaults` (ggplot2 R/geom-.R), called by
-  `compute_geom_2`, adds each missing default aesthetic as a constant
-  column (for `geom_point`: `shape`/`colour`/`size`/`fill`/`alpha`/`stroke`
-  as not mapped). At 1e6 rows that is 14 ms on the point cases, 5–9% of the
-  build, mostly memory writes of constant columns. Profile first: if the
-  time is the column fills, fill them in parallel in Rust; if it is
-  `after_scale`/`modifies_aes` evaluation or validation, it stays in R.
-  Handle only `GeomPoint` with plain default aesthetics and no
-  `after_scale()` modifiers or `params` overrides; decline anything else.
-- **Done when:** the Phase 1 completion criteria hold, and the step is at
-  least 1.25× faster at 1e6 rows on `point_discrete`. If not, drop it and
-  record why in `RESULTS.md`, as for any kernel.
-
 ---
 
 ## Phase 1 exit
