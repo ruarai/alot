@@ -4286,3 +4286,497 @@
           GuideLegend$measure_grobs(grobs, params, elements)
       }
 
+# upstream facet_wrap() assembly matches what the Rust layout mirrors
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          panel_col <- panel_cols(table)$l
+          panel_row <- panel_rows(table)$t
+          for (i in rev(seq_along(panel_row))) {
+              row_ind <- panel_row[i] + row_shift
+              table <- gtable_add_rows(table, row_height[i], pos = row_ind)
+              if (!missing(table2)) {
+                  table <- gtable_add_grob(table, table2[i, ], t = row_ind + 
+                      1, l = panel_col, clip = clip, name = paste0(name, 
+                      "-", seq_along(panel_col), "-", i), z = z)
+              }
+          }
+          table
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          panel_col <- panel_cols(table)$l
+          panel_row <- panel_rows(table)$t
+          for (i in rev(seq_along(panel_col))) {
+              col_ind <- panel_col[i] + col_shift
+              table <- gtable_add_cols(table, col_width[i], pos = col_ind)
+              if (!missing(table2)) {
+                  table <- gtable_add_grob(table, table2[, i], t = panel_row, 
+                      l = col_ind + 1, clip = clip, name = paste0(name, 
+                        "-", seq_along(panel_row), "-", i), z = z)
+              }
+          }
+          table
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          empty <- which(empty %||% matrix(logical(), 0, 0), arr.ind = TRUE)
+          sides <- match(names(axes), .trbl)
+          margin <- c(1L, 2L, 1L, 2L)[sides]
+          shift <- c(1L, -1L, -1L, 1L)[sides]
+          sizes <- Map(measure_axes, axis = axes, margin = margin, 
+              shift = shift, MoreArgs = list(empty_idx = empty))
+          names <- paste0("axis-", substr(names(axes), 1, 1))
+          shift <- c(-1L, 0L, 0L, -1L)[sides]
+          weave <- list(weave_tables_row, weave_tables_col)[c(1, 2, 
+              1, 2)][sides]
+          for (i in seq_along(axes)) {
+              panels <- weave[[i]](panels, axes[[i]], shift[i], sizes[[i]], 
+                  names[i], z = z)
+          }
+          panels
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          dim <- dim(axis)
+          measure <- switch(margin, height_cm, width_cm)
+          cm <- matrix(measure(axis), dim[1], dim[2])
+          if (nrow(empty_idx) > 0 && shift != 0) {
+              set_zero <- empty_idx
+              set_zero[, margin] <- set_zero[, margin] + shift
+              keep <- set_zero[, margin] <= dim[margin] & set_zero[, 
+                  margin] > 0
+              set_zero <- set_zero[keep, , drop = FALSE]
+          }
+          else {
+              set_zero <- matrix(integer(), nrow = 0, ncol = 2)
+          }
+          cm[set_zero] <- 0
+          unit(apply(cm, margin, max), "cm")
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          (col - 1) * nrow + row
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          labeller <- match.fun(labeller)
+          if (empty(label_df)) {
+              return(if (horizontal) {
+                  list(top = NULL, bottom = NULL)
+              } else {
+                  list(left = NULL, right = NULL)
+              })
+          }
+          labels <- data_frame0(!!!labeller(label_df))
+          ncol <- ncol(labels)
+          nrow <- nrow(labels)
+          labels_vec <- unlist(labels, use.names = FALSE)
+          clip <- calc_element("strip.clip", theme)[[1]]
+          clip <- pmatch(clip, c("on", "off", "inherit"), nomatch = 3)
+          clip <- c("on", "off", "inherit")[clip]
+          if (horizontal) {
+              grobs_top <- lapply(labels_vec, element_render, theme = theme, 
+                  element = "strip.text.x.top", margin_x = TRUE, margin_y = TRUE)
+              grobs_top <- assemble_strips(matrix(grobs_top, ncol = ncol, 
+                  nrow = nrow), theme, horizontal, clip = clip)
+              grobs_bottom <- lapply(labels_vec, element_render, theme = theme, 
+                  element = "strip.text.x.bottom", margin_x = TRUE, 
+                  margin_y = TRUE)
+              grobs_bottom <- assemble_strips(matrix(grobs_bottom, 
+                  ncol = ncol, nrow = nrow), theme, horizontal, clip = clip)
+              list(top = grobs_top, bottom = grobs_bottom)
+          }
+          else {
+              grobs_left <- lapply(labels_vec, element_render, theme = theme, 
+                  element = "strip.text.y.left", margin_x = TRUE, margin_y = TRUE)
+              grobs_left <- assemble_strips(matrix(grobs_left, ncol = ncol, 
+                  nrow = nrow), theme, horizontal, clip = clip)
+              grobs_right <- lapply(unlist(labels[, rev(seq_len(ncol(labels))), 
+                  drop = FALSE], use.names = FALSE), element_render, 
+                  theme = theme, element = "strip.text.y.right", margin_x = TRUE, 
+                  margin_y = TRUE)
+              grobs_right <- assemble_strips(matrix(grobs_right, ncol = ncol, 
+                  nrow = nrow), theme, horizontal, clip = clip)
+              list(left = grobs_left, right = grobs_right)
+          }
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (length(grobs) == 0 || is_zero(grobs[[1]])) {
+              grobs <- grobs[seq_len(NROW(grobs))]
+              return(grobs)
+          }
+          if (horizontal) {
+              height <- max_height(grobs)
+              width <- unit(1, "null")
+          }
+          else {
+              height <- unit(1, "null")
+              width <- max_width(grobs)
+          }
+          background <- if (horizontal) 
+              "strip.background.x"
+          else "strip.background.y"
+          background <- element_render(theme, background)
+          grobs[] <- lapply(grobs, function(x) {
+              ggname("strip", gTree(children = gList(background, x)))
+          })
+          apply(grobs, 1, function(x) {
+              if (horizontal) {
+                  mat <- matrix(x, ncol = 1)
+              }
+              else {
+                  mat <- matrix(x, nrow = 1)
+              }
+              gtable_matrix("strip", mat, rep(width, ncol(mat)), rep(height, 
+                  nrow(mat)), clip = clip)
+          })
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          axes <- list()
+          if (!is.null(x)) {
+              axes$x <- lapply(x, coord$render_axis_h, theme)
+          }
+          if (!is.null(y)) {
+              axes$y <- lapply(y, coord$render_axis_v, theme)
+          }
+          if (transpose) {
+              axes <- list(x = list(top = lapply(axes$x, `[[`, "top"), 
+                  bottom = lapply(axes$x, `[[`, "bottom")), y = list(left = lapply(axes$y, 
+                  `[[`, "left"), right = lapply(axes$y, `[[`, "right")))
+          }
+          axes
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (labels$x && labels$y) {
+              return(ranges)
+          }
+          draw <- matrix(TRUE, length(ranges), 4, dimnames = list(NULL, 
+              c("top", "bottom", "left", "right")))
+          if (!labels$x) {
+              xmax <- vec_ave(layout$ROW, layout$COL, max)
+              xmin <- vec_ave(layout$ROW, layout$COL, min)
+              draw[which(layout$ROW != xmax), "bottom"] <- FALSE
+              draw[which(layout$ROW != xmin), "top"] <- FALSE
+          }
+          if (!labels$y) {
+              ymax <- vec_ave(layout$COL, layout$ROW, max)
+              ymin <- vec_ave(layout$COL, layout$ROW, min)
+              draw[which(layout$COL != ymax), "right"] <- FALSE
+              draw[which(layout$COL != ymin), "left"] <- FALSE
+          }
+          for (i in seq_along(ranges)) {
+              ranges[[i]]$draw_labels <- as.list(draw[i, ])
+          }
+          ranges
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          height <- max(unlist(lapply(grobs, height_cm)))
+          if (!value_only) 
+              height <- unit(height, "cm")
+          height
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Facet[[m]])$f))
+    Output
+      {
+          free <- params$free %||% list(x = FALSE, y = FALSE)
+          space <- params$space_free %||% list(x = FALSE, y = FALSE)
+          aspect_ratio <- theme$aspect.ratio
+          if (!is.null(aspect_ratio) && (space$x || space$y)) {
+              cli::cli_abort("Free scales cannot be mixed with a fixed aspect ratio.")
+          }
+          if (!coord$is_free()) {
+              if (space$x && space$y) {
+                  aspect_ratio <- aspect_ratio %||% coord$ratio
+              }
+              else if (free$x || free$y) {
+                  msg <- paste0("{.fn {snake_class(self)}} can't use free scales with ", 
+                      "{.fn {snake_class(coord)}}")
+                  if (!is.null(coord$ratio)) {
+                      msg <- paste0(msg, " with a fixed {.arg ratio} argument")
+                  }
+                  cli::cli_abort(paste0(msg, "."))
+              }
+          }
+          table <- self$init_gtable(panels, layout, theme, ranges, 
+              params, aspect_ratio = aspect_ratio %||% coord$aspect(ranges[[1]]))
+          table <- self$attach_axes(table, layout, ranges, coord, theme, 
+              params)
+          self$attach_strips(table, layout, params, theme)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Facet[[m]])$f))
+    Output
+      {
+          dim <- c(max(layout$ROW), max(layout$COL))
+          table <- matrix(list(zeroGrob()), dim[1], dim[2])
+          table[cbind(layout$ROW, layout$COL)] <- panels
+          widths <- unit(rep(1, dim[2]), "null")
+          heights <- unit(rep(1 * abs(aspect_ratio %||% 1), dim[1]), 
+              "null")
+          space <- params$space_free %||% list(x = FALSE, y = FALSE)
+          if (space$x) {
+              idx <- layout$PANEL[layout$ROW == 1]
+              widths <- vapply(idx, function(i) diff(ranges[[i]]$x.range), 
+                  numeric(1))
+              widths <- unit(widths, "null")
+          }
+          if (space$y) {
+              idx <- layout$PANEL[layout$COL == 1]
+              heights <- vapply(idx, function(i) diff(ranges[[i]]$y.range), 
+                  numeric(1))
+              heights <- unit(heights * abs(aspect_ratio %||% 1), "null")
+          }
+          table <- gtable_matrix("layout", table, widths = widths, 
+              heights = heights, respect = !is.null(aspect_ratio), 
+              clip = "off", z = matrix(1, dim[1], dim[2]))
+          table$layout$name <- paste("panel", rep(seq_len(dim[2]), 
+              each = dim[1]), rep(seq_len(dim[1]), dim[2]), sep = "-")
+          spacing <- lapply(c(x = "panel.spacing.x", y = "panel.spacing.y"), 
+              calc_element, theme = theme)
+          table <- gtable_add_col_space(table, spacing$x)
+          table <- gtable_add_row_space(table, spacing$y)
+          table
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::FacetWrap[[m]])$f))
+    Output
+      {
+          if (inherits(coord, "CoordFlip")) {
+              layout[c("SCALE_X", "SCALE_Y")] <- layout[c("SCALE_Y", 
+                  "SCALE_X")]
+          }
+          panel_order <- order(layout$ROW, layout$COL)
+          layout <- layout[panel_order, ]
+          panels <- panels[panel_order]
+          ggproto_parent(Facet, self)$draw_panels(panels = panels, 
+              layout = layout, ranges = ranges, coord = coord, theme = theme, 
+              params = params)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::FacetWrap[[m]])$f))
+    Output
+      {
+          draw_axes <- params$draw_axes %||% list(x = FALSE, y = FALSE)
+          axis_labels <- params$axis_labels %||% list(x = TRUE, y = TRUE)
+          free <- params$free %||% list(x = FALSE, y = FALSE)
+          ranges <- censor_labels(ranges, layout, axis_labels)
+          original <- render_axes(ranges, ranges, coord, theme, transpose = TRUE)
+          x_order <- if (axis_labels$x) 
+              layout$SCALE_X
+          else seq_len(nrow(layout))
+          y_order <- if (axis_labels$y) 
+              layout$SCALE_Y
+          else seq_len(nrow(layout))
+          original$x <- lapply(original$x, `[`, i = x_order)
+          original$y <- lapply(original$y, `[`, i = y_order)
+          dim <- c(max(layout$ROW), max(layout$COL))
+          index <- convertInd(layout$ROW, layout$COL, dim[1])
+          empty <- matrix(list(zeroGrob()), dim[1], dim[2])
+          top <- bottom <- left <- right <- empty
+          top[index] <- original$x$top
+          bottom[index] <- original$x$bottom
+          left[index] <- original$y$left
+          right[index] <- original$y$right
+          if (!(free$x || draw_axes$x)) {
+              top[-1, ] <- list(zeroGrob())
+              bottom[-dim[1], ] <- list(zeroGrob())
+          }
+          if (!(free$y || draw_axes$y)) {
+              left[, -1] <- list(zeroGrob())
+              right[, -dim[2]] <- list(zeroGrob())
+          }
+          empty <- matrix(TRUE, dim[1], dim[2])
+          empty[index] <- FALSE
+          if (!any(empty)) {
+              axes <- list(top = top, bottom = bottom, left = left, 
+                  right = right)
+              return(weave_axes(table, axes, empty))
+          }
+          matched <- vec_match(data_frame0(ROW = as.vector(row(empty)), 
+              COL = as.vector(col(empty))), layout[, c("ROW", "COL")])
+          empty_bottom <- which(apply(empty, 2, function(x) c(diff(x) == 
+              1, FALSE)))
+          empty_top <- which(apply(empty, 2, function(x) c(FALSE, diff(x) == 
+              -1)))
+          empty_right <- which(t(apply(empty, 1, function(x) c(diff(x) == 
+              1, FALSE))))
+          empty_left <- which(t(apply(empty, 1, function(x) c(FALSE, 
+              diff(x) == -1))))
+          inside <- (theme$strip.placement %||% "inside") == "inside"
+          strip <- params$strip.position %||% "top"
+          clash <- c(top = FALSE, bottom = FALSE, left = FALSE, right = FALSE)
+          if (length(empty_bottom) > 0) {
+              x_axes <- original$x$bottom[matched[empty_bottom]]
+              clash["bottom"] <- strip == "bottom" && !inside && !free$x && 
+                  !all(vapply(x_axes, is_zero, logical(1)))
+              if (!clash["bottom"]) {
+                  bottom[empty_bottom] <- x_axes
+              }
+          }
+          if (length(empty_top) > 0) {
+              x_axes <- original$x$top[matched[empty_top]]
+              clash["top"] <- strip == "top" && !inside && !free$x && 
+                  !all(vapply(x_axes, is_zero, logical(1)))
+              if (!clash["top"]) {
+                  top[empty_top] <- x_axes
+              }
+          }
+          if (length(empty_right) > 0) {
+              y_axes <- original$y$right[matched[empty_right]]
+              clash["right"] <- strip == "right" && !inside && !free$y && 
+                  !all(vapply(y_axes, is_zero, logical(1)))
+              if (!clash["right"]) {
+                  right[empty_right] <- y_axes
+              }
+          }
+          if (length(empty_left) > 0) {
+              y_axes <- original$y$left[matched[empty_left]]
+              clash["left"] <- strip == "left" && !inside && !free$y && 
+                  !all(vapply(y_axes, is_zero, logical(1)))
+              if (!clash["left"]) {
+                  left[empty_left] <- y_axes
+              }
+          }
+          if (any(clash)) {
+              cli::cli_warn("Suppressing axis rendering when \\\n        {.code strip.position =\"{strip}\"} and \\\n        {.code strip.placement = \"outside\".}")
+          }
+          axes <- list(top = top, bottom = bottom, left = left, right = right)
+          weave_axes(table, axes, empty)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::FacetWrap[[m]])$f))
+    Output
+      {
+          strips <- self$format_strip_labels(layout, params)
+          strips <- render_strips(strips$facets, strips$facets, theme = theme)
+          padding <- convertUnit(calc_element("strip.switch.pad.wrap", 
+              theme), "cm")
+          position <- params$strip.position %||% "top"
+          pos <- substr(position, 1, 1)
+          prefix <- paste0("strip-", pos)
+          dim <- c(max(layout$ROW), max(layout$COL))
+          index <- convertInd(layout$ROW, layout$COL, dim[1])
+          mat <- matrix(list(zeroGrob()), dim[1], dim[2])
+          mat[index] <- unlist(unname(strips), recursive = FALSE)[[position]]
+          if (position %in% c("top", "bottom")) {
+              inside <- "strip.placement.x"
+              size <- apply(mat, 1, max_height, value_only = TRUE)
+              weave <- weave_tables_row
+          }
+          else {
+              inside <- "strip.placement.y"
+              size <- apply(mat, 2, max_width, value_only = TRUE)
+              weave <- weave_tables_col
+          }
+          inside <- (calc_element(inside, theme) %||% "inside") == 
+              "inside"
+          shift <- switch(position, top = , left = c(-1, -2), c(0, 
+              1))
+          shift <- if (inside) 
+              shift[1]
+          else shift[2]
+          size <- unit(size, "cm")
+          table <- weave(table, mat, shift, size, name = prefix, z = 2, 
+              clip = "off")
+          if (!inside) {
+              axes <- grepl(paste0("axis-", pos), table$layout$name)
+              has_axes <- !vapply(table$grobs[axes], is_zero, logical(1))
+              has_axes <- split(has_axes, table$layout[[pos]][axes])
+              has_axes <- vapply(has_axes, sum, numeric(1)) > 0
+              padding <- rep(padding, length(has_axes))
+              padding[!has_axes] <- unit(0, "cm")
+              table <- weave(table, , shift, padding)
+          }
+          table
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::FacetWrap[[m]])$f))
+    Output
+      {
+          if (length(params$facets) == 0) {
+              labels <- data_frame0(`(all)` = "(all)", .size = 1)
+          }
+          else {
+              labels <- layout[intersect(names(params$facets), names(layout))]
+          }
+          if (empty(labels)) {
+              return(NULL)
+          }
+          attr(labels, "facet") <- "wrap"
+          attr(labels, "type") <- switch(params$strip.position, left = , 
+              right = "rows", "cols")
+          labeller <- match.fun(params$labeller)
+          list(facets = data_frame0(!!!labeller(labels)))
+      }
+

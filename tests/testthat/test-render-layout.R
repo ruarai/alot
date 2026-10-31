@@ -85,7 +85,7 @@ test_that("plots alot doesn't lay out decline with a reason", {
     b <- suppressWarnings(ggplot_build(p))
     attr(layout_boxes_rust(b, 400, 300, 96), "reason")
   }
-  expect_match(reason(base + facet_wrap(~cyl)), "more than one panel")
+  expect_match(reason(base + facet_wrap(~cyl, scales = "free_y")), "free scales")
   expect_match(reason(base + facet_grid(. ~ cyl)), "more than one panel")
   expect_match(reason(base + coord_polar()), "coord not laid out")
   expect_match(reason(base + theme(panel.widths = unit(5, "cm"))), "fixed panel sizes")

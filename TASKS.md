@@ -786,7 +786,7 @@ anything else.
   skips it; the test helper sets that so the hybrid tests keep their tier).
   ggplot2's missing-value warning is raised once, after drawing.
 
-### R5.2 Fixed-scale `facet_wrap` and strips
+### R5.2 Fixed-scale `facet_wrap` and strips — done
 - **Depends:** R5.1
 - **Touches:** `alot-core/src/render/facet.rs`
 - **Do:** Mirror `FacetWrap$draw_panels` for fixed scales: panel table,
@@ -794,8 +794,22 @@ anything else.
   and panel spacing.
 - **Done when:** fixed-scale `facet_wrap` point plots pass layout and image
   checks.
+- **Result:** `layout.rs` `WrapSpec` mirrors `FacetWrap$draw_panels()`:
+  `init_gtable()` (panel grid, `panel.spacing`, `respect` for an aspect
+  ratio), `attach_axes()` (axes on the outer panels, and beside empty slots
+  with `measure_axes()`'s zeroed sizes) and `attach_strips()` (strips on top,
+  inside), built with gtable's weave steps so the cell names and boxes equal
+  grid's. `page.rs` draws panels, then strips (clipped to the strip as
+  `strip.clip = "on"`), then axes, as their `z` orders them. R
+  (`layout_wrap()` in R/render-layout.R) gives the grid, spacing and
+  strips' text; points are dealt out to panels in Rust. Declines (hybrid
+  tier): free scales or space, `axes`/`axis.labels`, strips not on top and
+  inside, strips of more than one variable, blank strip text or text that is
+  not plain (NA labels, plotmath), strip text wider than its strip (ggplot2
+  clips it), and `facet_grid`. Facets with `coord_flip` etc. keep declining
+  in `full_decline()`.
 
-### R5.3 Colourbar and point legend — partly done (README plot waits for R5.2)
+### R5.3 Colourbar and point legend — done except the performance targets
 - **Depends:** R5.1, R4.1
 - **Touches:** `alot-core/src/render/{legend,keys}.rs`
 - **Do:** Mirror guide assembly for the right-hand legend box with two
@@ -804,8 +818,12 @@ anything else.
   stacking.
 - **Done when:** the README plot renders in the full tier, passes layout and
   image checks, and meets both PHASE2.md targets.
-- **Result:** the legends are done; the README plot is not, as it needs
-  R5.2's facets. `R/render-legend.R` resolves each guide with ggplot2's own
+- **Result:** the legends are done, and with R5.2 the README plot renders
+  in the full tier within 4/255 of ragg and passes the layout check at 1600
+  × 1000 / 150 dpi and 2100 × 2100 / 300 dpi. The speed targets are not met
+  (inst/bench/RESULTS.md, R5.2): 146 ms against < 120 ms, 47 ms against
+  < 25 ms for 10 rows, 222 ms against < 200 ms for the default page; R7.2's
+  performance pass is where they go. `R/render-legend.R` resolves each guide with ggplot2's own
   `setup_params()` and `setup_elements()` (so guide `theme`, `legend.*`
   theme elements and `rel()` sizes resolve as ggplot2 does) and measures its
   text; `alot-core/src/render/legend.rs` does `measure_grobs()`,
@@ -824,8 +842,7 @@ anything else.
   `draw_key_point()`, colourbars that are not rasters or have `angle`, a
   non-zero `legend.box.margin`, a drawn `legend.box.background`,
   `legend.key.justification`, stretched (`null`) sizes, and labels that are
-  not plain text (including NA). Legends still use the single-panel table, so
-  faceted plots decline until R5.2.
+  not plain text (including NA).
 
 ## R6 Breadth (milestones 2.3–2.6)
 

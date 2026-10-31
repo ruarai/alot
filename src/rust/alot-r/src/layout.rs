@@ -1,6 +1,6 @@
 //! Glue for the page layout (`alot_core::render::layout`).
 
-use alot_core::render::layout::{self, LegendBox, PlotSpec, Tag, TagLocation, TitleGrob};
+use alot_core::render::layout::{self, LegendBox, PlotSpec, Tag, TagLocation, TitleGrob, WrapSpec};
 use extendr_api::prelude::*;
 
 /// The element called exactly `name` (`List::dollar()` matches partially, so
@@ -128,6 +128,29 @@ fn layout_boxes(spec: List, page: &[f64]) -> Robj {
     .into()
 }
 
+/// A `facet_wrap()`: see `layout_wrap()` in R/render-layout.R.
+pub(crate) fn wrap(spec: &List) -> Option<Option<WrapSpec>> {
+    let Some(r) = field(spec, "wrap") else { return Some(None) };
+    let w = List::try_from(r).ok()?;
+    let (rows, cols) = (nums(&w, "rows")?, nums(&w, "cols")?);
+    let sp = nums(&w, "spacing")?;
+    let mut strip = None;
+    if let Some(s) = field(&w, "strips") {
+        let mut h = 0.0f64;
+        for (_, t) in List::try_from(s).ok()?.iter() {
+            h = h.max(title(&List::try_from(t).ok()?)?.height());
+        }
+        strip = Some(h);
+    }
+    Some(Some(WrapSpec {
+        nrow: num(&w, "nrow")? as usize,
+        ncol: num(&w, "ncol")? as usize,
+        panels: rows.iter().zip(&cols).map(|(r, c)| (*r as usize - 1, *c as usize - 1)).collect(),
+        spacing: (*sp.first()?, *sp.get(1)?),
+        strip,
+    }))
+}
+
 pub(crate) fn build(spec: &List) -> Option<layout::Table> {
     let s = PlotSpec {
         aspect: num(spec, "aspect").filter(|a| a.is_finite()),
@@ -154,6 +177,8 @@ pub(crate) fn build(spec: &List) -> Option<layout::Table> {
         tag: tag(spec)?,
         margin: nums(spec, "margin")?.try_into().ok()?,
         background: flag(spec, "background")?,
+        wrap: wrap(spec)?,
+        has_axis: ["axis_t", "axis_b", "axis_l", "axis_r"].map(|n| field(spec, n).is_some()),
     };
     Some(layout::plot_table(&s))
 }

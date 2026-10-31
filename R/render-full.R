@@ -96,14 +96,17 @@ full_panel <- function(built, ir, res) {
   )
 }
 
-# The point layers of the panel as rs_render_page() reads them, mirroring
+# The point layers as rs_render_page() reads them, mirroring
 # draw_points_layer() (R/render.R) and GeomPoint$draw_panel() (ggplot2
 # R/geom-point.R): `ir`'s layer data has missing rows removed and shapes
-# translated. Positions rescale linearly (hybrid_decline() checked).
+# translated. Positions rescale linearly (hybrid_decline() checked), and
+# fixed scales give every panel the same ranges. Each layer carries its
+# rows' `panel` (1-based, layout order) for Rust to deal them out.
 full_points <- function(built, ir, res) {
   pp <- built@layout$panel_params[[1]]
-  x_range <- linear_range(pp$x)
-  y_range <- linear_range(pp$y)
+  x_range <- as.double(linear_range(pp$x))
+  y_range <- as.double(linear_range(pp$y))
+  n_panels <- nrow(ir$layout$panels)
   out <- list()
   for (layer in ir$layers) {
     data <- layer$data
@@ -114,9 +117,10 @@ full_points <- function(built, ir, res) {
       layout_decline("a point colour alot doesn't parse")
     }
     out[[length(out) + 1L]] <- list(
-      x = as.double(data$x), y = as.double(data$y), x_range = as.double(x_range), y_range = as.double(y_range),
+      x = as.double(data$x), y = as.double(data$y), x_range = x_range, y_range = y_range,
       shape = as.double(data$shape), size = as.double(data$size), stroke = as.double(data$stroke),
-      colour = colour, fill = fill, consts = c(ggplot2::.pt, ggplot2::.stroke, res)
+      colour = colour, fill = fill, consts = c(ggplot2::.pt, ggplot2::.stroke, res),
+      panel = if (n_panels > 1) as.integer(data$PANEL)
     )
   }
   out
@@ -169,7 +173,8 @@ page_spec <- function(built, ir, size) {
   list(
     page = page_px(size), bg = bg, layout = layout,
     background = full_rect(ir$theme[["plot.background"]], res),
-    panel = c(full_panel(built, ir, res), list(points = full_points(built, ir, res)))
+    panels = rep(list(full_panel(built, ir, res)), nrow(ir$layout$panels)),
+    points = full_points(built, ir, res)
   )
 }
 

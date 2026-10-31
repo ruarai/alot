@@ -300,6 +300,158 @@ pub struct LegendBox {
     pub height: f64,
 }
 
+/// `facet_wrap()` with fixed scales (`FacetWrap$draw_panels()`, ggplot2
+/// R/facet-.R, R/facet-wrap.R): the panels' grid and what goes between.
+#[derive(Clone, Debug, Default)]
+pub struct WrapSpec {
+    pub nrow: usize,
+    pub ncol: usize,
+    /// `(row, col)`, 0-based, of each panel.
+    pub panels: Vec<(usize, usize)>,
+    /// `panel.spacing.x` and `.y`.
+    pub spacing: (f64, f64),
+    /// The strips' height (`max_height()` of all of them), `None` if there
+    /// are no strips.
+    pub strip: Option<f64>,
+}
+
+/// Axis positions, in the order `weave_axes()` adds them.
+pub const WRAP_SIDES: [&str; 4] = ["t", "b", "l", "r"];
+
+impl WrapSpec {
+    fn occupied(&self) -> Vec<Vec<bool>> {
+        let mut m = vec![vec![false; self.ncol]; self.nrow];
+        for &(r, c) in &self.panels {
+            m[r][c] = true;
+        }
+        m
+    }
+
+    /// The axis of each side (top, bottom, left, right) drawn in each grid
+    /// cell, `[side][row][col]`, as `attach_axes()` leaves them: only on the
+    /// outer panels, and back on the panels next to an empty one. `has`:
+    /// whether the scale has an axis at each side.
+    pub fn axis_cells(&self, has: [bool; 4]) -> [Vec<Vec<bool>>; 4] {
+        let (nr, nc) = (self.nrow, self.ncol);
+        let occ = self.occupied();
+        let mut out: [Vec<Vec<bool>>; 4] = std::array::from_fn(|k| {
+            (0..nr).map(|r| (0..nc).map(|c| has[k] && occ[r][c] && match k {
+                0 => r == 0,
+                1 => r == nr - 1,
+                2 => c == 0,
+                _ => c == nc - 1,
+            }).collect()).collect()
+        });
+        for r in 0..nr {
+            for c in 0..nc {
+                if !occ[r][c] {
+                    continue;
+                }
+                let empty = |rr: isize, cc: isize| rr >= 0 && cc >= 0 && (rr as usize) < nr && (cc as usize) < nc && !occ[rr as usize][cc as usize];
+                let (ri, ci) = (r as isize, c as isize);
+                if empty(ri + 1, ci) { out[1][r][c] = has[1]; }
+                if empty(ri - 1, ci) { out[0][r][c] = has[0]; }
+                if empty(ri, ci + 1) { out[3][r][c] = has[3]; }
+                if empty(ri, ci - 1) { out[2][r][c] = has[2]; }
+            }
+        }
+        out
+    }
+
+    /// `measure_axes()`: the size of each row (top, bottom) or column
+    /// (left, right) of axes, ignoring those that border an empty panel.
+    fn measure(&self, side: usize, flags: &[Vec<bool>], size: f64) -> Vec<f64> {
+        let occ = self.occupied();
+        let rows = side < 2;
+        let n = if rows { self.nrow } else { self.ncol };
+        let shift: isize = [1, -1, 1, -1][side];
+        let mut cm = vec![vec![0.0; self.ncol]; self.nrow];
+        for r in 0..self.nrow {
+            for c in 0..self.ncol {
+                if flags[r][c] {
+                    cm[r][c] = size;
+                }
+            }
+        }
+        for r in 0..self.nrow {
+            for c in 0..self.ncol {
+                if occ[r][c] {
+                    continue;
+                }
+                let (rr, cc) = if rows { (r as isize + shift, c as isize) } else { (r as isize, c as isize + shift) };
+                if rr >= 0 && cc >= 0 && (rr as usize) < self.nrow && (cc as usize) < self.ncol {
+                    cm[rr as usize][cc as usize] = 0.0;
+                }
+            }
+        }
+        (0..n).map(|i| {
+            if rows { cm[i].iter().cloned().fold(0.0, f64::max) } else { cm.iter().map(|row| row[i]).fold(0.0, f64::max) }
+        }).collect()
+    }
+
+    /// `FacetWrap$draw_panels()`: `init_gtable()`, `attach_axes()` and
+    /// `attach_strips()` for strips on top, placed inside.
+    fn table(&self, s: &PlotSpec) -> Table {
+        use Size::{Abs, Null};
+        let mut t = Table {
+            widths: vec![Null(1.0); self.ncol],
+            heights: vec![Null(s.aspect.map_or(1.0, f64::abs)); self.nrow],
+            cells: Vec::new(),
+            respect: s.aspect.is_some(),
+        };
+        for c in 0..self.ncol {
+            for r in 0..self.nrow {
+                t.add_cell(&format!("panel-{}-{}", c + 1, r + 1), r, c, r, c);
+            }
+        }
+        for i in (1..self.ncol).rev() {
+            t.add_cols(&[Abs(self.spacing.0)], i);
+        }
+        for i in (1..self.nrow).rev() {
+            t.add_rows(&[Abs(self.spacing.1)], i);
+        }
+        let flags = self.axis_cells(s.has_axis);
+        let sizes = [s.axis_t, s.axis_b, s.axis_l, s.axis_r];
+        for side in 0..4 {
+            let m = self.measure(side, &flags[side], sizes[side]);
+            weave(&mut t, side >= 2, -1 + (side % 2 == 1) as isize, &m, &format!("axis-{}", WRAP_SIDES[side]));
+        }
+        if let Some(h) = self.strip {
+            let occ = self.occupied();
+            let m: Vec<f64> = occ.iter().map(|row| if row.iter().any(|&o| o) { h } else { 0.0 }).collect();
+            weave(&mut t, false, -1, &m, "strip-t");
+        }
+        t
+    }
+}
+
+/// `weave_tables_row()` (columns when `cols`) with `shift`: a row (column)
+/// of `sizes[i]` beside each row (column) of panels, and a cell for each
+/// panel in it.
+fn weave(t: &mut Table, cols: bool, shift: isize, sizes: &[f64], name: &str) {
+    let panels: Vec<&Cell> = t.cells.iter().filter(|c| c.name.starts_with("panel")).collect();
+    let uniq = |f: &dyn Fn(&Cell) -> usize| {
+        let mut v: Vec<usize> = panels.iter().map(|c| f(c)).collect();
+        v.sort();
+        v.dedup();
+        v
+    };
+    let (prow, pcol) = (uniq(&|c| c.t), uniq(&|c| c.l));
+    let (along, across) = if cols { (pcol, prow) } else { (prow, pcol) };
+    for i in (0..along.len()).rev() {
+        let pos = (along[i] as isize + 1 + shift) as usize;
+        if cols {
+            t.add_cols(&[Size::Abs(sizes[i])], pos);
+        } else {
+            t.add_rows(&[Size::Abs(sizes[i])], pos);
+        }
+        for (j, &a) in across.iter().enumerate() {
+            let label = format!("{}-{}-{}", name, j + 1, i + 1);
+            if cols { t.add_cell(&label, a, pos, a, pos) } else { t.add_cell(&label, pos, a, pos, a) }
+        }
+    }
+}
+
 /// Everything the single-panel plot table needs, in pixels.
 #[derive(Clone, Debug, Default)]
 pub struct PlotSpec {
@@ -334,10 +486,21 @@ pub struct PlotSpec {
     /// `plot.margin`: `[top, right, bottom, left]`.
     pub margin: [f64; 4],
     pub background: bool,
+    /// `facet_wrap()`; `None` for a single panel.
+    pub wrap: Option<WrapSpec>,
+    /// With `wrap`: whether each axis (top, bottom, left, right) exists
+    /// even where its size is 0.
+    pub has_axis: [bool; 4],
 }
 
-/// The table `ggplot_gtable()` builds for a single panel (`FacetNull`).
+/// The table `ggplot_gtable()` builds for a single panel (`FacetNull`) or
+/// a `facet_wrap()`.
 pub fn plot_table(s: &PlotSpec) -> Table {
+    let t = if let Some(w) = &s.wrap { w.table(s) } else { single_table(s) };
+    plot_table_rest(t, s)
+}
+
+fn single_table(s: &PlotSpec) -> Table {
     use Size::{Abs, Null};
     // FacetNull$draw_panels(): a 3 x 3 table, filled by column.
     let mut t = Table {
@@ -353,7 +516,11 @@ pub fn plot_table(s: &PlotSpec) -> Table {
     ] {
         t.add_cell(name, r, c, r, c);
     }
+    t
+}
 
+fn plot_table_rest(mut t: Table, s: &PlotSpec) -> Table {
+    use Size::Abs;
     // Facet$draw_labels()
     let (pt, pl, pb, pr) = t.find_panel().unwrap();
     t.add_rows(&[Abs(s.xlab_t)], 0);
@@ -489,6 +656,44 @@ mod tests {
         assert_eq!(t.cells[0].t, 2);
         t.add_rows(&[abs(5.0)], 0);
         assert_eq!((t.cells[0].t, t.cells[0].b), (3, 3));
+    }
+
+    fn wrap(n: usize, ncol: usize) -> WrapSpec {
+        let nrow = n.div_ceil(ncol);
+        WrapSpec { nrow, ncol, panels: (0..n).map(|i| (i / ncol, i % ncol)).collect(), spacing: (5.0, 7.0), strip: Some(10.0) }
+    }
+
+    #[test]
+    fn wrap_axes_are_on_the_outer_panels_and_beside_empty_slots() {
+        // Five panels in 2 x 3: the slot at (1, 2) is empty.
+        let w = wrap(5, 3);
+        let f = w.axis_cells([true; 4]);
+        // Bottom: the last row, and (0, 2) above the empty slot.
+        assert_eq!(f[1], vec![vec![false, false, true], vec![true, true, false]]);
+        // Top: the first row only; left and right the outer columns, and
+        // the right axis of (1, 1) beside the empty slot.
+        assert_eq!(f[0], vec![vec![true; 3], vec![false; 3]]);
+        assert_eq!(f[2], vec![vec![true, false, false], vec![true, false, false]]);
+        assert_eq!(f[3], vec![vec![false, false, true], vec![false, true, false]]);
+    }
+
+    #[test]
+    fn wrap_table_weaves_axes_strips_and_spacing_around_each_panel_row() {
+        let w = wrap(4, 2);
+        let s = PlotSpec { axis_t: 0.0, axis_b: 20.0, axis_l: 30.0, axis_r: 0.0, wrap: Some(w), has_axis: [false, true, true, false], ..Default::default() };
+        let t = plot_table(&s);
+        let boxes = t.solve(400.0, 300.0);
+        let at = |n: &str| boxes.iter().find(|b| b.name == n).unwrap_or_else(|| panic!("{n}")).clone();
+        // The strip sits just above its panel, 10 high; rows are 7 apart
+        // with the bottom axis (20) between panels.
+        let (strip, panel, below) = (at("strip-t-1-1"), at("panel-1-1"), at("panel-1-2"));
+        assert!((strip.y1 - panel.y0).abs() < 1e-9 && (strip.y1 - strip.y0 - 10.0).abs() < 1e-9);
+        assert!((at("axis-b-1-1").y0 - panel.y1).abs() < 1e-9);
+        assert!((at("strip-t-1-2").y0 - at("axis-b-1-1").y1 - 7.0).abs() < 1e-9);
+        assert!(below.y0 > panel.y1);
+        // Spacing between columns; interior left axes have no room.
+        assert!((at("panel-2-1").x0 - at("panel-1-1").x1 - 5.0).abs() < 1e-9);
+        assert!((at("axis-l-1-1").x1 - panel.x0).abs() < 1e-9 && (at("axis-l-1-2").x1 - at("panel-2-1").x0).abs() < 1e-9);
     }
 
     #[test]

@@ -1108,3 +1108,24 @@ Pixel fidelity against ggplot2 on ragg at 96 dpi: the colourbar's box differs
 by at most 1/255 from ragg's raster, and the legend keys by at most 5 (the
 point drawer's sprite coverage, as in the panel). Legend, bar and box sizes
 match grid's layout within 0.5 px in every `test-render-legend.R` case.
+
+## R5.2: facet_wrap in the full tier, and the README plot (2026-10-31)
+
+Release build, the README plot (`facet_wrap(~region)`, six panels, colourbar +
+shape legend, alpha 0.3, log x), `render_full()` against `render_hybrid()` on a
+built plot, 7 reps, medians:
+
+| case | target | full | hybrid |
+|---|---:|---:|---:|
+| 1e6 rows, 1600 × 1000 at 150 dpi | < 120 ms | 146 ms | 404 ms |
+| 10 rows, 1600 × 1000 at 150 dpi | < 25 ms | 47 ms | 218 ms |
+| 1e6 rows, 2100 × 2100 at 300 dpi | < 200 ms | 222 ms | 478 ms |
+
+None of the three targets is met yet. Stages (1600 × 1000): `render_ir()` 7-10
+ms, `legend_boxes()` 7, the rest of `layout_spec()` 6, `full_panel()` 3,
+`full_points()` 20 at 1e6 rows (its colour parsing, 18 ms), and
+`rs_render_page()` 23 ms at 10 rows, 101 ms at 1e6. At 10 rows 18 ms of the
+Rust time is the blank page (grid lines and panel backgrounds of six panels,
+the clear and the raster conversion); the text is about 5 ms. Dealing the
+points out to panels in Rust instead of `split()` and subsetting in R took
+`full_points()` + page spec from 70 ms to 34 ms.

@@ -274,3 +274,19 @@ test_that("upstream guide assembly matches what the legend drawers mirror", {
     expect_snapshot(print(body(environment(ggplot2::GuideColourbar[[m]])$f)))
   }
 })
+
+test_that("upstream facet_wrap() assembly matches what the Rust layout mirrors", {
+  # layout_wrap() (R/render-layout.R) and WrapSpec in
+  # alot-core/src/render/layout.rs mirror these for fixed scales and strips
+  # on top. If these fail, update the mirror, then the snapshots.
+  gg_fn <- function(f) utils::getFromNamespace(f, "ggplot2")
+  for (f in c("weave_tables_row", "weave_tables_col", "weave_axes", "measure_axes", "convertInd", "build_strip", "assemble_strips", "render_axes", "censor_labels", "max_height")) {
+    expect_snapshot(print(body(gg_fn(f))))
+  }
+  for (m in c("draw_panels", "init_gtable")) {
+    expect_snapshot(print(body(environment(ggplot2::Facet[[m]])$f)))
+  }
+  for (m in c("draw_panels", "attach_axes", "attach_strips", "format_strip_labels")) {
+    expect_snapshot(print(body(environment(ggplot2::FacetWrap[[m]])$f)))
+  }
+})

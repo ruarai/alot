@@ -5,7 +5,7 @@ use alot_core::render::agg::{Cap, Join};
 use alot_core::render::axis::{Axis, Side, Ticks};
 use alot_core::render::layout::TitleGrob;
 use alot_core::render::legend::{Bar, BarTicks, Body, Guide, Keys, LegendGroup};
-use alot_core::render::page::{draw_page, LineStyle, PageSpec, RectEl, TextStyle};
+use alot_core::render::page::{draw_page, LineStyle, PageSpec, RectEl, TextStyle, WrapDraw};
 use alot_core::render::panel::{GridLines, Panel, PointLayer};
 use alot_core::render::raster;
 use alot_core::render::text::Font;
@@ -128,30 +128,68 @@ fn colours(l: &List, name: &str) -> Option<Vec<[u8; 4]>> {
 /// A point layer: see `full_points()` in R/render-full.R. Columns of
 /// length 1 or n recycle; NA is declined.
 fn point_layer(l: &List) -> Option<PointLayer> {
-    let x = nums(l, "x")?;
+    point_layers(l, 1)?.pop()
+}
+
+/// A point layer dealt out to `n_panels` panels by its `panel` column
+/// (1-based; absent for one panel): a layer for each panel with rows.
+fn point_layers(l: &List, n_panels: usize) -> Option<Vec<PointLayer>> {
+    // Borrowed columns: a million rows are dealt out, not copied twice.
+    let robj = |name: &str| field(l, name);
+    let (xr, yr) = (robj("x")?, robj("y")?);
+    let (shape_r, size_r, stroke_r) = (robj("shape")?, robj("size")?, robj("stroke")?);
+    let (col_r, fill_r) = (robj("colour")?, robj("fill")?);
+    let (x, y) = (xr.as_real_slice()?, yr.as_real_slice()?);
+    let (shape, size, stroke) = (shape_r.as_real_slice()?, size_r.as_real_slice()?, stroke_r.as_real_slice()?);
+    let (col, fill) = (col_r.as_integer_slice()?, fill_r.as_integer_slice()?);
     let n = x.len();
-    let y = nums(l, "y")?;
-    let (shape, size, stroke) = (nums(l, "shape")?, nums(l, "size")?, nums(l, "stroke")?);
-    let (col, fill) = (colours(l, "colour")?, colours(l, "fill")?);
-    let recycles = |v: &Vec<f64>| (v.len() == 1 || v.len() == n) && !v.iter().any(|v| v.is_nan());
+    let recycles = |v: &[f64]| (v.len() == 1 || v.len() == n) && !v.iter().any(|v| v.is_nan());
     let [x0, x1] = nums(l, "x_range")?[..] else { return None };
     let [y0, y1] = nums(l, "y_range")?[..] else { return None };
     let [pt, stroke_scale, res] = nums(l, "consts")?[..] else { return None };
-    if y.len() != n || col.len() != n || fill.len() != n || ![&shape, &size, &stroke].into_iter().all(recycles) {
+    if y.len() != n || col.len() != n || fill.len() != n || ![shape, size, stroke].into_iter().all(recycles) {
         return None;
     }
-    Some(PointLayer { x, y, x_range: [x0, x1], y_range: [y0, y1], shape, size, stroke, col, fill, pt, stroke_scale, res })
+    let make = |idx: Option<&[u32]>| {
+        let pick = |v: &[f64]| match idx {
+            Some(i) if v.len() == n => i.iter().map(|&k| v[k as usize]).collect(),
+            _ => v.to_vec(),
+        };
+        let pick_c = |v: &[i32]| -> Vec<[u8; 4]> {
+            match idx {
+                Some(i) => i.iter().map(|&k| (v[k as usize] as u32).to_le_bytes()).collect(),
+                None => v.iter().map(|&c| (c as u32).to_le_bytes()).collect(),
+            }
+        };
+        PointLayer {
+            x: pick(x), y: pick(y), x_range: [x0, x1], y_range: [y0, y1], shape: pick(shape), size: pick(size),
+            stroke: pick(stroke), col: pick_c(col), fill: pick_c(fill), pt, stroke_scale, res,
+        }
+    };
+    let Some(panel_r) = field(l, "panel") else {
+        return Some(vec![make(None)]);
+    };
+    let panel = panel_r.as_integer_slice()?;
+    if panel.len() != n || panel.iter().any(|&p| p < 1 || p as usize > n_panels) {
+        return None;
+    }
+    let mut counts = vec![0usize; n_panels];
+    for &p in panel {
+        counts[p as usize - 1] += 1;
+    }
+    let mut rows: Vec<Vec<u32>> = counts.iter().map(|&c| Vec::with_capacity(c)).collect();
+    for (i, &p) in panel.iter().enumerate() {
+        rows[p as usize - 1].push(i as u32);
+    }
+    // One element per panel, empty ones as zero-point layers.
+    Some(rows.iter().map(|r| make(Some(r))).collect())
 }
 
-fn panel(l: &List) -> Option<Panel> {
+fn panel(l: &List, points: Vec<PointLayer>) -> Option<Panel> {
     let mut grid = Vec::new();
     for (_, g) in list_of(l, "grid")?.iter() {
         let g = List::try_from(g).ok()?;
         grid.push(GridLines { pos: nums(&g, "pos")?, horizontal: flag(&g, "horizontal")?, style: line_style(&list_of(&g, "style")?)? });
-    }
-    let mut points = Vec::new();
-    for (_, p) in list_of(l, "points")?.iter() {
-        points.push(point_layer(&List::try_from(p).ok()?)?);
     }
     Some(Panel { clip: flag(l, "clip")?, background: opt(l, "background", rect_el)?, grid, points, border: opt(l, "border", rect_el)? })
 }
@@ -287,11 +325,54 @@ fn render(spec: &List, threads: i32) -> Option<Robj> {
             legends.push((name.to_string(), legend_group(&l, &mut fonts)?));
         }
     }
+    let is_wrap = field(&layout, "wrap").is_some();
     let mut axes = Vec::new();
-    for (cell, name) in [("axis_t", "axis-t"), ("axis_l", "axis-l"), ("axis_r", "axis-r"), ("axis_b", "axis-b")] {
+    let mut by_side: [Option<alot_core::render::axis::Axis>; 4] = [None, None, None, None];
+    for (cell, name, k) in [("axis_t", "axis-t", 0), ("axis_b", "axis-b", 1), ("axis_l", "axis-l", 2), ("axis_r", "axis-r", 3)] {
         if let Some(a) = opt(&layout, cell, |l| axis(l, &mut fonts))? {
-            axes.push((name.to_string(), a));
+            if is_wrap {
+                by_side[k] = Some(a);
+            } else {
+                axes.push((name.to_string(), a));
+            }
         }
+    }
+    let [axes_t, axes_b, axes_l, axes_r] = by_side;
+    let wrap_spec = crate::layout::wrap(&layout)?;
+    let mut panels = Vec::new();
+    let n_panels = list_of(spec, "panels")?.len();
+    let mut layers: Vec<std::vec::IntoIter<PointLayer>> = Vec::new();
+    for (_, l) in list_of(spec, "points")?.iter() {
+        layers.push(point_layers(&List::try_from(l).ok()?, n_panels)?.into_iter());
+    }
+    for (i, (_, pl)) in list_of(spec, "panels")?.iter().enumerate() {
+        let name = match &wrap_spec {
+            Some(w) => {
+                let (r, c) = *w.panels.get(i)?;
+                format!("panel-{}-{}", c + 1, r + 1)
+            }
+            None => "panel".to_string(),
+        };
+        // With one panel the layer's `panel` is absent: its single element.
+        let points = layers.iter_mut().filter_map(|it| it.next()).filter(|p| !p.x.is_empty()).collect();
+        panels.push((name, panel(&List::try_from(pl).ok()?, points)?));
+    }
+    let mut wrap = None;
+    if let Some(spec_w) = wrap_spec {
+        let w = list_of(&layout, "wrap")?;
+        let mut strips = Vec::new();
+        if let Some(s) = field(&w, "strips") {
+            for (_, t) in List::try_from(s).ok()?.iter() {
+                strips.push(title(&List::try_from(t).ok()?, &mut fonts)?);
+            }
+        }
+        wrap = Some(WrapDraw {
+            spec: spec_w,
+            axes: [axes_t, axes_b, axes_l, axes_r],
+            strips,
+            strip_bg: opt(&w, "strip_bg", rect_el)?,
+            strip_clip: flag(&w, "strip_clip")?,
+        });
     }
     let page = PageSpec {
         width: w,
@@ -299,8 +380,9 @@ fn render(spec: &List, threads: i32) -> Option<Robj> {
         bg: rgba(spec, "bg")?,
         table: build(&layout)?,
         background: opt(spec, "background", rect_el)?,
-        panel: panel(&list_of(spec, "panel")?)?,
+        panels,
         axes,
+        wrap,
         titles,
         legends,
         threads: threads.max(0) as usize,

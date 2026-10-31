@@ -216,7 +216,7 @@ layout_spec_ <- function(built, ir, res, legends) {
   plot <- built@plot
   layout <- built@layout
   theme <- ir$theme
-  if (ir$facet$class != "FacetNull") {
+  if (!ir$facet$class %in% c("FacetNull", "FacetWrap")) {
     layout_decline("more than one panel")
   }
   if (!ir$coord$class %in% c("CoordCartesian", "CoordFlip", "CoordFixed", "CoordTransform")) {
@@ -229,12 +229,15 @@ layout_spec_ <- function(built, ir, res, legends) {
     legends <- legend_boxes(built, res)
   }
 
+  wrap <- if (ir$facet$class == "FacetWrap") layout_wrap(built, ir, res)
   aspect <- plot@theme$aspect.ratio %||% layout$coord$aspect(layout$panel_params[[1]])
   spec <- list(
     aspect = if (is.null(aspect)) NA_real_ else as.numeric(aspect),
     axis_l = layout_axis(ir, built, "left", res), axis_r = layout_axis(ir, built, "right", res),
     axis_t = layout_axis(ir, built, "top", res), axis_b = layout_axis(ir, built, "bottom", res)
   )
+
+  spec$wrap <- wrap
 
   # Layout$render(): the axis titles, [[1]] top or left, [[2]] bottom or right.
   labels <- layout$coord$labels(
@@ -270,6 +273,42 @@ layout_spec_ <- function(built, ir, res, legends) {
   spec$background <- as.numeric(!is.null(plot@theme$plot.background))
   # NULL entries are absent from a list, so zeroGrobs are missing keys.
   spec[!vapply(spec, is.null, logical(1))]
+}
+
+# FacetWrap$draw_panels() (ggplot2 R/facet-wrap.R, R/facet-.R) for fixed
+# scales and strips on top, inside: the panels' grid, `panel.spacing` and
+# the strips' text and background. Everything else declines.
+layout_wrap <- function(built, ir, res) {
+  params <- built@layout$facet_params
+  theme <- ir$theme
+  if (any(unlist(params$free)) || any(unlist(params$space_free))) {
+    layout_decline("free scales")
+  }
+  if (any(unlist(params$draw_axes)) || !all(unlist(params$axis_labels))) {
+    layout_decline("axes on every panel")
+  }
+  if (!identical(params$strip.position %||% "top", "top") || !identical(theme[["strip.placement.x"]] %||% "inside", "inside")) {
+    layout_decline("strips not on top, inside")
+  }
+  panels <- ir$layout$panels
+  labels <- ir$strips$facets
+  if (is.null(labels) || ncol(labels) != 1) {
+    layout_decline("strips of more than one variable")
+  }
+  element <- as_element(theme[["strip.text.x.top"]])
+  bg <- theme[["strip.background.x"]]
+  if (layout_blank(element)) {
+    layout_decline("blank strips")
+  }
+  strips <- legend_labels(element, as.character(labels[[1]]), res)
+  if (length(strips) != nrow(panels)) {
+    layout_decline("strip labels alot doesn't measure")
+  }
+  list(
+    nrow = as.numeric(max(panels$ROW)), ncol = as.numeric(max(panels$COL)), rows = as.numeric(panels$ROW), cols = as.numeric(panels$COL),
+    spacing = c(layout_px(theme[["panel.spacing.x"]], res), layout_px(theme[["panel.spacing.y"]], res)),
+    strips = strips, strip_bg = if (!layout_blank(bg)) full_rect(bg, res), strip_clip = as.numeric(identical(theme[["strip.clip"]][[1]], "on"))
+  )
 }
 
 # table_add_tag() (ggplot2 R/plot-build.R): the tag's size and where the
