@@ -101,3 +101,24 @@ test_that("text fonts resolve once per style", {
   expect_identical(f$path[1], f$path[3])
   expect_true(is.na(f$path[4]))
 })
+
+test_that("alot_render_coverage() reports the tier alot_png() would use", {
+  base <- ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg)) + ggplot2::geom_point()
+  withr::local_options(alot.full_tier = TRUE)
+  cov <- alot_render_coverage(base + ggplot2::aes(colour = qsec) + ggplot2::facet_wrap(~cyl))
+  expect_identical(cov$tier, "full")
+  expect_identical(nrow(cov$full), 0L)
+  # Reasons from the page layout are reported too.
+  cov <- alot_render_coverage(base + ggplot2::facet_wrap(~cyl, scales = "free"))
+  expect_identical(cov$tier, "hybrid")
+  expect_identical(cov$full$reason, "free scales")
+  cov <- alot_render_coverage(base + ggplot2::theme(legend.position = "inside") + ggplot2::aes(colour = qsec))
+  expect_identical(cov$tier, "hybrid")
+  cov <- alot_render_coverage(ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg)) + ggplot2::geom_line())
+  expect_identical(cov$tier, "hybrid")
+  # What alot_png() uses.
+  b <- ggplot2::ggplot_build(base)
+  expect_identical(alot_render_coverage(b)$tier, render_raster(b, render_size)$tier)
+  withr::local_options(alot.full_tier = FALSE)
+  expect_identical(alot_render_coverage(b)$tier, "hybrid")
+})

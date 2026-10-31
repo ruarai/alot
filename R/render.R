@@ -36,7 +36,7 @@
 #' @param ... Passed to the ragg device ([ragg::agg_capture()] or
 #'   [ragg::agg_png()]).
 #' @return `filename`, invisibly, with attribute `"tier"` naming the tier
-#'   that drew it (`"hybrid"` or `"ggplot2"`).
+#'   that drew it (`"full"`, `"hybrid"` or `"ggplot2"`).
 #' @seealso [alot_ggsave()]
 #' @export
 alot_png <- function(plot, filename, width = 7, height = 7, units = c("in", "cm", "mm", "px"),
@@ -113,16 +113,37 @@ render_raster <- function(built, size) {
 #' Report how alot would render a plot
 #'
 #' @param plot A ggplot or a built plot.
-#' @return A list with `tier`, the tier [alot_png()] would use (`"hybrid"` or
-#'   `"ggplot2"`); `layers`, a data frame with one row per layer: its
-#'   `geom`, the `engine` that draws it (`"rust"` or `"ggplot2"`) and, for
-#'   `"ggplot2"`, the `reason`; and `full`, a data frame of the
-#'   `component`, `name` and `reason` for everything that keeps the plot out
-#'   of the full tier, which is in development (no rows: nothing does).
+#' @return A list with `tier`, the tier [alot_png()] would use (`"full"`,
+#'   `"hybrid"` or `"ggplot2"`; `"full"` unless `options(alot.full_tier =
+#'   FALSE)`); `layers`, a data frame with one row per layer: its
+#'   `geom`, the `engine` that draws it in the hybrid tier (`"rust"` or
+#'   `"ggplot2"`) and, for `"ggplot2"`, the `reason`; and `full`, a data
+#'   frame of the `component`, `name` and `reason` for everything that keeps
+#'   the plot out of the full tier (no rows: nothing does). `tier` can still
+#'   drop to `"hybrid"` if the full renderer meets something at draw time,
+#'   such as a strip narrower than its text.
 #' @export
 alot_render_coverage <- function(plot) {
   built <- if (ggplot2::is_ggplot(plot)) alot_build(plot) else plot
-  c(render_coverage(built), list(full = render_ir(built)$support))
+  ir <- render_ir(built)
+  out <- render_coverage(built)
+  full <- ir$support
+  reason <- full_page_reason(built, ir)
+  if (nrow(full) == 0 && !is.null(reason)) {
+    full <- data.frame(component = "page", name = "layout", reason = reason)
+  }
+  if (nrow(full) == 0 && !isFALSE(getOption("alot.full_tier"))) {
+    out$tier <- "full"
+  }
+  c(out, list(full = full))
+}
+
+# Why the full tier's page can't be laid out for `built`, or NULL: the
+# declines of page_spec() (any page size gives the same).
+full_page_reason <- function(built, ir) {
+  size <- list(width = 100, height = 100, units = "px", res = 96)
+  out <- tryCatch(page_spec(built, ir, size), alot_layout_decline = function(e) conditionMessage(e))
+  if (is.character(out)) out else NULL
 }
 
 render_coverage <- function(built) {

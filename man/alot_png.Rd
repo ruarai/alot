@@ -38,7 +38,7 @@ alot_png(
 }
 \value{
 `filename`, invisibly, with attribute `"tier"` naming the tier
-  that drew it (`"hybrid"` or `"ggplot2"`).
+  that drew it (`"full"`, `"hybrid"` or `"ggplot2"`).
 }
 \description{
 Builds `plot` with [alot_build()] (unless it is already built) and draws

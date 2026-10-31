@@ -10,12 +10,15 @@ alot_render_coverage(plot)
 \item{plot}{A ggplot or a built plot.}
 }
 \value{
-A list with `tier`, the tier [alot_png()] would use (`"hybrid"` or
-  `"ggplot2"`); `layers`, a data frame with one row per layer: its
-  `geom`, the `engine` that draws it (`"rust"` or `"ggplot2"`) and, for
-  `"ggplot2"`, the `reason`; and `full`, a data frame of the
-  `component`, `name` and `reason` for everything that keeps the plot out
-  of the full tier, which is in development (no rows: nothing does).
+A list with `tier`, the tier [alot_png()] would use (`"full"`,
+  `"hybrid"` or `"ggplot2"`; `"full"` unless `options(alot.full_tier =
+  FALSE)`); `layers`, a data frame with one row per layer: its
+  `geom`, the `engine` that draws it in the hybrid tier (`"rust"` or
+  `"ggplot2"`) and, for `"ggplot2"`, the `reason`; and `full`, a data
+  frame of the `component`, `name` and `reason` for everything that keeps
+  the plot out of the full tier (no rows: nothing does). `tier` can still
+  drop to `"hybrid"` if the full renderer meets something at draw time,
+  such as a strip narrower than its text.
 }
 \description{
 Report how alot would render a plot
