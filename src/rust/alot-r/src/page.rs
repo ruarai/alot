@@ -277,6 +277,17 @@ fn path_layers(l: &List, n_panels: usize) -> Option<Vec<Option<Layer>>> {
     let (mitre, res) = (num(l, "mitre")?, num(l, "res")?);
     let path_rows = list_of(l, "path_rows")?;
     let rows = panel_rows(l, n_panels)?;
+    // Ribbons: `closed` paths are polygons filled with `fill` (both per path).
+    let fill: Vec<Option<[u8; 4]>> = match (field(l, "closed"), field(l, "fill")) {
+        (Some(closed), Some(fill)) => {
+            let (closed, fill) = (closed.as_integer_slice()?, fill.as_integer_slice()?);
+            if closed.len() != np || fill.len() != np {
+                return None;
+            }
+            closed.iter().zip(fill).map(|(&c, &f)| (c == 1).then(|| (f as u32).to_le_bytes())).collect()
+        }
+        _ => Vec::new(),
+    };
     rows.into_iter()
         .zip(path_rows.iter())
         .enumerate()
@@ -295,6 +306,7 @@ fn path_layers(l: &List, n_panels: usize) -> Option<Vec<Option<Layer>>> {
                 col: colour.iter().map(|&c| (c as u32).to_le_bytes()).collect(),
                 lwd: lwd.to_vec(),
                 lty: lty.iter().map(|&t| t as u32).collect(),
+                fill: fill.clone(),
                 cap, join, mitre, res,
             })))
         })

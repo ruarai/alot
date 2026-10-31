@@ -104,6 +104,15 @@ render_cases <- list(
               legend.box.background = element_rect(), legend.box.margin = margin_auto(4))
     },
     size = readme_size
+  ),
+  # R6.5a: stacked areas of 1e6 rows (stat_align, outline.type "upper")
+  # and a smooth's ribbon and line by group.
+  area_1e6 = list(
+    plot = function() {
+      d <- data.frame(x = rep(seq_len(2.5e5), 4), g = rep(letters[1:4], each = 2.5e5), y = stats::runif(1e6))
+      ggplot(d, aes(x, y, fill = g)) + geom_area(colour = "black")
+    },
+    size = readme_size
   )
 )
 

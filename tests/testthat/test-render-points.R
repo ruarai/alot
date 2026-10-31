@@ -85,7 +85,7 @@ test_that("point plots the full tier doesn't draw decline to another tier", {
   # other layers, clip off, other coords and shapes.
   expect_identical(tier(base + geom_point(aes(colour = factor(cyl))) + theme(legend.key.width = unit(1, "null"))), "hybrid")
   expect_identical(tier(base + geom_point() + facet_wrap(vars(cyl)) + theme(strip.text = element_blank())), "hybrid")
-  expect_identical(tier(base + geom_point() + geom_smooth(method = "lm", formula = y ~ x)), "hybrid")
+  expect_identical(tier(base + geom_point() + geom_rug()), "hybrid")
   expect_identical(tier(base + geom_point() + coord_cartesian(clip = "off")), "ggplot2")
   expect_identical(tier(base + geom_point() + coord_flip()), "ggplot2")
   expect_identical(tier(base + geom_point() + coord_trans(x = "sqrt")), "ggplot2")
@@ -97,6 +97,6 @@ test_that("point plots the full tier doesn't draw decline to another tier", {
 test_that("the full tier names why it declines a point plot", {
   b <- ggplot_build(base + geom_point(shape = "a"))
   expect_match(attr(render_full(b, render_size), "reason"), "character pch|unsupported shape")
-  b <- ggplot_build(base + geom_point() + geom_smooth(method = "lm", formula = y ~ x))
+  b <- ggplot_build(base + geom_point() + geom_rug())
   expect_match(attr(render_full(b, render_size), "reason"), "layers other than")
 })

@@ -272,15 +272,26 @@ hybrid_kind <- function(layer) {
 
 # The drawer the full tier has for a layer's geom: the hybrid tier's, and
 # GeomText's draw_panel (text is drawn by ggplot2 in the hybrid tier).
+# GeomRibbon's draw_group (GeomArea, GeomDensity) and GeomSmooth's are
+# drawn in the full tier only ("ribbons", "smooth"; R6.5a).
 full_kind <- function(layer) {
   kind <- hybrid_kind(layer)
-  geom <- drawn_geom(layer$geom)
-  if (is.null(kind) && identical(geom, ggplot2::GeomText) &&
-    identical(environment(geom$draw_panel)$f, environment(ggplot2::GeomText$draw_panel)$f)) {
-    "text"
-  } else {
-    kind
+  if (!is.null(kind)) {
+    return(kind)
   }
+  geom <- drawn_geom(layer$geom)
+  same <- function(parent, method) identical(environment(geom[[method]])$f, environment(parent[[method]])$f)
+  if (identical(geom, ggplot2::GeomText) && same(ggplot2::GeomText, "draw_panel")) {
+    return("text")
+  }
+  if (class(geom)[1] %in% c("GeomRibbon", "GeomArea", "GeomDensity") && same(ggplot2::GeomRibbon, "draw_group") &&
+    same(ggplot2::GeomRibbon, "draw_panel") && same(ggplot2::GeomRibbon, "handle_na")) {
+    return("ribbons")
+  }
+  if (identical(class(geom)[1], "GeomSmooth") && same(ggplot2::GeomSmooth, "draw_group") && same(ggplot2::GeomSmooth, "draw_panel")) {
+    return("smooth")
+  }
+  NULL
 }
 
 # A layer's data as its geom draws it: Layer$draw_geom() removes missing
@@ -303,6 +314,11 @@ hybrid_data <- function(layer, data) {
 # rows for it costs more than drawing them.
 point_handle_na <- function(layer, data) {
   geom <- layer$geom
+  # GeomRibbon$handle_na() (ggplot2 R/geom-ribbon.R) checks its own columns
+  # and splits groups at the rows it removes.
+  if (inherits(geom, "GeomRibbon")) {
+    return(geom$handle_na(data, layer$computed_geom_params))
+  }
   vars <- intersect(c(geom$required_aes, geom$non_missing_aes), names(data))
   complete <- rs_columns_complete(unclass(data)[vars], render_threads())
   if (complete) data else geom$handle_na(data, layer$computed_geom_params)
@@ -331,7 +347,9 @@ hybrid_decline <- function(layer, data, layout, kind = hybrid_kind(layer)) {
     rects = rects_decline(data, layer$computed_geom_params),
     paths = paths_decline(data, layer$computed_geom_params),
     polygons = polygons_decline(data, layer$computed_geom_params),
-    text = text_decline(data, layer$computed_geom_params)
+    text = text_decline(data, layer$computed_geom_params),
+    ribbons = ribbons_decline(data, layer$computed_geom_params, FALSE),
+    smooth = ribbons_decline(data, layer$computed_geom_params, TRUE)
   )
   if (!is.null(reason)) {
     return(reason)
@@ -885,4 +903,50 @@ hybrid_fallback_grob <- function(x) {
       linemitre = s$params$linemitre %||% 10
     )
   )
+}
+
+# Why a ribbon layer (GeomRibbon$draw_group(), also GeomArea and
+# GeomDensity) or a geom_smooth() layer (GeomSmooth$draw_group(): the
+# ribbon, then GeomLine's path) isn't drawn in Rust, or NULL. Declines what
+# ggplot2 would draw as a gradient or abort on (aesthetics varying along a
+# ribbon), and groups of fewer than two rows (one-point polylines, and the
+# path's message for them).
+ribbons_decline <- function(data, params, smooth) {
+  flipped <- isTRUE(params$flipped_aes)
+  nm <- if (flipped) c(pos = "y", lo = "xmin", hi = "xmax", val = "x") else c(pos = "x", lo = "ymin", hi = "ymax", val = "y")
+  ribbon <- !smooth || (isTRUE(params$se) && all(nm[c("lo", "hi")] %in% names(data)))
+  pos <- c(nm[["pos"]], if (ribbon) nm[c("lo", "hi")], if (smooth) nm[["val"]])
+  cols <- c(pos, "colour", "fill", "linewidth", "linetype", "alpha", "group")
+  if (!all(cols %in% names(data))) {
+    return("missing ribbon aesthetics")
+  }
+  if (!all(vapply(data[pos], is.double, logical(1))) || any(vapply(data[pos], inherits, logical(1), "AsIs"))) {
+    return("positions are not double")
+  }
+  if (anyNA(data[pos])) {
+    return("NA in a ribbon's positions")
+  }
+  if (!is_colour_vector(data$colour) || !is_colour_vector(data$fill)) {
+    return("colour or fill is not a colour vector")
+  }
+  if (!is.numeric(data$linewidth) || anyNA(data$linewidth) || !(is.numeric(data$alpha) || all(is.na(data$alpha)))) {
+    return("linewidth or alpha is not numeric")
+  }
+  if (is.null(lty_code(data$linetype))) {
+    return("unsupported linetype")
+  }
+  if (!smooth && !(params$outline.type %||% "both") %in% c("both", "upper", "lower", "full")) {
+    return("unsupported outline.type")
+  }
+  key <- vctrs::vec_group_id(data.frame(as.integer(data$PANEL), data$group))
+  if (any(tabulate(key) < 2)) {
+    return("a group of fewer than two rows")
+  }
+  cols <- unclass(data)[c("colour", "fill", "linewidth", "linetype", "alpha")]
+  first <- match(seq_len(attr(key, "n")), key)
+  constant <- all(vapply(cols, function(v) all(vctrs::vec_equal(v, v[first[key]], na_equal = TRUE)), logical(1)))
+  if (!constant) {
+    return("aesthetics vary along a ribbon")
+  }
+  line_params_decline(params)
 }

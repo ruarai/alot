@@ -238,6 +238,20 @@ legend_glyph <- function(f, data, params, res, default_cm) {
   if (is_key("text")) {
     return(legend_text_glyph(data, res))
   }
+  # draw_key_smooth(): with `se`, a rect of alpha(fill, alpha) filling the
+  # key, then draw_key_path() of the data with alpha 1.
+  if (is_key("smooth")) {
+    fill <- data$fill %||% "grey60"
+    rect <- if (isTRUE(params$se)) {
+      legend_rect_glyph(
+        fill = legend_colour(fill, data$alpha %||% NA), colour = legend_colour(NA),
+        lwd = 0, lty = 1, join = "round", cap = "round", inset = 0, res = res
+      )
+    }
+    data$alpha <- 1
+    path <- legend_glyph(gg("draw_key_path"), data, params, res, default_cm)
+    return(list(marks = c(if (!is.null(rect)) list(rect), if (!is.null(path$mark)) list(path$mark)), size = path$size))
+  }
   layout_decline("a legend key alot doesn't draw")
 }
 
@@ -360,7 +374,8 @@ legend_keys <- function(params, elems, n, res) {
     f <- environment(dec$draw_key)$f %||% dec$draw_key
     for (i in seq_len(n)) {
       k <- legend_glyph(f, vctrs::vec_slice(dec$data, i), dec$params, res, key_size / res * 2.54)
-      if (!is.null(k$mark)) marks[[i]] <- c(marks[[i]], list(k$mark))
+      add <- k$marks %||% if (!is.null(k$mark)) list(k$mark)
+      if (length(add)) marks[[i]] <- c(marks[[i]], add)
       size[, i] <- c(max(size[1, i], k$size[1], na.rm = TRUE), max(size[2, i], k$size[2], na.rm = TRUE))
     }
   }

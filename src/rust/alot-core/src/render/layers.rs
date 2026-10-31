@@ -92,6 +92,11 @@ pub struct PathLayer {
     pub lwd: Vec<f64>,
     /// R's packed line type per path.
     pub lty: Vec<u32>,
+    /// Fill per path (empty when no path is filled): a path with `Some` is a closed polygon
+    /// (`polygonGrob()`, filled non-zero as ragg's `drawPolygon()` fills),
+    /// drawn whole; ribbons (`GeomRibbon$draw_group()`) mix them with
+    /// polylines in drawing order.
+    pub fill: Vec<Option<[u8; 4]>>,
     pub cap: Cap,
     pub join: Join,
     pub mitre: f64,
@@ -107,6 +112,16 @@ impl PathLayer {
         let mut k = 0;
         while k < self.x.len() {
             let p = self.path[k] as usize;
+            let stroke = Stroke { lwd: self.lwd[p] * self.res / 96.0, lty: self.lty[p], cap: self.cap, join: self.join, mitre: self.mitre };
+            if let Some(&Some(fill)) = self.fill.get(p) {
+                let mut ring = Vec::new();
+                while k < self.x.len() && self.path[k] as usize == p {
+                    ring.push([c.x0 + npc(self.x[k], &self.x_range) * pw, c.y0 + (1.0 - npc(self.y[k], &self.y_range)) * ph]);
+                    k += 1;
+                }
+                specs.push(PathSpec { rings: vec![ring], closed: true, fill, rule: Rule::NonZero, col: self.col[p], stroke });
+                continue;
+            }
             let mut rings: Vec<Vec<[f64; 2]>> = vec![Vec::new()];
             while k < self.x.len() && self.path[k] as usize == p {
                 let pt = [c.x0 + npc(self.x[k], &self.x_range) * pw, c.y0 + (1.0 - npc(self.y[k], &self.y_range)) * ph];
@@ -117,7 +132,6 @@ impl PathLayer {
                 }
                 k += 1;
             }
-            let stroke = Stroke { lwd: self.lwd[p] * self.res / 96.0, lty: self.lty[p], cap: self.cap, join: self.join, mitre: self.mitre };
             specs.extend(rings.into_iter().filter(|r| !r.is_empty()).map(|r| PathSpec {
                 rings: vec![r],
                 closed: false,
@@ -202,7 +216,7 @@ mod tests {
             x: vec![0.0, 5.0, f64::NAN, 10.0, 10.0], y: vec![0.0, 5.0, 5.0, 0.0, 10.0],
             path: vec![0, 0, 0, 0, 0],
             x_range: [0.0, 10.0], y_range: [0.0, 10.0],
-            col: vec![[0, 0, 0, 255]], lwd: vec![1.0], lty: vec![0],
+            col: vec![[0, 0, 0, 255]], lwd: vec![1.0], lty: vec![0], fill: vec![],
             cap: Cap::Butt, join: Join::Round, mitre: 10.0, res: 96.0,
         };
         let specs = l.specs(&cell());
@@ -212,11 +226,26 @@ mod tests {
     }
 
     #[test]
+    fn filled_paths_are_closed_polygons_in_order() {
+        let l = PathLayer {
+            x: vec![0.0, 10.0, 10.0, 0.0, 0.0, 10.0], y: vec![5.0, 5.0, 0.0, 0.0, 5.0, 5.0], path: vec![0, 0, 0, 0, 1, 1],
+            x_range: [0.0, 10.0], y_range: [0.0, 10.0],
+            col: vec![[0; 4], [0, 0, 0, 255]], lwd: vec![0.0, 1.0], lty: vec![0, 0], fill: vec![Some([9, 9, 9, 255]), None],
+            cap: Cap::Butt, join: Join::Round, mitre: 10.0, res: 96.0,
+        };
+        let specs = l.specs(&cell());
+        assert_eq!(specs.len(), 2);
+        assert!(specs[0].closed && !specs[1].closed);
+        assert_eq!(specs[0].fill, [9, 9, 9, 255]);
+        assert_eq!(specs[0].rings[0], vec![[10.0, 45.0], [110.0, 45.0], [110.0, 70.0], [10.0, 70.0]]);
+    }
+
+    #[test]
     fn paths_of_different_ids_are_separate() {
         let l = PathLayer {
             x: vec![0.0, 1.0, 2.0, 3.0], y: vec![0.0; 4], path: vec![0, 0, 1, 1],
             x_range: [0.0, 10.0], y_range: [0.0, 10.0],
-            col: vec![[0, 0, 0, 255], [255, 0, 0, 255]], lwd: vec![1.0, 2.0], lty: vec![0, 0],
+            col: vec![[0, 0, 0, 255], [255, 0, 0, 255]], lwd: vec![1.0, 2.0], lty: vec![0, 0], fill: vec![],
             cap: Cap::Butt, join: Join::Round, mitre: 10.0, res: 96.0,
         };
         let specs = l.specs(&cell());

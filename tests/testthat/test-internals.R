@@ -220,6 +220,17 @@ test_that("upstream step and text drawing match what the full tier mirrors", {
   expect_snapshot(print(body(utils::getFromNamespace("validate_labels", "ggplot2"))))
 })
 
+test_that("upstream ribbon and smooth drawing match what the full tier mirrors", {
+  # full_ribbons() (R/render-full.R) mirrors GeomRibbon$draw_group() and
+  # GeomSmooth$draw_group() (by way of Geom$draw_panel()); point_handle_na()
+  # calls GeomRibbon$handle_na(); legend_glyph() mirrors draw_key_smooth().
+  expect_snapshot(print(body(environment(ggplot2::GeomRibbon$draw_group)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomRibbon$handle_na)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomSmooth$draw_group)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Geom$draw_panel)$f)))
+  expect_snapshot(print(body(ggplot2::draw_key_smooth)))
+})
+
 test_that("upstream theme and label resolution match what the render IR mirrors", {
   # resolve_theme() (R/render-ir.R) mirrors calc_element() and
   # combine_elements(); ir_labels() mirrors Layout$render()'s axis titles.

@@ -2473,6 +2473,159 @@
           }
       }
 
+# upstream ribbon and smooth drawing match what the full tier mirrors
+
+    Code
+      print(body(environment(ggplot2::GeomRibbon$draw_group)$f))
+    Output
+      {
+          data <- fix_linewidth(data, snake_class(self))
+          data <- flip_data(data, flipped_aes)
+          data <- data[order(data$group), ]
+          aes <- lapply(data[names(data) %in% c("colour", "fill", "linewidth", 
+              "linetype", "alpha")], unique0)
+          non_constant <- names(aes)[lengths(aes) > 1]
+          if (coord$is_linear()) {
+              if (any(c("fill", "alpha") %in% non_constant)) {
+                  check_device("gradients", action = "abort", maybe = TRUE)
+              }
+              non_constant <- setdiff(non_constant, c("fill", "alpha"))
+          }
+          if (length(non_constant) > 0) {
+              cli::cli_abort("Aesthetics can not vary along a ribbon: {.and {.field {non_constant}}}.")
+          }
+          if ((length(aes$fill) > 1 || length(aes$alpha) > 1)) {
+              transformed <- coord$transform(flip_data(data, flipped_aes), 
+                  panel_params)
+              if (flipped_aes) {
+                  keep <- is.finite(transformed$y)
+                  args <- list(colours = alpha(data$fill, data$alpha)[keep], 
+                      stops = rescale(transformed$y)[keep], y1 = 0, 
+                      y2 = 1, x1 = 0.5, x2 = 0.5)
+              }
+              else {
+                  keep <- is.finite(transformed$x)
+                  args <- list(colours = alpha(data$fill, data$alpha)[keep], 
+                      stops = rescale(transformed$x)[keep], x1 = 0, 
+                      x2 = 1, y1 = 0.5, y2 = 0.5)
+              }
+              aes$fill <- inject(linearGradient(!!!args))
+              aes$alpha <- NA
+          }
+          missing_pos <- !stats::complete.cases(data[c("x", "ymin", 
+              "ymax")])
+          ids <- cumsum(missing_pos) + 1
+          ids[missing_pos] <- NA
+          data <- unclass(data)
+          upper_keep <- TRUE
+          if (!is.null(data$align_padding)) {
+              upper_keep <- !data$align_padding
+              upper_keep[is.na(upper_keep)] <- TRUE
+          }
+          positions_upper <- data_frame0(x = data$x[upper_keep], y = data$ymax[upper_keep], 
+              id = ids[upper_keep])
+          positions_lower <- data_frame0(x = rev(data$x), y = rev(data$ymin), 
+              id = rev(ids))
+          positions_upper <- flip_data(positions_upper, flipped_aes)
+          positions_lower <- flip_data(positions_lower, flipped_aes)
+          munched_upper <- coord_munch(coord, positions_upper, panel_params)
+          munched_lower <- coord_munch(coord, positions_lower, panel_params)
+          munched_poly <- vec_rbind0(munched_upper, munched_lower)
+          is_full_outline <- identical(outline.type, "full")
+          g_poly <- polygonGrob(munched_poly$x, munched_poly$y, id = munched_poly$id, 
+              default.units = "native", gp = gg_par(fill = fill_alpha(aes$fill, 
+                  aes$alpha), col = if (is_full_outline) 
+                  aes$colour
+              else NA, lwd = if (is_full_outline) 
+                  aes$linewidth
+              else 0, lty = if (is_full_outline) 
+                  aes$linetype
+              else 1, lineend = lineend, linejoin = linejoin, linemitre = linemitre))
+          if (is_full_outline) {
+              return(ggname("geom_ribbon", g_poly))
+          }
+          munched_lower$id <- munched_lower$id + max(ids, na.rm = TRUE)
+          arg_match0(outline.type, c("both", "upper", "lower"))
+          munched_lines <- switch(outline.type, both = vec_rbind0(munched_upper, 
+              munched_lower), upper = munched_upper, lower = munched_lower)
+          g_lines <- polylineGrob(munched_lines$x, munched_lines$y, 
+              id = munched_lines$id, default.units = "native", gp = gg_par(col = aes$colour, 
+                  lwd = aes$linewidth, lty = aes$linetype, lineend = lineend, 
+                  linejoin = linejoin, linemitre = linemitre))
+          ggname("geom_ribbon", grobTree(g_poly, g_lines))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomRibbon$handle_na)$f))
+    Output
+      {
+          vars <- vapply(strsplit(self$required_aes, "|", fixed = TRUE), 
+              `[[`, i = 1, character(1))
+          if (isTRUE(params$flipped_aes || any(data$flipped_aes) %||% 
+              FALSE)) {
+              vars <- switch_orientation(vars)
+          }
+          vars <- c(vars, self$non_missing_aes)
+          missing <- detect_missing(data, vars, finite = FALSE)
+          if (!any(missing)) {
+              return(data)
+          }
+          data$group <- vec_identify_runs(data_frame0(missing, data$group))
+          data <- vec_slice(data, !missing)
+          if (!params$na.rm) {
+              cli::cli_warn("Removed {sum(missing)} row{?s} containing missing values or values \\\n          outside the scale range ({.fn {snake_class(self)}}).")
+          }
+          data
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomSmooth$draw_group)$f))
+    Output
+      {
+          ribbon <- transform(data, colour = NA)
+          path <- transform(data, alpha = NA)
+          ymin <- flipped_names(flipped_aes)$ymin
+          ymax <- flipped_names(flipped_aes)$ymax
+          has_ribbon <- se && !is.null(data[[ymax]]) && !is.null(data[[ymin]])
+          gList(if (has_ribbon) 
+              GeomRibbon$draw_group(ribbon, panel_params, coord, flipped_aes = flipped_aes), 
+              GeomLine$draw_panel(path, panel_params, coord, lineend = lineend, 
+                  linejoin = linejoin, linemitre = linemitre))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Geom$draw_panel)$f))
+    Output
+      {
+          groups <- split(data, factor(data$group))
+          grobs <- lapply(groups, function(group) {
+              self$draw_group(group, panel_params, coord, ...)
+          })
+          ggname(snake_class(self), gTree(children = inject(gList(!!!grobs))))
+      }
+
+---
+
+    Code
+      print(body(ggplot2::draw_key_smooth))
+    Output
+      {
+          data$fill <- alpha(data$fill %||% "grey60", data$alpha)
+          data$alpha <- 1
+          path <- draw_key_path(data, params, size)
+          grob <- grobTree(if (isTRUE(params$se)) 
+              rectGrob(gp = gg_par(col = NA, fill = data$fill)), path)
+          attr(grob, "width") <- attr(path, "width")
+          attr(grob, "height") <- attr(path, "height")
+          grob
+      }
+
 # upstream theme and label resolution match what the render IR mirrors
 
     Code

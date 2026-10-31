@@ -133,9 +133,12 @@ full_layers <- function(built, ir, res) {
       points = full_points(layer$data, ranges, n_panels, res),
       rects = full_rects(built@plot@layers[[i]], layer$data, ranges, n_panels, res),
       paths = full_paths(built@plot@layers[[i]], layer$data, ranges, n_panels, res),
-      text = full_text(built@plot@layers[[i]], layer$data, built@layout$coord, pps, scales, n_panels, res)
+      text = full_text(built@plot@layers[[i]], layer$data, built@layout$coord, pps, scales, n_panels, res),
+      ribbons = full_ribbons(built@plot@layers[[i]], layer$data, ranges, n_panels, res, FALSE),
+      smooth = full_ribbons(built@plot@layers[[i]], layer$data, ranges, n_panels, res, TRUE)
     )
-    if (!is.null(spec)) out[[length(out) + 1L]] <- c(list(kind = layer$kind), spec)
+    kind <- if (layer$kind %in% c("ribbons", "smooth")) "paths" else layer$kind
+    if (!is.null(spec)) out[[length(out) + 1L]] <- c(list(kind = kind), spec)
   }
   out
 }
@@ -227,6 +230,88 @@ full_paths <- function(layer, data, ranges, n_panels, res) {
     } else {
       unname(lapply(split(path, factor(as.integer(data$PANEL)[order], levels = seq_len(n_panels))), function(p) if (length(p)) p))
     }
+  ))
+}
+
+# A ribbon layer as a path layer of polygons and polylines in drawing
+# order. Mirrors Geom$draw_panel() (ggplot2 R/geom-.R: each group in turn,
+# by panel then group) and GeomRibbon$draw_group() (R/geom-ribbon.R) for a
+# linear coord and aesthetics constant along each ribbon (ribbons_decline()):
+# a polygonGrob() of the upper line (rows not marked `align_padding` by
+# stat_align()) then the lower line reversed, filled with
+# fill_alpha(fill, alpha) and outlined only for outline.type = "full"; then
+# polylineGrob()s of the upper and/or lower line in `colour` (its own
+# alpha). With `smooth`, GeomSmooth$draw_group() (R/geom-smooth.R): the
+# ribbon (when `se`, uncoloured, so without its lines), then
+# GeomLine$draw_panel()'s polyline of x and y in alpha(colour, NA).
+full_ribbons <- function(layer, data, ranges, n_panels, res, smooth) {
+  params <- layer$computed_geom_params
+  flipped <- isTRUE(params$flipped_aes)
+  nm <- if (flipped) c(pos = "y", lo = "xmin", hi = "xmax", val = "x") else c(pos = "x", lo = "ymin", hi = "ymax", val = "y")
+  ribbon <- !smooth || (isTRUE(params$se) && all(nm[c("lo", "hi")] %in% names(data)))
+  outline <- if (smooth) "none" else params$outline.type %||% "both"
+  o <- order(as.integer(data$PANEL), data$group)
+  key <- vctrs::vec_group_id(data.frame(as.integer(data$PANEL), data$group)[o, , drop = FALSE])
+  n_groups <- attr(key, "n")
+  first <- o[match(seq_len(n_groups), key)]
+  # Pieces of each group's paths: rows, the column giving their value
+  # (1 lower, 2 upper, 3 the smooth's line) and the slot of the path.
+  pieces <- list()
+  add <- function(rows, k, which, slot) {
+    pieces[[length(pieces) + 1L]] <<- list(rows = rows, key = k, which = rep(which, length(rows)), slot = rep(slot, length(rows)))
+  }
+  if (ribbon) {
+    keep <- if (is.null(data$align_padding)) rep(TRUE, nrow(data)) else !data$align_padding %in% TRUE
+    up <- keep[o]
+    lo_order <- order(rev(key))
+    lo_rows <- rev(o)[lo_order]
+    lo_key <- rev(key)[lo_order]
+    add(o[up], key[up], 2L, 0L)
+    add(lo_rows, lo_key, 1L, 0L)
+    if (outline %in% c("both", "upper")) add(o[up], key[up], 2L, 1L)
+    if (outline %in% c("both", "lower")) add(lo_rows, lo_key, 1L, 2L)
+  }
+  if (smooth) add(o, key, 3L, 3L)
+  rows <- unlist(lapply(pieces, `[[`, "rows"))
+  path <- (unlist(lapply(pieces, `[[`, "key")) - 1L) * 4L + unlist(lapply(pieces, `[[`, "slot"))
+  which <- unlist(lapply(pieces, `[[`, "which"))
+  ord <- order(path)
+  rows <- rows[ord]
+  path <- path[ord]
+  which <- which[ord]
+  if (length(rows) == 0) {
+    return(NULL)
+  }
+  ids <- unique(path)
+  g <- first[ids %/% 4L + 1L]
+  slot <- ids %% 4L
+  pos <- data[[nm[["pos"]]]][rows]
+  val <- numeric(length(rows))
+  for (w in 1:3) {
+    at <- which == w
+    val[at] <- data[[nm[[c("lo", "hi", "val")[w]]]]][rows[at]]
+  }
+  codes <- lty_code(data$linetype[g])
+  # Polygons: stroked only for outline.type = "full"; lines and the
+  # smooth's path take colour with its own alpha.
+  stroked <- slot != 0L | outline == "full"
+  colour <- point_colours(ifelse(stroked, as.character(data$colour[g]), NA_character_), NA)
+  fill <- point_colours(as.character(data$fill[g]), data$alpha[g])
+  if (is.null(colour) || is.null(fill)) {
+    layout_decline("a ribbon colour alot doesn't parse")
+  }
+  panel <- as.integer(data$PANEL)[rows]
+  path <- match(path, ids) - 1L
+  seqs <- seq_along(rows)
+  c(ranges, list(
+    x = as.double(if (flipped) val else pos), y = as.double(if (flipped) pos else val), colour = colour,
+    lwd = ifelse(codes < 0 | !stroked, 0, data$linewidth[g] * ggplot2::.pt), lty = as.double(pmax(codes, 0)),
+    closed = as.integer(slot == 0L), fill = fill,
+    cap = as.numeric(match(params$lineend %||% "butt", c("round", "butt", "square")) - 1L),
+    join = as.numeric(match(params$linejoin %||% "round", c("round", "mitre", "bevel")) - 1L),
+    mitre = as.double(params$linemitre %||% 10), res = res,
+    rows = if (n_panels == 1) list(seqs) else layer_panel_rows(panel, n_panels),
+    path_rows = if (n_panels == 1) list(path) else unname(lapply(split(path, factor(panel, levels = seq_len(n_panels))), function(p) if (length(p)) p))
   ))
 }
 
@@ -322,7 +407,8 @@ full_text <- function(layer, data, coord, pps, scales, n_panels, res) {
 full_geoms <- function() {
   list(
     ggplot2::GeomPoint, ggplot2::GeomRect, ggplot2::GeomTile, ggplot2::GeomBar,
-    ggplot2::GeomCol, ggplot2::GeomPath, ggplot2::GeomLine, ggplot2::GeomStep, ggplot2::GeomText
+    ggplot2::GeomCol, ggplot2::GeomPath, ggplot2::GeomLine, ggplot2::GeomStep, ggplot2::GeomText,
+    ggplot2::GeomRibbon, ggplot2::GeomArea, ggplot2::GeomDensity, ggplot2::GeomSmooth
   )
 }
 

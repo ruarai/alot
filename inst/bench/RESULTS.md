@@ -1203,3 +1203,16 @@ labels. With a continuous `scale_size()` instead of the binned one the same
 plot takes about 3.5 s in the full tier (against 4.4 s): every point has its
 own size, and drawing 1e6 points of distinct sizes is the point drawer's
 cost, not the legend's; it is left to R7.2.
+
+## R6.5a: ribbons in the full tier (2026-10-31)
+
+`render_full()` against ggplot2's gtable drawn on `ragg::agg_capture()` (the
+build is not timed), release build, 1600 × 1000 at 150 dpi, median of 3:
+
+| Plot | Full tier | ggplot2 + ragg |
+|---|---:|---:|
+| `geom_area(colour = "black")`, 4 stacked groups, 1e6 rows (`area_1e6`) | 2701 ms | 39119 ms |
+| `geom_smooth()` (loess) by 3 groups, with ribbons and a legend | 40 ms | 83 ms |
+
+Both are faster than ragg drawing the same marks. The area's 2.7 s has not
+been profiled by stage (left to R7.2).
