@@ -557,6 +557,45 @@ Whole build (`facet-scaling.R`, `ALOT_BENCH_CORES=1`, 100 panels): wrap free
   zero-width range (where rescaling ±Inf is no longer 0 or 1), `reverse`,
   other coords, overridden coord or facet methods.
 
+### T5.5 Facet-scaling verification (2026-10-31)
+
+`facet-scaling.R`, release build, `ALOT_BENCH_CORES=1`, 200 rows per panel,
+whole `alot_build()` vs `ggplot_build()`:
+
+| case | panels | ggplot2_ms | alot_ms | speedup | alot_ms_per_panel |
+| --- | --- | ---: | ---: | --- | ---: |
+| wrap_fixed_point | 25 | 21 | 19 | 1.11x | 0.8 |
+| wrap_fixed_point | 100 | 25 | 20 | 1.25x | 0.2 |
+| wrap_fixed_point | 400 | 40 | 28 | 1.43x | 0.1 |
+| wrap_fixed_point | 1600 | 278 | 209 | 1.33x | 0.1 |
+| wrap_free_point | 25 | 199 | 95 | 2.09x | 3.8 |
+| wrap_free_point | 100 | 754 | 341 | 2.21x | 3.4 |
+| wrap_free_point | 400 | 3,017 | 1,335 | 2.26x | 3.3 |
+| wrap_free_point | 1600 | 13,508 | 6,113 | 2.21x | 3.8 |
+| grid_free_point | 25 | 166 | 44 | 3.77x | 1.8 |
+| grid_free_point | 100 | 602 | 109 | 5.52x | 1.1 |
+| grid_free_point | 400 | 2,299 | 345 | 6.66x | 0.9 |
+| grid_free_point | 1600 | 10,229 | 1,347 | 7.59x | 0.8 |
+| wrap_histogram | 25 | 234 | 232 | 1.01x | 9.3 |
+| wrap_histogram | 100 | 858 | 853 | 1.01x | 8.5 |
+| wrap_histogram | 400 | 3,635 | 3,644 | 1.00x | 9.1 |
+| wrap_histogram | 1600 | 21,140 | 20,931 | 1.01x | 13.1 |
+
+- **Targets met.** At 400 panels both free-scale cases are over 2×
+  (wrap 2.26×, grid 6.66×), and the fixed-scale control is faster (1.43×),
+  not slower.
+- **Linear growth.** Per-panel cost is flat from 100 to 1,600 panels for the
+  point cases (wrap free 3.4 → 3.8 ms, grid free 1.1 → 0.8, fixed 0.2 →
+  0.1); there is no per-panel overhead left to fix. The wrap histogram's
+  per-panel cost rises at 1,600 (8.5 → 13.1 ms) in both ggplot2 and alot's
+  time, which are equal there, so it is the unported stat/geom work and
+  memory pressure, not a facet step.
+- **Histogram:** 1.0× at every size. Its 5× target waits for the deferred
+  T3.3 and T4.1; these are its current numbers.
+- What remains in `wrap_free_point` (about 3.3 ms per panel) is ggplot2's
+  own `setup_panel_params`/`setup_panel_guides` object construction per
+  COORD, which must stay to give each panel its own objects (T5.3, T5.4).
+
 ## Phase 2 prototype: README plot to PNG (2026-10-30)
 
 Experimental (branch `proto/phase2-points`). `inst/bench/render-readme.R`

@@ -403,7 +403,7 @@ All stat kernels use the grouped driver (T0.4) and register under
 - **Done when:** the guides in `layout$panel_params` are equal, and both the
   `facet_wrap` and the 20×20 `facet_grid` free cases are at least 2× faster.
 
-### T5.5 Facet-scaling verification
+### T5.5 Facet-scaling verification — done
 - **Depends:** T5.1, T5.3, T5.4
 - **Do:** Run the facet-scaling suite and confirm the free-scale cases are
   at least 2× faster at 400 panels and the fixed-scale control is no slower.
