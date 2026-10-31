@@ -3147,6 +3147,272 @@
           grob
       }
 
+# upstream label drawing matches what the full tier mirrors
+
+    Code
+      print(body(environment(ggplot2::GeomLabel$draw_panel)$f))
+    Output
+      {
+          lab <- data$label
+          if (parse) {
+              lab <- parse_safe(as.character(lab))
+          }
+          lab <- validate_labels(lab)
+          data <- coord$transform(data, panel_params)
+          data$vjust <- compute_just(data$vjust, data$y, data$x, data$angle)
+          data$hjust <- compute_just(data$hjust, data$x, data$y, data$angle)
+          if (!is_margin(label.padding)) {
+              label.padding <- rep(label.padding, length.out = 4)
+          }
+          size.unit <- resolve_text_unit(size.unit)
+          data$text.colour <- text.colour %||% data$colour
+          data$border.colour <- border.colour %||% data$colour
+          data$border.colour[data$linewidth == 0] <- NA
+          data$fill <- fill_alpha(data$fill, data$alpha)
+          data$size <- data$size * size.unit
+          grobs <- lapply(seq_len(nrow(data)), function(i) {
+              row <- data[i, , drop = FALSE]
+              labelGrob(lab[i], x = unit(row$x, "native"), y = unit(row$y, 
+                  "native"), just = c(row$hjust, row$vjust), padding = label.padding, 
+                  r = label.r, angle = row$angle, text.gp = gg_par(col = row$text.colour, 
+                      fontsize = row$size, fontfamily = row$family, 
+                      fontface = row$fontface, lineheight = row$lineheight), 
+                  rect.gp = gg_par(col = row$border.colour, fill = row$fill, 
+                      lwd = row$linewidth, lty = row$linetype))
+          })
+          class(grobs) <- "gList"
+          ggname("geom_label", grobTree(children = grobs))
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          if (length(label) != 1) {
+              cli::cli_abort("{.arg label} must be of length 1.")
+          }
+          if (!is.unit(x)) 
+              x <- unit(x, default.units)
+          if (!is.unit(y)) 
+              y <- unit(y, default.units)
+          if (!is.null(angle) & is.null(vp)) {
+              vp <- viewport(angle = angle, x = x, y = y, width = unit(0, 
+                  "cm"), height = unit(0, "cm"), gp = gg_par(fontsize = text.gp$fontsize))
+              x <- unit(rep(0.5, length(x)), "npc")
+              y <- unit(rep(0.5, length(y)), "npc")
+          }
+          descent <- font_descent(text.gp$fontfamily, text.gp$fontface, 
+              text.gp$fontsize, text.gp$cex)
+          padding[1] <- unit.pmax(padding[1], descent)
+          padding[3] <- unit.pmax(padding[3] - descent, unit(0, "pt"))
+          hjust <- resolveHJust(just, NULL)
+          vjust <- resolveVJust(just, NULL)
+          text <- titleGrob(label = label, hjust = hjust, vjust = vjust, 
+              x = x, y = y + (1 - vjust) * descent, margin = padding, 
+              margin_x = TRUE, margin_y = TRUE, gp = text.gp)
+          height <- heightDetails(text)
+          box <- roundrectGrob(x = x, y = y + (0.5 - vjust) * height, 
+              width = widthDetails(text), height = height, just = c(hjust, 
+                  0.5), r = r, gp = rect.gp, name = "box")
+          gTree(children = gList(box, text), name = name, vp = vp)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          if (is.null(label)) {
+              return(zeroGrob())
+          }
+          just <- rotate_just(angle, hjust, vjust)
+          n <- max(length(x), length(y), 1)
+          x <- x %||% unit(rep(just$hjust, n), "npc")
+          y <- y %||% unit(rep(just$vjust, n), "npc")
+          if (!is.unit(x)) {
+              x <- unit(x, "npc")
+          }
+          if (!is.unit(y)) {
+              y <- unit(y, "npc")
+          }
+          grob <- textGrob(label, x, y, hjust = hjust, vjust = vjust, 
+              rot = angle, gp = gp, check.overlap = check.overlap)
+          descent <- font_descent(gp$fontfamily, gp$fontface, gp$fontsize, 
+              gp$cex)
+          rad <- (angle[1]%%360)/180 * pi
+          x_descent <- abs(sin(rad)) * descent
+          y_descent <- abs(cos(rad)) * descent
+          width <- unit(1, "grobwidth", grob) + x_descent
+          height <- unit(1, "grobheight", grob) + y_descent
+          if (is.null(margin)) {
+              margin <- margin(0, 0, 0, 0)
+          }
+          margin_x <- isTRUE(margin_x)
+          margin_y <- isTRUE(margin_y)
+          new_x <- NULL
+          new_y <- NULL
+          new_width <- NULL
+          new_height <- NULL
+          if (margin_x) {
+              new_width <- unit.c(margin[4], width, margin[2])
+              new_x <- x - margin[2] * just$hjust + margin[4] * (1 - 
+                  just$hjust)
+          }
+          if (margin_y) {
+              new_height <- unit.c(margin[1], height, margin[3])
+              new_y <- y - margin[1] * just$vjust + margin[3] * (1 - 
+                  just$vjust)
+          }
+          if (xor(margin_x, margin_y)) {
+              new_width <- new_width %||% unit(1, "null")
+              new_height <- new_height %||% unit(1, "null")
+          }
+          new_width <- new_width %||% width
+          new_height <- new_height %||% height
+          x <- new_x %||% x
+          y <- new_y %||% y
+          grob$x <- x
+          grob$y <- y
+          if (isTRUE(debug)) {
+              children <- gList(rectGrob(x = x, y = y, width = width, 
+                  height = height, hjust = just$hjust, vjust = just$vjust, 
+                  gp = gg_par(fill = "cornsilk", col = NA)), pointsGrob(x, 
+                  y, pch = 20, gp = gg_par(col = "gold")), grob)
+          }
+          else {
+              children <- gList(grob)
+          }
+          gTree(children = children, widths = new_width, heights = new_height, 
+              cl = "titleGrob")
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          cur_dev <- names(grDevices::dev.cur())
+          if (cur_dev == "null device") {
+              cache <- FALSE
+          }
+          else {
+              cache <- TRUE
+          }
+          key <- paste0(cur_dev, ":", family, ":", face, ":", size, 
+              ":", cex)
+          key <- key[1]
+          descent <- descent_cache[[key]]
+          if (is.null(descent)) {
+              descent <- convertHeight(grobDescent(textGrob(label = "gjpqyQ", 
+                  gp = gg_par(fontsize = size, cex = cex, fontfamily = family, 
+                      fontface = face))), "inches")
+              if (cache) {
+                  descent_cache[[key]] <- descent
+              }
+          }
+          descent
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          data <- replace_null(unclass(data), label = "a", angle = 0)
+          hjust <- compute_just(data$hjust %||% 0.5)
+          vjust <- compute_just(data$vjust %||% 0.5)
+          just <- rotate_just(data$angle, hjust, vjust)
+          padding <- rep(params$label.padding %||% unit(0.25, "lines"), 
+              length.out = 4)
+          descent <- font_descent(family = data$family %||% "", face = data$fontface %||% 
+              1, size = data$size %||% 3.88)
+          lwd <- data$linewidth %||% 0.25
+          grob <- labelGrob(data$label, x = unit(just$hjust, "npc"), 
+              y = unit(just$vjust, "npc") + descent, angle = data$angle, 
+              just = c(hjust, vjust), padding = padding, r = params$label.r %||% 
+                  unit(0.15, "lines"), text.gp = gg_par(col = params$text.colour %||% 
+                  data$colour %||% "black", fontfamily = data$family %||% 
+                  "", fontface = data$fontface %||% 1, fontsize = (data$size %||% 
+                  3.88) * .pt), rect.gp = gg_par(col = if (isTRUE(all.equal(lwd, 
+                  0))) 
+                  NA
+              else params$border.colour %||% data$colour %||% "black", 
+                  fill = alpha(data$fill %||% "white", data$alpha), 
+                  lwd = lwd, lty = data$linetype %||% 1L))
+          angle <- deg2rad(data$angle %||% 0)
+          text <- grob$children[[2]]
+          width <- convertWidth(grobWidth(text), "cm", valueOnly = TRUE)
+          height <- convertHeight(grobHeight(text), "cm", valueOnly = TRUE)
+          x <- c(0, 0, width, width)
+          y <- c(0, height, height, 0)
+          attr(grob, "width") <- diff(range(x * cos(angle) - y * sin(angle)))
+          attr(grob, "height") <- diff(range(x * sin(angle) + y * cos(angle)))
+          grob
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("rrpoints", "grid")))
+    Output
+      {
+          left <- 0
+          bottom <- 0
+          right <- convertX(unit(1, "npc"), "inches", valueOnly = TRUE)
+          top <- convertY(unit(1, "npc"), "inches", valueOnly = TRUE)
+          r <- min(convertWidth(x$r, "inches", valueOnly = TRUE), convertHeight(x$r, 
+              "inches", valueOnly = TRUE))
+          corner1 <- roundCorner(1, left, bottom, r)
+          corner2 <- roundCorner(2, left, top, r)
+          corner3 <- roundCorner(3, right, top, r)
+          corner4 <- roundCorner(4, right, bottom, r)
+          xx <- unit(c(left + r, right - r, corner4$x, right, right, 
+              corner3$x, right - r, left + r, corner2$x, left, left, 
+              corner1$x), "inches")
+          yy <- unit(c(bottom, bottom, corner4$y, bottom + r, top - 
+              r, corner3$y, top, top, corner2$y, top - r, bottom + 
+              r, corner1$y), "inches")
+          list(x = xx, y = yy)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("roundCorner", "grid")))
+    Output
+      {
+          n <- 10 * 4
+          t <- seq(0, 2 * pi, length.out = n)
+          cost <- cos(t)
+          sint <- sin(t)
+          if (num == 1) {
+              xc <- x + r
+              yc <- y + r
+              subset <- (n/2):(3 * n/4)
+          }
+          else if (num == 2) {
+              xc <- x + r
+              yc <- y - r
+              subset <- (n/4):(n/2)
+          }
+          else if (num == 3) {
+              xc <- x - r
+              yc <- y - r
+              subset <- 1L:(n/4)
+          }
+          else if (num == 4) {
+              xc <- x - r
+              yc <- y + r
+              subset <- (3 * n/4):n
+          }
+          list(x = xc + (cost * r)[subset], y = yc + (sint * r)[subset])
+      }
+
 # upstream theme and label resolution match what the render IR mirrors
 
     Code

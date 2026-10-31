@@ -249,6 +249,9 @@ legend_glyph <- function(f, data, params, res, default_cm) {
   if (is_key("text")) {
     return(legend_text_glyph(data, res))
   }
+  if (is_key("label")) {
+    return(legend_label_glyph(data, params, res))
+  }
   # draw_key_smooth(): with `se`, a rect of alpha(fill, alpha) filling the
   # key, then draw_key_path() of the data with alpha 1.
   if (is_key("smooth")) {

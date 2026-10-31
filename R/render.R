@@ -293,7 +293,8 @@ full_kind <- function(layer) {
   }
   # Boxplots, violins and the range geoms (R6.5b, R/render-ranges.R);
   # segments, reference lines and rugs (R6.5c, R/render-segments.R).
-  range_kind(geom) %||% segment_kind(geom)
+  # Labels (R6.5d, R/render-labels.R).
+  range_kind(geom) %||% segment_kind(geom) %||% label_kind(geom)
 }
 
 # A layer's data as its geom draws it: Layer$draw_geom() removes missing
@@ -358,6 +359,7 @@ hybrid_decline <- function(layer, data, layout, kind = hybrid_kind(layer)) {
     text = text_decline(data, layer$computed_geom_params),
     ribbons = ribbons_decline(data, layer$computed_geom_params, FALSE),
     smooth = ribbons_decline(data, layer$computed_geom_params, TRUE),
+    label = label_decline(data, layer$computed_geom_params),
     if (kind %in% names(segment_kinds())) {
       segment_decline(kind, data, layer$computed_geom_params)
     } else {

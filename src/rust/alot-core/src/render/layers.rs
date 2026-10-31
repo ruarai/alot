@@ -97,6 +97,11 @@ pub struct PathLayer {
     /// drawn whole; ribbons (`GeomRibbon$draw_group()`) mix them with
     /// polylines in drawing order.
     pub fill: Vec<Option<[u8; 4]>>,
+    /// Offsets in device pixels (y down) added to each row's position once
+    /// mapped to the panel, or empty: `geom_label()`'s boxes are sized in
+    /// absolute units around their data anchor (`labelGrob()`).
+    pub dx: Vec<f64>,
+    pub dy: Vec<f64>,
     pub cap: Cap,
     pub join: Join,
     pub mitre: f64,
@@ -108,6 +113,7 @@ impl PathLayer {
     /// as grid draws each run separately.
     pub(crate) fn specs(&self, c: &Rect) -> Vec<PathSpec> {
         let (pw, ph) = (c.x1 - c.x0, c.y1 - c.y0);
+        let off = |k: usize| if self.dx.is_empty() { [0.0, 0.0] } else { [self.dx[k], self.dy[k]] };
         let mut specs = Vec::new();
         let mut k = 0;
         while k < self.x.len() {
@@ -116,7 +122,8 @@ impl PathLayer {
             if let Some(&Some(fill)) = self.fill.get(p) {
                 let mut ring = Vec::new();
                 while k < self.x.len() && self.path[k] as usize == p {
-                    ring.push([c.x0 + npc(self.x[k], &self.x_range) * pw, c.y0 + (1.0 - npc(self.y[k], &self.y_range)) * ph]);
+                    let d = off(k);
+                    ring.push([c.x0 + npc(self.x[k], &self.x_range) * pw + d[0], c.y0 + (1.0 - npc(self.y[k], &self.y_range)) * ph + d[1]]);
                     k += 1;
                 }
                 specs.push(PathSpec { rings: vec![ring], closed: true, fill, rule: Rule::NonZero, col: self.col[p], stroke });
@@ -124,7 +131,8 @@ impl PathLayer {
             }
             let mut rings: Vec<Vec<[f64; 2]>> = vec![Vec::new()];
             while k < self.x.len() && self.path[k] as usize == p {
-                let pt = [c.x0 + npc(self.x[k], &self.x_range) * pw, c.y0 + (1.0 - npc(self.y[k], &self.y_range)) * ph];
+                let d = off(k);
+                let pt = [c.x0 + npc(self.x[k], &self.x_range) * pw + d[0], c.y0 + (1.0 - npc(self.y[k], &self.y_range)) * ph + d[1]];
                 if pt[0].is_finite() && pt[1].is_finite() {
                     rings.last_mut().unwrap().push(pt);
                 } else {
@@ -154,6 +162,10 @@ pub struct Label {
     pub vjust: f64,
     /// `angle`, in degrees.
     pub rot: f64,
+    /// Offset in device pixels (y down) from the position (`geom_label()`'s
+    /// text sits inside its padding).
+    pub dx: f64,
+    pub dy: f64,
     pub text: String,
     pub style: TextStyle,
 }
@@ -170,20 +182,73 @@ impl TextLayer {
     /// Consecutive labels in one style are drawn together; labels in
     /// different styles in order, so overlaps composite as on a device.
     pub(crate) fn draw(&self, p: &mut Painter, c: &Rect, clip: [i32; 4]) -> Option<()> {
+        self.draw_range(p, c, clip, 0, self.labels.len())
+    }
+
+    /// Draws labels `from..to` only.
+    pub(crate) fn draw_range(&self, p: &mut Painter, c: &Rect, clip: [i32; 4], from: usize, to: usize) -> Option<()> {
         let (w, h) = (c.x1 - c.x0, c.y1 - c.y0);
-        let mut k = 0;
-        while k < self.labels.len() {
+        let mut k = from;
+        while k < to {
             let style = self.labels[k].style;
-            let end = self.labels[k..].iter().position(|l| l.style != style).map_or(self.labels.len(), |d| k + d);
+            let end = self.labels[k..to].iter().position(|l| l.style != style).map_or(to, |d| k + d);
             let runs: Vec<Run> = self.labels[k..end]
                 .iter()
-                .map(|l| Run { x: c.x0 + l.x * w, y: c.y1 - l.y * h, hjust: l.hjust, vjust: l.vjust, rot: l.rot, text: &l.text })
+                .map(|l| Run { x: c.x0 + l.x * w + l.dx, y: c.y1 - l.y * h + l.dy, hjust: l.hjust, vjust: l.vjust, rot: l.rot, text: &l.text })
                 .filter(|r| r.x.is_finite() && r.y.is_finite())
                 .collect();
             p.text_clipped(&runs, &style, clip)?;
             k = end;
         }
         Some(())
+    }
+}
+
+/// A `geom_label()` layer (`GeomLabel$draw_panel()`): per label, in data
+/// order, a `labelGrob()` of its box (path `i` of `boxes`, a closed filled
+/// polygon) then its text (label `i` of `text`). Consecutive labels whose
+/// boxes (widened by their stroke and their font size, which bounds the
+/// glyphs' ink outside the box) don't overlap are drawn as one batch of
+/// boxes then one of text: the same pixels as drawing them in turn.
+pub struct LabelLayer {
+    pub boxes: PathLayer,
+    pub text: TextLayer,
+}
+
+impl LabelLayer {
+    pub(crate) fn groups(&self, specs: &[PathSpec]) -> Option<Vec<(usize, usize)>> {
+        let n = self.text.labels.len();
+        if specs.len() != n {
+            return None;
+        }
+        let bbox = |i: usize| {
+            let pad = specs[i].stroke.lwd + self.text.labels[i].style.size + 2.0;
+            let r = &specs[i].rings[0];
+            let (mut x0, mut y0, mut x1, mut y1) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+            for pt in r {
+                x0 = x0.min(pt[0]);
+                x1 = x1.max(pt[0]);
+                y0 = y0.min(pt[1]);
+                y1 = y1.max(pt[1]);
+            }
+            [x0 - pad, y0 - pad, x1 + pad, y1 + pad]
+        };
+        let mut out = Vec::new();
+        let mut start = 0;
+        let mut seen: Vec<[f64; 4]> = Vec::new();
+        for i in 0..n {
+            let b = bbox(i);
+            if seen.iter().any(|s| b[0] < s[2] && s[0] < b[2] && b[1] < s[3] && s[1] < b[3]) {
+                out.push((start, i));
+                start = i;
+                seen.clear();
+            }
+            seen.push(b);
+        }
+        if n > 0 {
+            out.push((start, n));
+        }
+        Some(out)
     }
 }
 
@@ -216,7 +281,7 @@ mod tests {
             x: vec![0.0, 5.0, f64::NAN, 10.0, 10.0], y: vec![0.0, 5.0, 5.0, 0.0, 10.0],
             path: vec![0, 0, 0, 0, 0],
             x_range: [0.0, 10.0], y_range: [0.0, 10.0],
-            col: vec![[0, 0, 0, 255]], lwd: vec![1.0], lty: vec![0], fill: vec![],
+            col: vec![[0, 0, 0, 255]], lwd: vec![1.0], lty: vec![0], fill: vec![], dx: vec![], dy: vec![],
             cap: Cap::Butt, join: Join::Round, mitre: 10.0, res: 96.0,
         };
         let specs = l.specs(&cell());
@@ -230,7 +295,7 @@ mod tests {
         let l = PathLayer {
             x: vec![0.0, 10.0, 10.0, 0.0, 0.0, 10.0], y: vec![5.0, 5.0, 0.0, 0.0, 5.0, 5.0], path: vec![0, 0, 0, 0, 1, 1],
             x_range: [0.0, 10.0], y_range: [0.0, 10.0],
-            col: vec![[0; 4], [0, 0, 0, 255]], lwd: vec![0.0, 1.0], lty: vec![0, 0], fill: vec![Some([9, 9, 9, 255]), None],
+            col: vec![[0; 4], [0, 0, 0, 255]], lwd: vec![0.0, 1.0], lty: vec![0, 0], fill: vec![Some([9, 9, 9, 255]), None], dx: vec![], dy: vec![],
             cap: Cap::Butt, join: Join::Round, mitre: 10.0, res: 96.0,
         };
         let specs = l.specs(&cell());
@@ -241,11 +306,48 @@ mod tests {
     }
 
     #[test]
+    fn path_offsets_are_device_pixels_after_mapping() {
+        let l = PathLayer {
+            x: vec![5.0, 5.0, 5.0], y: vec![5.0, 5.0, 5.0], path: vec![0, 0, 0],
+            x_range: [0.0, 10.0], y_range: [0.0, 10.0],
+            col: vec![[0; 4]], lwd: vec![0.0], lty: vec![0], fill: vec![Some([9, 9, 9, 255])],
+            dx: vec![-2.0, 3.0, 3.0], dy: vec![1.0, 1.0, -4.0],
+            cap: Cap::Butt, join: Join::Round, mitre: 10.0, res: 96.0,
+        };
+        let specs = l.specs(&cell());
+        assert_eq!(specs[0].rings[0], vec![[58.0, 46.0], [63.0, 46.0], [63.0, 41.0]]);
+    }
+
+    #[test]
+    fn label_groups_break_at_overlapping_boxes() {
+        let sq = |x: f64| PathSpec {
+            rings: vec![vec![[x, 0.0], [x + 10.0, 0.0], [x + 10.0, 10.0], [x, 10.0]]],
+            closed: true, fill: [0; 4], rule: Rule::NonZero, col: [0; 4],
+            stroke: Stroke { lwd: 0.0, lty: 0, cap: Cap::Butt, join: Join::Round, mitre: 10.0 },
+        };
+        let label = |x: f64| Label {
+            x, y: 0.0, hjust: 0.5, vjust: 0.5, rot: 0.0, dx: 0.0, dy: 0.0, text: "a".into(),
+            style: TextStyle { font: 0, size: 2.0, line: 2.4, colour: [0; 4] },
+        };
+        let l = LabelLayer {
+            boxes: PathLayer {
+                x: vec![], y: vec![], path: vec![], x_range: [0.0, 1.0], y_range: [0.0, 1.0], col: vec![], lwd: vec![], lty: vec![],
+                fill: vec![], dx: vec![], dy: vec![], cap: Cap::Butt, join: Join::Round, mitre: 10.0, res: 96.0,
+            },
+            text: TextLayer { labels: vec![label(0.0), label(0.5), label(0.6)] },
+        };
+        // Boxes at 0 and 100 apart; the third overlaps the second.
+        let specs = vec![sq(0.0), sq(100.0), sq(105.0)];
+        assert_eq!(l.groups(&specs), Some(vec![(0, 2), (2, 3)]));
+        assert_eq!(l.groups(&specs[..2]), None);
+    }
+
+    #[test]
     fn paths_of_different_ids_are_separate() {
         let l = PathLayer {
             x: vec![0.0, 1.0, 2.0, 3.0], y: vec![0.0; 4], path: vec![0, 0, 1, 1],
             x_range: [0.0, 10.0], y_range: [0.0, 10.0],
-            col: vec![[0, 0, 0, 255], [255, 0, 0, 255]], lwd: vec![1.0, 2.0], lty: vec![0, 0], fill: vec![],
+            col: vec![[0, 0, 0, 255], [255, 0, 0, 255]], lwd: vec![1.0, 2.0], lty: vec![0, 0], fill: vec![], dx: vec![], dy: vec![],
             cap: Cap::Butt, join: Join::Round, mitre: 10.0, res: 96.0,
         };
         let specs = l.specs(&cell());

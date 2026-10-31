@@ -1250,3 +1250,17 @@ build is not timed), release build, 1600 × 1000 at 150 dpi, median of 3:
 All are faster than ragg, but by less than the other geoms' cases (ragg
 draws segments cheaply); not profiled by stage (left to R7.2).
 
+
+## R6.5d: labels and polygons in the full tier (2026-10-31)
+
+`render_full()` against ggplot2's gtable drawn on `ragg::agg_capture()` (the
+build is not timed), release build, 1600 × 1000 at 150 dpi, median of 3:
+
+| Plot | Full tier | ggplot2 + ragg |
+|---|---:|---:|
+| `geom_label()`, 2000 overlapping labels filled by 4 groups (`label_2e3`) | 643 ms | 4513 ms |
+| `geom_polygon()`, 1e4 outlined triangles filled by 4 groups (`polygon_1e4`) | 62 ms | 130 ms |
+
+Overlapping labels are drawn in batches (a box batch, then a text batch)
+that break wherever a label's box would overlap an earlier one in the
+batch, so dense labels cost more batches but stay well ahead of ragg.

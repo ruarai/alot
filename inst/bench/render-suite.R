@@ -137,6 +137,24 @@ render_cases <- list(
       ggplot(d, aes(x, y, xend = x + 0.02, yend = y + 0.01, colour = g)) + geom_segment()
     },
     size = readme_size
+  ),
+  # R6.5d: 2000 overlapping labels filled by group; 1e4 triangles.
+  label_2e3 = list(
+    plot = function() {
+      d <- data.frame(x = stats::runif(2000), y = stats::runif(2000), g = rep(letters[1:4], 500))
+      ggplot(d, aes(x, y, label = g, fill = g)) + geom_label()
+    },
+    size = readme_size
+  ),
+  polygon_1e4 = list(
+    plot = function() {
+      n <- 1e4
+      cx <- rep(stats::runif(n), each = 3)
+      cy <- rep(stats::runif(n), each = 3)
+      d <- data.frame(x = cx + c(0, 0.01, 0.005), y = cy + c(0, 0, 0.01), g = rep(seq_len(n), each = 3), f = rep(letters[1:4], each = 3, length.out = 3 * n))
+      ggplot(d, aes(x, y, group = g, fill = f)) + geom_polygon(colour = "black", linewidth = 0.2)
+    },
+    size = readme_size
   )
 )
 

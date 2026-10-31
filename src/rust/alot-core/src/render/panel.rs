@@ -4,7 +4,7 @@
 
 use crate::render::display::Item;
 use crate::render::display::Rect;
-use crate::render::layers::{PathLayer, RectLayer, TextLayer};
+use crate::render::layers::{LabelLayer, PathLayer, RectLayer, TextLayer};
 use crate::render::paths::PathBatch;
 use crate::render::page::{LineStyle, Painter, RectEl};
 use crate::render::points::{Point, PointBatch};
@@ -77,6 +77,7 @@ pub enum Layer {
     Rects(RectLayer),
     Paths(PathLayer),
     Text(TextLayer),
+    Labels(LabelLayer),
 }
 
 pub struct Panel {
@@ -117,6 +118,13 @@ impl Panel {
                     }
                 }
                 Layer::Text(l) => l.draw(p, c, clip)?,
+                Layer::Labels(l) => {
+                    let specs = l.boxes.specs(c);
+                    for (a, b) in l.groups(&specs)? {
+                        p.list.push(Item::Paths(PathBatch::new(&specs[a..b])));
+                        l.text.draw_range(p, c, clip, a, b)?;
+                    }
+                }
             }
         }
         if self.ontop {

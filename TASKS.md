@@ -965,7 +965,7 @@ anything else.
   doesn't draw yet, which come with R6.5), and guides other than legend,
   colourbar, coloursteps and bins.
 
-### R6.5 Remaining geoms
+### R6.5 Remaining geoms — done
 - **Depends:** R6.1
 - **Do:** Add drawers for the rest of PHASE2.md's geom list (area, ribbon,
   density, boxplot, violin, the ranges, crossbar, segment, curve, the
@@ -973,6 +973,18 @@ anything else.
   split into one task per family when started.
 - **Done when:** each passes `expect_render_close()` across its corpus
   plots.
+- **Result:** split into R6.5a–d below. The full tier now draws the ribbon
+  family and smooths (a), boxplots, violins, crossbars and the range geoms
+  (b), segments, reference lines and rugs (c), and labels, polygons and
+  annotate() layers of all of these (d), with their legend keys; every corpus
+  plot it draws matches ragg (with the full tier forced on, 189 of the 208
+  plots of the default render-corpus sample draw in full, against 168 after
+  R6.5c). Declined, and drawn by the hybrid or ggplot2 tier instead:
+  `geom_curve()` (grid's X-spline), `geom_raster()`, arrows, polygon
+  subgroups (holes), aesthetics varying along a line or ribbon, parsed or
+  multi-line labels, and the coords and options the full tier declines
+  elsewhere. None of these geoms has a hybrid drawer beyond the existing
+  polygon one (left to R7.1).
 
 ### R6.5a Ribbon family — done
 - **Result:** the full tier draws `geom_ribbon()`, `geom_area()`,
@@ -1048,6 +1060,36 @@ anything else.
   removes them), rug lengths in units other than npc, and the coords and
   options the full tier declines elsewhere. No hybrid drawer (left to
   R7.1). The render tests' undrawn example is now `geom_curve()`.
+
+### R6.5d Labels, polygons, rasters and annotations — done
+- **Result:** the full tier draws `geom_label()` (R/render-labels.R) as
+  GeomLabel's `labelGrob()` lays each label out about its position: the
+  top padding raised to the descent of "gjpqyQ" and the bottom one reduced
+  by it, the text placed by `titleGrob()`'s margins, and the box as the
+  polygon of grid's `rrpoints()` (`roundrectGrob()`), all in device pixels
+  and rotated by `angle`; `label.padding` (one or four values), `label.r`,
+  `border.colour`, `text.colour`, `linewidth` 0 (no border), `alpha` on the
+  fill only, justification, faces, facets and free scales. Rust gets a label
+  layer (a path layer of boxes with per-vertex pixel offsets and a text layer
+  with per-label offsets) drawn box, text, box, text as grid does, batched
+  where boxes don't overlap. `geom_polygon()` without subgroups is drawn as
+  closed filled paths (one per group, styled by its first row, nothing for
+  a panel of one row). `draw_key_label()` is drawn (its size taken with the
+  padding in the device's default 12 pt, its raise by the descent at a
+  fontsize of `size`, as ggplot2 computes them). annotate() layers of the
+  drawn geoms (text, label, rect, segment, pointrange, polygon, ...) need
+  nothing of their own and are tested. `test-render-labels.R` has about 30
+  image + layout cases and the fallbacks. With the full tier forced on, 33
+  of the 57 render-corpus plots of the label/text, polygon, annotate and
+  raster files draw in full and match ragg, as do 189 of the 208 of the
+  default sample. Declined: `geom_raster()` and `annotation_raster()` (a
+  device-scaled, possibly interpolated `rasterGrob()`; not mirrored within
+  this task), polygon subgroups (`pathGrob()` with holes and `rule`; the
+  hybrid tier draws them), parsed, numeric and multi-line labels,
+  `label.padding`/`label.r` in npc-like units, vectors of `border.colour` or
+  `text.colour`, non-finite label positions, rotated label keys, and the
+  coords and options the full tier declines elsewhere. No hybrid label
+  drawer (left to R7.1).
 
 ### R6.6 Coords and secondary axes
 - **Depends:** R6.1

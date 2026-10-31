@@ -17,6 +17,8 @@ use crate::render::display::{Item, Rect};
 use crate::render::layout::{Size, Table};
 use crate::render::page::{LineStyle, Painter, RectEl};
 use crate::render::panel::PointLayer;
+use crate::render::layers::LabelLayer;
+use crate::render::paths::PathBatch;
 use crate::render::rects::{RectBatch, RectSpec, RectStyle};
 use crate::render::title::Title;
 
@@ -68,6 +70,8 @@ pub enum Glyph {
     Line { x: Vec<f64>, y: Vec<f64>, style: LineStyle },
     /// `draw_key_text()`: a title grob in the key.
     Text(Title),
+    /// `draw_key_label()`: a label layer in the key, positions in its npc.
+    Label(LabelLayer),
 }
 
 impl Glyph {
@@ -88,6 +92,14 @@ impl Glyph {
                 p.lines(vec![line], style);
             }
             Glyph::Text(t) => t.draw(p, c)?,
+            Glyph::Label(l) => {
+                let specs = l.boxes.specs(c);
+                let clip = p.page_clip();
+                for (a, b) in l.groups(&specs)? {
+                    p.list.push(Item::Paths(PathBatch::new(&specs[a..b])));
+                    l.text.draw_range(p, c, clip, a, b)?;
+                }
+            }
         }
         Some(())
     }

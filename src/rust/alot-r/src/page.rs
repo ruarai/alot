@@ -6,7 +6,7 @@ use alot_core::render::axis::{Axis, Side, Ticks};
 use alot_core::render::layout::TitleGrob;
 use alot_core::render::legend::{Bar, BarTicks, Bins, Body, Glyph, Guide, Keys, LegendGroup};
 use alot_core::render::page::{draw_page, FacetDraw, LineStyle, PageSpec, RectEl, StripDraw, TextStyle};
-use alot_core::render::layers::{Label, PathLayer, RectLayer, TextLayer};
+use alot_core::render::layers::{Label, LabelLayer, PathLayer, RectLayer, TextLayer};
 use alot_core::render::panel::{GridLines, Layer, Panel, PointLayer};
 use alot_core::render::raster;
 use alot_core::render::text::Font;
@@ -288,6 +288,15 @@ fn path_layers(l: &List, n_panels: usize) -> Option<Vec<Option<Layer>>> {
         }
         _ => Vec::new(),
     };
+    // Labels' boxes: per-row offsets in device pixels.
+    let (dx_r, dy_r) = (field(l, "dx"), field(l, "dy"));
+    let (dx, dy): (&[f64], &[f64]) = match (&dx_r, &dy_r) {
+        (Some(a), Some(b)) => (a.as_real_slice()?, b.as_real_slice()?),
+        _ => (&[], &[]),
+    };
+    if !dx.is_empty() && (dx.len() != x.len() || dy.len() != x.len()) {
+        return None;
+    }
     rows.into_iter()
         .zip(path_rows.iter())
         .enumerate()
@@ -307,6 +316,8 @@ fn path_layers(l: &List, n_panels: usize) -> Option<Vec<Option<Layer>>> {
                 lwd: lwd.to_vec(),
                 lty: lty.iter().map(|&t| t as u32).collect(),
                 fill: fill.clone(),
+                dx: if dx.is_empty() { Vec::new() } else { rows.iter().map(|&i| dx[i]).collect() },
+                dy: if dy.is_empty() { Vec::new() } else { rows.iter().map(|&i| dy[i]).collect() },
                 cap, join, mitre, res,
             })))
         })
@@ -331,6 +342,15 @@ fn text_layers(l: &List, n_panels: usize, fonts: &mut Fonts) -> Option<Vec<Optio
         return None;
     }
     let ids: Vec<usize> = paths.iter().zip(indices).map(|(p, &i)| fonts.index(p.to_string(), i as u32)).collect();
+    // Labels' text: per-row offsets in device pixels.
+    let (dx_r, dy_r) = (field(l, "dx"), field(l, "dy"));
+    let (dx, dy): (&[f64], &[f64]) = match (&dx_r, &dy_r) {
+        (Some(a), Some(b)) => (a.as_real_slice()?, b.as_real_slice()?),
+        _ => (&[], &[]),
+    };
+    if !dx.is_empty() && (dx.len() != n || dy.len() != n) {
+        return None;
+    }
     panel_rows(l, n_panels)?
         .into_iter()
         .map(|rows| {
@@ -342,11 +362,29 @@ fn text_layers(l: &List, n_panels: usize, fonts: &mut Fonts) -> Option<Vec<Optio
                 }
                 labels.push(Label {
                     x: cols[0][i], y: cols[1][i], hjust: cols[2][i], vjust: cols[3][i], rot: cols[4][i],
+                    dx: dx.get(i).copied().unwrap_or(0.0), dy: dy.get(i).copied().unwrap_or(0.0),
                     text: label[i].to_string(),
                     style: TextStyle { font: ids[font[i] as usize - 1], size: cols[5][i], line: cols[6][i], colour: (colour[i] as u32).to_le_bytes() },
                 });
             }
             Some(Some(Layer::Text(TextLayer { labels })))
+        })
+        .collect()
+}
+
+/// A label layer dealt out to the panels: see `full_labels()` in
+/// R/render-labels.R. `boxes` is a path layer and `text` a text layer,
+/// path `i` of a panel being the box of its label `i`.
+fn label_layers(l: &List, n_panels: usize, fonts: &mut Fonts) -> Option<Vec<Option<Layer>>> {
+    let boxes = path_layers(&List::try_from(field(l, "boxes")?).ok()?, n_panels)?;
+    let text = text_layers(&List::try_from(field(l, "text")?).ok()?, n_panels, fonts)?;
+    boxes
+        .into_iter()
+        .zip(text)
+        .map(|(b, t)| match (b, t) {
+            (Some(Layer::Paths(boxes)), Some(Layer::Text(text))) => Some(Some(Layer::Labels(LabelLayer { boxes, text }))),
+            (None, None) => Some(None),
+            _ => None,
         })
         .collect()
 }
@@ -361,6 +399,7 @@ fn layers(l: &List, n_panels: usize, fonts: &mut Fonts) -> Option<Vec<Option<Lay
         "rects" => rect_layers(l, n_panels),
         "paths" => path_layers(l, n_panels),
         "text" => text_layers(l, n_panels, fonts),
+        "labels" => label_layers(l, n_panels, fonts),
         _ => None,
     }
 }
@@ -422,6 +461,10 @@ fn glyph(l: &List, fonts: &mut Fonts) -> Option<Glyph> {
             Some(Glyph::Line { x, y, style: line_style(l)? })
         }
         "text" => Some(Glyph::Text(title(l, fonts)?)),
+        "label" => match label_layers(l, 1, fonts)?.pop()? {
+            Some(Layer::Labels(layer)) => Some(Glyph::Label(layer)),
+            _ => None,
+        },
         _ => None,
     }
 }

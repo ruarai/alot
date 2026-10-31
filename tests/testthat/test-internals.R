@@ -261,6 +261,18 @@ test_that("upstream segment, reference line and rug drawing match what the full 
   }
 })
 
+test_that("upstream label drawing matches what the full tier mirrors", {
+  # R/render-labels.R mirrors GeomLabel$draw_panel(), labelGrob() (with
+  # titleGrob() and font_descent()), grid's rrpoints() and
+  # draw_key_label() (GeomPolygon$draw_panel() is snapshotted above).
+  expect_snapshot(print(body(environment(ggplot2::GeomLabel$draw_panel)$f)))
+  for (f in c("labelGrob", "titleGrob", "font_descent", "draw_key_label")) {
+    expect_snapshot(print(body(utils::getFromNamespace(f, "ggplot2"))))
+  }
+  expect_snapshot(print(body(utils::getFromNamespace("rrpoints", "grid"))))
+  expect_snapshot(print(body(utils::getFromNamespace("roundCorner", "grid"))))
+})
+
 test_that("upstream theme and label resolution match what the render IR mirrors", {
   # resolve_theme() (R/render-ir.R) mirrors calc_element() and
   # combine_elements(); ir_labels() mirrors Layout$render()'s axis titles.
