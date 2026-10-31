@@ -129,6 +129,14 @@ render_cases <- list(
       ggplot(d, aes(g, y, fill = g)) + geom_boxplot(notch = TRUE)
     },
     size = readme_size
+  ),
+  # R6.5c: 1e5 segments coloured by group.
+  segment_1e5 = list(
+    plot = function() {
+      d <- data.frame(x = stats::runif(1e5), y = stats::runif(1e5), g = rep(letters[1:4], 2.5e4))
+      ggplot(d, aes(x, y, xend = x + 0.02, yend = y + 0.01, colour = g)) + geom_segment()
+    },
+    size = readme_size
   )
 )
 

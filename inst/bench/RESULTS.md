@@ -1235,3 +1235,18 @@ many small paths slower than ragg: 1e5 error bars took 11.4 s, and 1e4
 two-point `geom_path()` groups 706 ms to draw. Each path is now rasterised
 over its bounding box only (`agg::rasterize_in()` of a box gives the full
 rasterisation's alpha); those take 324 ms and 24 ms.
+
+## R6.5c: segments, reference lines and rugs in the full tier (2026-10-31)
+
+`render_full()` against ggplot2's gtable drawn on `ragg::agg_capture()` (the
+build is not timed), release build, 1600 × 1000 at 150 dpi, median of 3:
+
+| Plot | Full tier | ggplot2 + ragg |
+|---|---:|---:|
+| `geom_segment()`, 1e5 segments by 4 colours (`segment_1e5`) | 295 ms | 402 ms |
+| `geom_rug()`, 1e5 rows on two sides (2e5 segments) | 381 ms | 439 ms |
+| 100 each of `geom_hline()`, `geom_vline()`, `geom_abline()` over 10 points | 63 ms | 70 ms |
+
+All are faster than ragg, but by less than the other geoms' cases (ragg
+draws segments cheaply); not profiled by stage (left to R7.2).
+

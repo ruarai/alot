@@ -247,6 +247,20 @@ test_that("upstream boxplot, violin and range drawing match what the full tier m
   }
 })
 
+test_that("upstream segment, reference line and rug drawing match what the full tier mirrors", {
+  # R/render-segments.R mirrors these draw methods (GeomSegment's is
+  # snapshotted above); legend_glyph() mirrors the keys.
+  expect_snapshot(print(body(environment(ggplot2::GeomAbline$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomHline$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomVline$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomRug$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomRug$handle_na)$f)))
+  expect_snapshot(print(body(environment(ggplot2::CoordCartesian$backtransform_range)$f)))
+  for (f in c("draw_key_abline", "draw_key_vline")) {
+    expect_snapshot(print(body(utils::getFromNamespace(f, "ggplot2"))))
+  }
+})
+
 test_that("upstream theme and label resolution match what the render IR mirrors", {
   # resolve_theme() (R/render-ir.R) mirrors calc_element() and
   # combine_elements(); ir_labels() mirrors Layout$render()'s axis titles.

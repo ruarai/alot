@@ -137,7 +137,8 @@ full_layers <- function(built, ir, res) {
       ribbons = full_ribbons(built@plot@layers[[i]], layer$data, ranges, n_panels, res, FALSE),
       smooth = full_ribbons(built@plot@layers[[i]], layer$data, ranges, n_panels, res, TRUE),
       {
-        out <- c(out, full_range(layer$kind, built@plot@layers[[i]], layer$data, ranges, n_panels, res))
+        draw <- if (layer$kind %in% names(segment_kinds())) full_segments else full_range
+        out <- c(out, draw(layer$kind, built@plot@layers[[i]], layer$data, ranges, n_panels, res))
         next
       }
     )
@@ -414,7 +415,8 @@ full_geoms <- function() {
     ggplot2::GeomCol, ggplot2::GeomPath, ggplot2::GeomLine, ggplot2::GeomStep, ggplot2::GeomText,
     ggplot2::GeomRibbon, ggplot2::GeomArea, ggplot2::GeomDensity, ggplot2::GeomSmooth,
     ggplot2::GeomBoxplot, ggplot2::GeomViolin, ggplot2::GeomCrossbar, ggplot2::GeomErrorbar,
-    ggplot2::GeomLinerange, ggplot2::GeomPointrange
+    ggplot2::GeomLinerange, ggplot2::GeomPointrange, ggplot2::GeomSegment, ggplot2::GeomAbline,
+    ggplot2::GeomHline, ggplot2::GeomVline, ggplot2::GeomRug
   )
 }
 

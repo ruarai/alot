@@ -132,8 +132,8 @@ test_that("plots the full tier doesn't draw decline to another tier", {
   }
   expect_identical(tier(base), "full")
   # Other layers aren't drawn yet.
-  expect_identical(tier(ggplot(mtcars, aes(wt, mpg)) + geom_rug()), "ggplot2")
-  expect_identical(tier(base + geom_blank() + geom_rug()), "ggplot2")
+  expect_identical(tier(ggplot(mtcars, aes(wt, mpg)) + geom_curve(aes(xend = wt + 1, yend = mpg))), "ggplot2")
+  expect_identical(tier(base + geom_blank() + geom_curve(aes(xend = wt + 1, yend = mpg))), "ggplot2")
   # Blank strips, coords, axis caps and scaling aren't drawn yet.
   expect_identical(tier(base + facet_wrap(vars(cyl)) + theme(strip.text = element_blank())), "ggplot2")
   expect_identical(tier(base + coord_flip()), "ggplot2")
@@ -154,7 +154,7 @@ test_that("the full tier names why it declines", {
   set.seed(1)
   b <- ggplot_build(base + guides(x = guide_axis(cap = "both")))
   expect_match(attr(render_full(b, render_size), "reason"), "axis cap")
-  b <- ggplot_build(ggplot(mtcars, aes(wt, mpg)) + geom_rug())
+  b <- ggplot_build(ggplot(mtcars, aes(wt, mpg)) + geom_curve(aes(xend = wt + 1, yend = mpg)))
   expect_match(attr(render_full(b, render_size), "reason"), "layers other than")
 })
 

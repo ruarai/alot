@@ -74,7 +74,7 @@ test_that("unsupported parts give reasons", {
   expect_match(ir_reasons(base + ggplot2::coord_polar()), "coord not in Phase 2 scope", all = FALSE)
   expect_match(ir_reasons(base + ggplot2::labs(title = quote(alpha^2))), "plotmath", all = FALSE)
   expect_match(ir_reasons(base + ggplot2::labs(title = "排気量")), "glyph missing", all = FALSE)
-  expect_match(ir_reasons(base + ggplot2::geom_rug()), "no Rust drawer", all = FALSE)
+  expect_match(ir_reasons(base + ggplot2::geom_curve(ggplot2::aes(xend = displ + 1, yend = hwy))), "no Rust drawer", all = FALSE)
   expect_match(
     ir_reasons(base + ggplot2::guides(x = ggplot2::guide_axis_logticks())),
     "axis guide not in Phase 2 scope", all = FALSE
@@ -115,7 +115,7 @@ test_that("alot_render_coverage() reports the tier alot_png() would use", {
   cov <- alot_render_coverage(base + ggplot2::aes(colour = qsec) + ggplot2::guides(colour = ggplot2::guide_colourbar(display = "gradient")))
   expect_identical(cov$tier, "hybrid")
   expect_match(cov$full$reason, "gradient")
-  cov <- alot_render_coverage(ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg)) + ggplot2::geom_rug())
+  cov <- alot_render_coverage(ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg)) + ggplot2::geom_curve(ggplot2::aes(xend = wt + 1, yend = mpg)))
   expect_identical(cov$tier, "ggplot2")
   # What alot_png() uses.
   b <- ggplot2::ggplot_build(base)

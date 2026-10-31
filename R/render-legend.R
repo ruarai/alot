@@ -235,6 +235,17 @@ legend_glyph <- function(f, data, params, res, default_cm) {
     }
     return(list(mark = mark, size = px(legend_key_cm(data, default = default_cm))))
   }
+  # draw_key_abline(): a segment corner to corner; draw_key_vline(): a
+  # segment up the middle, the key's full height.
+  if (is_key("abline") || is_key("vline")) {
+    if (!is.null(params[["arrow"]])) {
+      layout_decline("a legend key with an arrow")
+    }
+    xy <- if (is_key("abline")) list(c(0, 1), c(0, 1)) else list(c(0.5, 0.5), c(0, 1))
+    mark <- legend_line_mark(xy[[1]], xy[[2]], legend_colour(data$colour %||% data$fill %||% "black", data$alpha %||% NA),
+      data$linewidth %||% 0.5, data$linetype %||% 1, params$lineend %||% "butt", "round", res)
+    return(list(mark = mark, size = px(legend_key_cm(data, default = default_cm))))
+  }
   if (is_key("text")) {
     return(legend_text_glyph(data, res))
   }

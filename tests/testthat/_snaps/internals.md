@@ -2976,6 +2976,177 @@
           grob
       }
 
+# upstream segment, reference line and rug drawing match what the full tier mirrors
+
+    Code
+      print(body(environment(ggplot2::GeomAbline$draw_panel)$f))
+    Output
+      {
+          ranges <- coord$backtransform_range(panel_params)
+          if (coord$clip == "on" && coord$is_linear()) {
+              ranges$x <- ranges$x + c(-1, 1) * diff(ranges$x)
+              ranges$y <- ranges$y + c(-1, 1) * diff(ranges$y)
+          }
+          x <- sweep(outer(ranges$y, data$intercept, FUN = "-"), 2, 
+              data$slope, FUN = "/")
+          data$x <- pmax(ranges$x[1], pmin(x[1, ], x[2, ]))
+          data$xend <- pmin(ranges$x[2], pmax(x[1, ], x[2, ]))
+          data$y <- data$x * data$slope + data$intercept
+          data$yend <- data$xend * data$slope + data$intercept
+          GeomSegment$draw_panel(unique0(data), panel_params, coord, 
+              lineend = lineend)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomHline$draw_panel)$f))
+    Output
+      {
+          ranges <- coord$backtransform_range(panel_params)
+          data$x <- ranges$x[1]
+          data$xend <- ranges$x[2]
+          data$y <- data$yintercept
+          data$yend <- data$yintercept
+          GeomSegment$draw_panel(unique0(data), panel_params, coord, 
+              lineend = lineend)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomVline$draw_panel)$f))
+    Output
+      {
+          ranges <- coord$backtransform_range(panel_params)
+          data$x <- data$xintercept
+          data$xend <- data$xintercept
+          data$y <- ranges$y[1]
+          data$yend <- ranges$y[2]
+          GeomSegment$draw_panel(unique0(data), panel_params, coord, 
+              lineend = lineend)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomRug$draw_panel)$f))
+    Output
+      {
+          data <- fix_linewidth(data, snake_class(self))
+          check_inherits(length, "unit")
+          rugs <- list()
+          data <- coord$transform(data, panel_params)
+          if (inherits(coord, "CoordFlip")) {
+              sides <- chartr("tblr", "rlbt", sides)
+          }
+          rug_length <- if (!outside) {
+              list(min = length, max = unit(1, "npc") - length)
+          }
+          else {
+              list(min = -1 * length, max = unit(1, "npc") + length)
+          }
+          gp <- gg_par(col = alpha(data$colour, data$alpha), lty = data$linetype, 
+              lwd = data$linewidth, lineend = lineend)
+          if (!is.null(data$x)) {
+              if (grepl("b", sides)) {
+                  rugs$x_b <- segmentsGrob(x0 = unit(data$x, "native"), 
+                      x1 = unit(data$x, "native"), y0 = unit(0, "npc"), 
+                      y1 = rug_length$min, gp = gp)
+              }
+              if (grepl("t", sides)) {
+                  rugs$x_t <- segmentsGrob(x0 = unit(data$x, "native"), 
+                      x1 = unit(data$x, "native"), y0 = unit(1, "npc"), 
+                      y1 = rug_length$max, gp = gp)
+              }
+          }
+          if (!is.null(data$y)) {
+              if (grepl("l", sides)) {
+                  rugs$y_l <- segmentsGrob(y0 = unit(data$y, "native"), 
+                      y1 = unit(data$y, "native"), x0 = unit(0, "npc"), 
+                      x1 = rug_length$min, gp = gp)
+              }
+              if (grepl("r", sides)) {
+                  rugs$y_r <- segmentsGrob(y0 = unit(data$y, "native"), 
+                      y1 = unit(data$y, "native"), x0 = unit(1, "npc"), 
+                      x1 = rug_length$max, gp = gp)
+              }
+          }
+          gTree(children = inject(gList(!!!rugs)))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomRug$handle_na)$f))
+    Output
+      {
+          sides_aes <- character()
+          if (grepl("b|t", params$sides)) {
+              sides_aes <- c(sides_aes, "x")
+          }
+          if (grepl("l|r", params$sides)) {
+              sides_aes <- c(sides_aes, "y")
+          }
+          if (length(sides_aes) > 0) {
+              df_list <- lapply(sides_aes, function(axis) {
+                  remove_missing(data, params$na.rm, c(axis, self$required_aes, 
+                      self$non_missing_aes), snake_class(self))
+              })
+              data <- switch(paste0(sides_aes, collapse = ""), x = , 
+                  y = df_list[[1]], xy = vctrs::vec_set_union(df_list[[1]], 
+                      df_list[[2]]))
+          }
+          else {
+              data <- remove_missing(data, params$na.rm, c(self$required_aes, 
+                  self$non_missing_aes), snake_class(self))
+          }
+          data
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::CoordCartesian$backtransform_range)$f))
+    Output
+      {
+          self$range(panel_params)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          segmentsGrob(0, 0, 1, 1, gp = gg_par(col = alpha(data$colour %||% 
+              data$fill %||% "black", data$alpha), fill = alpha(params$arrow.fill %||% 
+              data$colour %||% data$fill %||% "black", data$alpha), 
+              lwd = data$linewidth %||% 0.5, lty = data$linetype %||% 
+                  1, lineend = params$lineend %||% "butt"), arrow = params[["arrow"]])
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          grob <- segmentsGrob(0.5, 0, 0.5, 1, gp = gg_par(col = alpha(data$colour %||% 
+              data$fill %||% "black", data$alpha), fill = alpha(params$arrow.fill %||% 
+              data$colour %||% data$fill %||% "black", data$alpha), 
+              lwd = data$linewidth %||% 0.5, lty = data$linetype %||% 
+                  1, lineend = params$lineend %||% "butt"), arrow = params[["arrow"]])
+          if (!is.null(params[["arrow"]])) {
+              angle <- deg2rad(params[["arrow"]]$angle)
+              length <- convertUnit(params[["arrow"]]$length[1], "cm", 
+                  valueOnly = TRUE)
+              attr(grob, "width") <- sin(angle) * length * 2
+              attr(grob, "height") <- cos(angle) * length
+          }
+          grob
+      }
+
 # upstream theme and label resolution match what the render IR mirrors
 
     Code
