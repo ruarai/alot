@@ -3,27 +3,29 @@
 use alot_core::render::layout::{self, LegendBox, PlotSpec, Tag, TagLocation, TitleGrob};
 use extendr_api::prelude::*;
 
-fn field(l: &List, name: &str) -> Option<Robj> {
-    let r = l.dollar(name).ok()?;
+/// The element called exactly `name` (`List::dollar()` matches partially, so
+/// `title` would find `title_plot`), NULL being absent.
+pub(crate) fn field(l: &List, name: &str) -> Option<Robj> {
+    let (_, r) = l.iter().find(|(n, _)| *n == name)?;
     if r.is_null() { None } else { Some(r) }
 }
 
-fn num(l: &List, name: &str) -> Option<f64> {
+pub(crate) fn num(l: &List, name: &str) -> Option<f64> {
     field(l, name)?.as_real_slice()?.first().copied()
 }
 
-fn nums(l: &List, name: &str) -> Option<Vec<f64>> {
+pub(crate) fn nums(l: &List, name: &str) -> Option<Vec<f64>> {
     Some(field(l, name)?.as_real_slice()?.to_vec())
 }
 
-fn flag(l: &List, name: &str) -> Option<bool> {
+pub(crate) fn flag(l: &List, name: &str) -> Option<bool> {
     Some(num(l, name)? != 0.0)
 }
 
 /// A `titleGrob()`: `w`, `h` (each label's width and height in pixels),
 /// `descent`, `angle`, `hjust`, `vjust`, `margin` (top, right, bottom,
 /// left) and whether the margins count in x and y (`mx`, `my`).
-fn title(l: &List) -> Option<TitleGrob> {
+pub(crate) fn title(l: &List) -> Option<TitleGrob> {
     let (w, h) = (nums(l, "w")?, nums(l, "h")?);
     let margin: [f64; 4] = nums(l, "margin")?.try_into().ok()?;
     if w.len() != h.len() {
@@ -41,7 +43,7 @@ fn title(l: &List) -> Option<TitleGrob> {
     })
 }
 
-fn list_of(l: &List, name: &str) -> Option<List> {
+pub(crate) fn list_of(l: &List, name: &str) -> Option<List> {
     List::try_from(field(l, name)?).ok()
 }
 
@@ -120,7 +122,7 @@ fn layout_boxes(spec: List, page: &[f64]) -> Robj {
     .into()
 }
 
-fn build(spec: &List) -> Option<layout::Table> {
+pub(crate) fn build(spec: &List) -> Option<layout::Table> {
     let s = PlotSpec {
         aspect: num(spec, "aspect").filter(|a| a.is_finite()),
         axis_l: axis(spec, "axis_l", true)?,

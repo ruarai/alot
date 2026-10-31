@@ -71,6 +71,23 @@ write_png <- function(raster, filename, bg = "white", dpi = NA) {
 # error in alot's tier warns (class "alot_render_fallback") and drops to
 # ggplot2.
 render_raster <- function(built, size) {
+  # The full tier draws blank-layer plots only so far (R4.2); alot_png()
+  # uses it from R5.1. options(alot.full_tier = TRUE) tries it first.
+  if (isTRUE(getOption("alot.full_tier"))) {
+    out <- tryCatch(
+      render_full(built, size),
+      error = function(e) {
+        cli::cli_warn(
+          c("alot's full renderer failed; trying another tier.", "x" = conditionMessage(e)),
+          class = "alot_render_fallback"
+        )
+        NULL
+      }
+    )
+    if (inherits(out, "nativeRaster")) {
+      return(list(tier = "full", raster = out))
+    }
+  }
   tier <- render_coverage(built)$tier
   if (tier == "ggplot2") {
     cli::cli_inform(

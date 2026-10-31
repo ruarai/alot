@@ -738,7 +738,7 @@ alongside Phase 1's remaining tasks.
   Legend boxes are inputs: the corpus test takes their sizes from grid until
   the legend layout lands in R5.
 
-### R4.2 Panel decorations and axes
+### R4.2 Panel decorations and axes — done
 - **Depends:** R4.1, R1.3, R1.4, R2.2
 - **Touches:** `alot-core/src/render/{panel,axis}.rs`
 - **Do:** Draw the panel background, major and minor grid lines and the
@@ -747,6 +747,18 @@ alongside Phase 1's remaining tasks.
   positions bottom, left, top and right.
 - **Done when:** blank-layer plots with `theme_grey()` pass
   `expect_render_close()` and the layout check.
+- **Result:** `render-full.R` resolves the theme elements into a spec for
+  `rs_render_page()`, which solves the table (R4.1), draws the plot
+  background, the panel (`panel.rs`: background, grid lines, border, `clip`),
+  the axes (`axis.rs`: `GuideAxis$assemble_drawing()`'s gtable, line, major
+  and minor ticks, labels with `angle`, `n.dodge`, `check.overlap`) and the
+  title grobs (`title.rs`: axis titles, title, subtitle, caption, tag) into
+  one display list. Text becomes image items from R2.2's `draw_runs()`. Blank
+  layers (`geom_blank()`) only, `CoordCartesian`/`CoordFixed`, one panel, no
+  legends; other plots decline. `alot_png()` still doesn't use the tier
+  (`options(alot.full_tier = TRUE)` tries it first; R5.1 switches it on).
+  Every complete theme and the axis options pass `expect_render_close()` at
+  96 and 150 dpi with a largest pixel difference of 1 (of 255).
 
 ## R5 README vertical slice (milestone 2.2)
 

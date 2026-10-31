@@ -5,6 +5,7 @@
 use crate::render::paths::PathBatch;
 use crate::render::points::PointBatch;
 use crate::render::rects::RectBatch;
+use crate::render::text::Image;
 
 /// An axis-aligned box in device pixels; edges may be fractional.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -48,6 +49,9 @@ pub enum Item {
     Points(PointBatch),
     Rects(RectBatch),
     Paths(PathBatch),
+    /// Premultiplied pixels blended over the page as they are, not clipped
+    /// by the display clip (text is clipped when drawn, as ragg clips it).
+    Image(Image),
 }
 
 impl Item {
@@ -59,6 +63,7 @@ impl Item {
             Item::Points(b) => Some(b.rows()),
             Item::Rects(b) => Some(b.rows()),
             Item::Paths(b) => Some(b.rows()),
+            Item::Image(i) => Some((i.y0 as i64, i.y0 as i64 + i.h as i64)),
         }
     }
 }

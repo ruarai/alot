@@ -330,7 +330,33 @@ fn draw_band(page: &Page, b: usize, buf: &mut [[f32; 4]]) {
             (Item::Paths(batch), Prepared::Marks(buckets)) => {
                 batch.draw(buf, top, width, buckets.band(b), &shares);
             }
+            (Item::Image(img), _) => blend_image(img, buf, top, width),
             _ => {}
+        }
+    }
+}
+
+/// Blends a premultiplied image over a band's rows.
+fn blend_image(img: &crate::render::text::Image, buf: &mut [[f32; 4]], top: usize, width: usize) {
+    let h = buf.len() / width;
+    for j in 0..img.h {
+        let y = img.y0 as i64 + j as i64 - top as i64;
+        if y < 0 || y >= h as i64 {
+            continue;
+        }
+        for i in 0..img.w {
+            let x = img.x0 as i64 + i as i64;
+            if x < 0 || x >= width as i64 {
+                continue;
+            }
+            let s = img.px[j * img.w + i];
+            if s[3] == 0.0 {
+                continue;
+            }
+            let d = &mut buf[y as usize * width + x as usize];
+            for k in 0..4 {
+                d[k] = s[k] + d[k] * (1.0 - s[3]);
+            }
         }
     }
 }

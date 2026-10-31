@@ -173,6 +173,12 @@ rs_grouped_test_position <- function(df, col) .Call(wrap__grouped_test_position,
 #' @noRd
 rs_layout <- function(spec, page) .Call(wrap__layout_boxes, spec, page)
 
+#' Draws a single-panel plot's page (see `page_spec()` in
+#' R/render-full.R for the spec) to a nativeRaster, or returns NULL
+#' (decline) where something isn't drawn as ragg does.
+#' @noRd
+rs_render_page <- function(spec, threads) .Call(wrap__render_page, spec, threads)
+
 #' Writes a nativeRaster (`dim` = height, width) to `path` as PNG with the
 #' metadata ragg's `agg_png()` writes for device background `bg` (R, G, B,
 #' A, 0-255): RGBA unless `bg` is opaque, `bKGD`, and `pHYs` if `dpi` is

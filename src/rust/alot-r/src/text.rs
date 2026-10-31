@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 
 /// Font file bytes, read once per session per path.
-fn font_data(path: &str) -> Option<Arc<Vec<u8>>> {
+pub(crate) fn font_data(path: &str) -> Option<Arc<Vec<u8>>> {
     static CACHE: OnceLock<Mutex<HashMap<String, Arc<Vec<u8>>>>> = OnceLock::new();
     let mut cache = CACHE.get_or_init(Default::default).lock().ok()?;
     if let Some(d) = cache.get(path) {

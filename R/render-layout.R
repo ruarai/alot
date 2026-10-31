@@ -67,10 +67,25 @@ layout_title <- function(element, label, res, mx, my, angle = NULL, hjust = NULL
   }
   n <- length(label)
   margin <- layout_px(element$margin %||% ggplot2::margin(), res)
+  angle <- as.numeric(angle %||% element$angle %||% 0)
+  hjust <- as.numeric(hjust %||% element$hjust)
+  vjust <- as.numeric(vjust %||% element$vjust)
+  # What drawing the label needs (alot-core/src/render/title.rs): the font
+  # file, ragg's size (fontsize * res / 72) and GEText()'s line height
+  # (lineheight * 1.2 * fontsize * res / 72), the colour and titleGrob()'s
+  # rotated justification.
+  font <- text_fonts(family, face)
+  colour <- point_colours(as.character(element$colour), NA)
+  if (is.na(font$path) || is.null(colour) || length(colour) != 1) {
+    layout_decline("a font or colour alot doesn't draw")
+  }
+  just <- gg("rotate_just")(angle, hjust, vjust)
   list(
     w = m$width[seq_len(n)], h = m$height[seq_len(n)], descent = m$descent[n + 1L],
-    angle = as.numeric(angle %||% element$angle %||% 0), hjust = as.numeric(hjust %||% element$hjust),
-    vjust = as.numeric(vjust %||% element$vjust), margin = margin, mx = as.numeric(mx), my = as.numeric(my)
+    angle = angle, hjust = hjust, vjust = vjust, margin = margin, mx = as.numeric(mx), my = as.numeric(my),
+    label = label, just = c(just$hjust, just$vjust), font_path = font$path, font_index = as.numeric(font$index),
+    size = element$size * res / 72, line = element$lineheight * 1.2 * element$size * res / 72,
+    colour = colour, check_overlap = 0
   )
 }
 
@@ -125,11 +140,14 @@ layout_axis <- function(ir, built, position, res) {
   }
   draw <- built@layout$panel_params[[1]]$draw_labels[[position]]
   labels <- character()
+  if (".type" %in% names(key)) {
+    type <- key$.type
+  } else {
+    type <- rep("major", nrow(key))
+  }
+  major_key <- key[type == "major", , drop = FALSE]
   if (!isFALSE(draw)) {
-    if (".type" %in% names(key)) {
-      key <- key[key$.type == "major", , drop = FALSE]
-    }
-    labels <- key$.label
+    labels <- major_key$.label
     if (is.expression(labels) || is.list(labels)) {
       layout_decline("axis labels that are not plain text")
     }
@@ -137,12 +155,48 @@ layout_axis <- function(ir, built, position, res) {
   }
   items <- list()
   if (length(labels) > 0) {
+    # GuideAxis$build_labels() and draw_axis_labels() (R/guide-axis.R):
+    # labels dodge round-robin; check.overlap draws each group in
+    # axis_label_priority() order.
     n_dodge <- a$n.dodge %||% 1
+    check <- isTRUE(a$check.overlap)
     groups <- unname(split(seq_along(labels), rep(seq_len(n_dodge), length.out = length(labels))))
-    items <- lapply(groups, function(i) layout_title(text, labels[i], res, mx = vertical, my = !vertical))
+    items <- lapply(groups, function(i) {
+      if (check) {
+        i <- i[gg("axis_label_priority")(length(i))]
+      }
+      item <- layout_title(text, labels[i], res, mx = vertical, my = !vertical)
+      if (!is.null(item)) {
+        item[[aes]] <- as.numeric(major_key[[aes]][i])
+        item$check_overlap <- as.numeric(check)
+      }
+      item
+    })
     items <- Filter(Negate(is.null), items)
   }
-  list(major = major, minor = minor, items = items)
+  # Drawing: GuideAxis$assemble_drawing() justifies the labels by the text
+  # element's rotated hjust (vertical axes) or vjust, and build_ticks() and
+  # build_decor() draw the ticks and the axis line.
+  just <- 0.5
+  if (!layout_blank(text)) {
+    just <- gg("rotate_just")(element = text)[[if (vertical) "hjust" else "vjust"]]
+  }
+  tick_set <- function(element, len, rows) {
+    if (layout_blank(element) || is.null(len)) {
+      return(NULL)
+    }
+    style <- full_line(element, res)
+    if (is.null(style)) {
+      return(NULL)
+    }
+    list(pos = as.numeric(key[[aes]][rows]), len = len, style = style)
+  }
+  list(
+    major = major, minor = minor, items = items, side = position, just = as.numeric(just),
+    line = full_line(theme[[paste0("axis.line.", suffix)]], res),
+    ticks = tick_set(ticks, major, type == "major"),
+    minor_ticks = if (!is.null(minor)) tick_set(theme[[paste0("axis.minor.ticks.", suffix)]], minor, type == "minor")
+  )
 }
 
 # The spec of the Rust layout (see rs_layout()) for the plot `built`, on a

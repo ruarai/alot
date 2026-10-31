@@ -3230,3 +3230,273 @@
           x
       }
 
+# upstream panel and axis drawing match what the Rust drawers mirror
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          x_major <- panel_params$x$mapped_breaks()
+          x_minor <- setdiff(panel_params$x$mapped_breaks_minor(), 
+              x_major)
+          y_major <- panel_params$y$mapped_breaks()
+          y_minor <- setdiff(panel_params$y$mapped_breaks_minor(), 
+              y_major)
+          transform <- if (isTRUE(square)) {
+              if (inherits(coord, "CoordFlip")) {
+                  function(x) coord$transform(flip_axis_labels(x), 
+                      panel_params)
+              }
+              else {
+                  function(x) coord$transform(x, panel_params)
+              }
+          }
+          else {
+              function(x) coord_munch(coord, x, panel_params)
+          }
+          grill <- Map(f = breaks_as_grid, var = list(y_minor, x_minor, 
+              y_major, x_major), type = c("minor.y", "minor.x", "major.y", 
+              "major.x"), MoreArgs = list(theme = theme, transform = transform))
+          grill <- compact(grill)
+          background <- element_render(theme, "panel.background")
+          if (!isTRUE(square) && !is_zero(background)) {
+              gp <- background$gp
+              background <- data_frame0(x = c(1, 1, -1, -1), y = c(1, 
+                  -1, -1, 1)) * Inf
+              background <- coord_munch(coord, background, panel_params, 
+                  is_closed = TRUE)
+              background <- polygonGrob(x = background$x, y = background$y, 
+                  gp = gp)
+          }
+          ggname("grill", inject(grobTree(background, !!!grill)))
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          n <- length(var)
+          if (n < 1) {
+              return(NULL)
+          }
+          df <- data_frame0(var = rep(var, each = 2), alt = rep(c(-Inf, 
+              Inf), n), group = rep(seq_along(var), each = 2))
+          colnames(df)[1:2] <- switch(type, major.y = , minor.y = c("y", 
+              "x"), c("x", "y"))
+          df <- transform(df)
+          element_render(theme, paste0("panel.grid.", type), x = df$x, 
+              y = df$y, id.lengths = vec_unrep(df$group)$times)
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (n <= 0) {
+              return(numeric(0))
+          }
+          c(1, n, axis_label_priority_between(1, n))
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          n <- y - x + 1
+          if (n <= 2) {
+              return(numeric(0))
+          }
+          mid <- x - 1 + (n + 1)%/%2
+          c(mid, axis_label_priority_between(x, mid), axis_label_priority_between(mid, 
+              y))
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          el <- calc_element(element, theme)
+          if (is.null(el)) {
+              cli::cli_inform("Theme element {.var {element}} is missing")
+              return(zeroGrob())
+          }
+          grob <- element_grob(el, ...)
+          ggname(paste(element, name, sep = "."), grob)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Coord$draw_panel)$f))
+    Output
+      {
+          fg <- self$render_fg(params, theme)
+          bg <- self$render_bg(params, theme)
+          if (isTRUE(theme$panel.ontop)) {
+              panel <- list2(!!!panel, bg, fg)
+          }
+          else {
+              panel <- list2(bg, !!!panel, fg)
+          }
+          gTree(children = inject(gList(!!!panel)), vp = viewport(clip = self$clip))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Coord$render_fg)$f))
+    Output
+      {
+          element_render(theme, "panel.border", fill = NA)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::CoordCartesian$render_bg)$f))
+    Output
+      {
+          guide_grid(theme, panel_params, self)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::CoordCartesian$transform)$f))
+    Output
+      {
+          reverse <- panel_params$reverse %||% "none"
+          x <- panel_params$x[[switch(reverse, xy = , x = "reverse", 
+              "rescale")]]
+          y <- panel_params$y[[switch(reverse, xy = , y = "reverse", 
+              "rescale")]]
+          data <- transform_position(data, x, y)
+          transform_position(data, squish_infinite, squish_infinite)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Guide$build_ticks)$f))
+    Output
+      {
+          force(length)
+          if (!is_theme_element(elements)) {
+              elements <- elements$ticks
+          }
+          if (!is_theme_element(elements, "line")) {
+              return(zeroGrob())
+          }
+          if (!is.list(key)) {
+              breaks <- key
+          }
+          else {
+              breaks <- key[[params$aes]]
+          }
+          n_breaks <- length(breaks)
+          if (n_breaks < 1) {
+              return(zeroGrob())
+          }
+          tick_len <- rep(length %||% unit(0.2, "npc"), length.out = n_breaks)
+          mark <- unit(rep(breaks, each = 2), "npc")
+          pos <- unname(c(top = 1, bottom = 0, left = 0, right = 1)[position])
+          dir <- -2 * pos + 1
+          pos <- unit(rep(pos, 2 * n_breaks), "npc")
+          dir <- rep(vec_interleave(dir, 0), n_breaks) * rep(tick_len, 
+              each = 2)
+          tick <- pos + dir
+          flip_element_grob(elements, x = tick, y = mark, id.lengths = rep(2, 
+              n_breaks), flip = position %in% c("top", "bottom"))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideAxis$build_ticks)$f))
+    Output
+      {
+          major <- Guide$build_ticks(vec_slice(key, (key$.type %||% 
+              "major") == "major"), elements$ticks, params, position, 
+              elements$major_length)
+          if (!params$minor.ticks) {
+              return(major)
+          }
+          minor <- Guide$build_ticks(vec_slice(key, (key$.type %||% 
+              "major") == "minor"), elements$minor, params, position, 
+              elements$minor_length)
+          grobTree(major, minor, name = "ticks")
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideAxis$build_decor)$f))
+    Output
+      {
+          if (empty(decor)) {
+              return(zeroGrob())
+          }
+          element_grob(elements$line, x = unit(decor$x, "npc"), y = unit(decor$y, 
+              "npc"))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideAxis$assemble_drawing)$f))
+    Output
+      {
+          axis_line <- grobs$decor
+          z <- if (params$position == "left") 
+              c(2, 1, 3)
+          else 1:3
+          z <- rep(z, c(1, length(grobs$labels), 1))
+          grobs <- c(list(grobs$ticks), grobs$labels, list(grobs$title))
+          gt <- exec(gtable, `:=`(!!params$orth_sizes, sizes), `:=`(!!params$para_sizes, 
+              unit(1, "npc")), name = "axis")
+          gt <- gtable_add_grob(gt, grobs, t = layout$t, b = layout$b, 
+              l = layout$l, r = layout$r, clip = "off", z = z)
+          vp <- exec(viewport, `:=`(!!params$orth_aes, unit(params$orth_side, 
+              "npc")), `:=`(!!params$orth_size, max(params$measure_gtable(gt), 
+              unit(1, "npc"))), just = params$opposite)
+          if (params$position %in% c("left", "right")) {
+              where <- layout$l[-c(1, length(layout$l))]
+              just <- rotate_just(element = elements$text)$hjust %||% 
+                  0.5
+              gt <- gtable_add_cols(gt, unit(just, "null"), pos = min(where) - 
+                  1)
+              gt <- gtable_add_cols(gt, unit(1 - just, "null"), pos = max(where) + 
+                  1)
+          }
+          if (params$position %in% c("top", "bottom")) {
+              where <- layout$t[-c(1, length(layout$t))]
+              just <- rotate_just(element = elements$text)$vjust %||% 
+                  0.5
+              gt <- gtable_add_rows(gt, unit(1 - just, "null"), pos = min(where) - 
+                  1)
+              gt <- gtable_add_rows(gt, unit(just, "null"), pos = max(where) + 
+                  1)
+          }
+          absoluteGrob(gList(axis_line, gt), width = gtable_width(gt), 
+              height = gtable_height(gt), vp = vp)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideAxis$draw_early_exit)$f))
+    Output
+      {
+          line <- self$build_decor(decor = params$decor, elements = elements, 
+              params = params)
+          absoluteGrob(gList(line), width = grobWidth(line), height = grobHeight(line))
+      }
+

@@ -232,3 +232,22 @@ test_that("upstream table assembly matches what the Rust layout mirrors", {
   expect_snapshot(print(body(environment(ggplot2::CoordCartesian$labels)$f)))
   expect_snapshot(print(body(gtable::gtable_add_padding)))
 })
+
+test_that("upstream panel and axis drawing match what the Rust drawers mirror", {
+  # full_panel() (R/render-full.R), layout_axis() (R/render-layout.R) and
+  # alot-core/src/render/{panel,axis,title}.rs mirror these. If these fail,
+  # update the mirror, then the snapshots.
+  gg_fn <- function(f) utils::getFromNamespace(f, "ggplot2")
+  for (f in c("guide_grid", "breaks_as_grid", "axis_label_priority", "axis_label_priority_between", "element_render")) {
+    expect_snapshot(print(body(gg_fn(f))))
+  }
+  expect_snapshot(print(body(environment(ggplot2::Coord$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Coord$render_fg)$f)))
+  expect_snapshot(print(body(environment(ggplot2::CoordCartesian$render_bg)$f)))
+  expect_snapshot(print(body(environment(ggplot2::CoordCartesian$transform)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Guide$build_ticks)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GuideAxis$build_ticks)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GuideAxis$build_decor)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GuideAxis$assemble_drawing)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GuideAxis$draw_early_exit)$f)))
+})
