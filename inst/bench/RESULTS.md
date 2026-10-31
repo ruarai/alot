@@ -1437,3 +1437,68 @@ ggplot2 time, with their speedups. Full tables are in the suite's output.
 Where the position scales, facets and panel guides dominate, the build is
 2–6× faster; plots dominated by stats (`density_groups`, `smooth_lm`,
 `wrap_histogram`) stay near 1× until the stat and position kernels land.
+
+## R7.2: performance pass (2026-10-31)
+
+The PHASE2.md targets: the README plot (`render-cases.R`) rendered by
+`alot_png()` from a built plot (IR, layout, raster, PNG file; not the
+build), release build, 8 threads (the default cap), medians of 9 after a
+warm-up rep:
+
+| case | target | before | after |
+|---|---:|---:|---:|
+| 1e6 rows, 1600 × 1000 at 150 dpi | < 120 ms | 159 ms | 105 ms |
+| 1e6 rows, 2100 × 2100 at 300 dpi | < 200 ms | 233 ms | 190 ms |
+| 10 rows, 1600 × 1000 at 150 dpi | < 25 ms | 48 ms | 37 ms |
+
+The 10-row target is not met. Of its 37 ms, R takes about 25: `render_ir()`
+7 ms (3 of it resolving the theme), `layout_spec()` 13 (titles' and
+legends' text metrics, guide elements, facet axes and strips) and the panels
+3; Rust draws and encodes the page in about 12. What is left in R is many
+small calls, not one stage, and was not worth the restructuring.
+
+What moved:
+
+- **Thread starts.** Display-list batches (paths, rects, buckets, PNG
+  chunks) spawned scoped threads even for a handful of marks; at ~25 µs a
+  start, a page's 80-100 items cost 5 ms in bucketing alone.
+  `raster::par_map()` runs the first chunk on the calling thread, so
+  single-chunk work spawns nothing. The 10-row page's Rust time fell from
+  19 to 9 ms.
+- **First touch of fresh memory.** Faulting in multi-megabyte buffers on
+  one thread took longer than filling them. The point spec's columns are
+  dealt to panels in one pass of parallel chunks (`deal()`, alot-r
+  page.rs), each column read once instead of once per panel (parse 25 → 6
+  ms at 1e6 rows); `PointBatch::from_fn()` writes its placements from the
+  workers (6 × 2 ms of serial faulting gone) and folds the row range there.
+  Bucketing chunks are 16k marks, not 64k, so a 167k-point panel uses all
+  workers (9 → 6 ms).
+- **Point colours.** `rs_point_colours()` finds the distinct CHARSXPs in
+  parallel, parses them on the main thread and maps rows in parallel into
+  the R vector (16 → 3 ms at 1e6 rows); the default all-NA fill is no
+  longer `as.character()`ed and parsed (12-20 ms).
+- **PNG.** `alot_png()` streams the full tier's bands into the encoder
+  (`rs_render_page_png()`), without a nativeRaster in R (an 18 MB allocation
+  at 300 dpi, which sometimes triggered a 15-20 ms GC) and its separate
+  pass; pixels are packed to bytes in the compressing workers, not on the
+  main thread. Output is byte-identical (test-render-tiers.R).
+- **Unpremultiply** skips the division for opaque pixels and rounds without
+  libm's `roundf()`, bit-identical (raster.rs test).
+- **R.** `text_fonts()` caches font matches for one render (19 calls of
+  `systemfonts::match_fonts()` at 0.3 ms each); the plot background is read
+  from the built plot's theme instead of `get_plot_background()`'s second
+  `plot_theme()` and `check_theme()` (3 ms).
+
+Tried and dropped: per-row runs of non-zero coverage in point sprites
+(slower at 300 dpi: 83 vs 64 ms for 1e6 points), packing each subpixel
+slot's masks into one arena (2 ms of 40, not worth the code), a branch-free
+blend loop (no gain).
+
+**Thread scaling** (1e6 points of the README's four shapes on 1600 × 1000,
+raster draw only, after placement): 1 thread 222 ms, 4 76 ms, 8 40 ms, 16
+22 ms: near-linear, so the 8-thread default cap (PHASE2.md decisions) is
+what keeps the 300 dpi page at 190 ms; `options(alot.threads = 16)` gives
+more on this machine. **Memory at 300 dpi:** the executor holds 8 band
+buffers of 64 × 2100 px (21.5 MB with the output rows, `band_memory()`), and the page itself
+is no longer materialised for `alot_png()`; the point layer's dealt
+columns (about 48 MB for 1e6 rows) and placements (24 MB) dominate.

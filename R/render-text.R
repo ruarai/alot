@@ -19,6 +19,17 @@ text_fonts <- function(family, face) {
   ok <- !is.na(fam) & fac %in% 1:4
   path <- rep(NA_character_, length(fam))
   index <- rep(NA_integer_, length(fam))
+  cache <- font_cache$fonts
+  if (!is.null(cache)) {
+    for (i in which(ok)) {
+      hit <- cache[[key[first][i]]]
+      if (!is.null(hit)) {
+        path[i] <- hit$path
+        index[i] <- hit$index
+        ok[i] <- FALSE
+      }
+    }
+  }
   if (any(ok)) {
     m <- systemfonts::match_fonts(
       fam[ok],
@@ -28,9 +39,34 @@ text_fonts <- function(family, face) {
     plain <- lengths(m$features) == 0 & lengths(m$variations) == 0
     path[ok] <- ifelse(plain, m$path, NA_character_)
     index[ok] <- m$index
+    if (!is.null(cache)) {
+      for (i in which(ok)) {
+        cache[[key[first][i]]] <- list(path = path[i], index = index[i])
+      }
+    }
   }
   at <- match(key, key[first])
   list2DF(list(path = path[at], index = index[at]))
+}
+
+# text_fonts()' matches, kept for the length of one render (render_raster(),
+# alot_render_coverage()): systemfonts::match_fonts() takes about 0.3 ms a
+# call and a page asks for the same few faces a dozen times or more. Fonts
+# registered between renders are seen.
+font_cache <- new.env(parent = emptyenv())
+
+# Starts the cache unless a render up the stack has; TRUE if this call did,
+# when the caller ends it with font_cache_close().
+font_cache_open <- function() {
+  if (!is.null(font_cache$fonts)) {
+    return(FALSE)
+  }
+  font_cache$fonts <- new.env(parent = emptyenv())
+  TRUE
+}
+
+font_cache_close <- function() {
+  font_cache$fonts <- NULL
 }
 
 # Metrics in device pixels of each string, as GEStrWidth(), GEStrMetric()
@@ -66,7 +102,7 @@ text_metrics <- function(text, family = "", face = 1L, fontsize = 12, cex = 1,
     font$path[first][order(key[first])], font$index[first][order(key[first])],
     as.double(size), as.double(line)
   )
-  as.data.frame(out)
+  list2DF(out)
 }
 
 # The tier text limits a plot to: "full" if alot measures every string as

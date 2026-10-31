@@ -234,7 +234,15 @@ layer_panel_rows <- function(panel, n_panels, rows = seq_along(panel)) {
 # layout order) for Rust to deal them out.
 full_points <- function(data, ranges, n_panels, res) {
   colour <- point_colours(data$colour, data$alpha)
-  fill <- if (!is.null(colour)) point_colours(as.character(data$fill), data$alpha)
+  fill <- if (is.null(colour)) {
+    NULL
+  } else if (rs_all_na_logical(data$fill)) {
+    # The default NA fill: col2rgb(NA)'s transparent white in every row,
+    # whatever the alpha, without a million NA strings to parse.
+    rep.int(16777215L, nrow(data))
+  } else {
+    point_colours(as.character(data$fill), data$alpha)
+  }
   if (is.null(fill)) {
     layout_decline("a point colour alot doesn't parse")
   }
@@ -562,15 +570,20 @@ page_spec <- function(built, ir, size) {
   )
 }
 
-# Draws `built` in the full tier: a nativeRaster, or NULL with the reason
-# as a "reason" attribute where the full tier declines the plot.
-render_full <- function(built, size) {
+# Draws `built` in the full tier: a nativeRaster, or with a `file`, TRUE
+# once the page is written there as a PNG (see render_raster()); NULL with
+# the reason as a "reason" attribute where the full tier declines the plot.
+render_full <- function(built, size, file = NULL) {
   decline <- function(reason) structure(list(), reason = reason)
   spec <- tryCatch(page_spec(built, render_ir(built), size), alot_layout_decline = function(e) e)
   if (inherits(spec, "condition")) {
     return(decline(conditionMessage(spec)))
   }
-  out <- rs_render_page(spec, render_threads())
+  out <- if (is.null(file)) {
+    rs_render_page(spec, render_threads())
+  } else {
+    rs_render_page_png(spec, render_threads(), file, png_bg(size$bg %||% "white"), png_dpi(size$res))
+  }
   if (is.null(out)) {
     return(decline("the page spec is not one the Rust drawer reads"))
   }

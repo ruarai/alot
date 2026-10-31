@@ -50,15 +50,25 @@ alot_png <- function(plot, filename, width = 7, height = 7, units = c("in", "cm"
   filename <- path.expand(filename)
   dpi <- gg_parse_dpi(dpi)
   dim <- gg_plot_dim(c(width, height), units = units[1], limitsize = FALSE, dpi = dpi)
-  bg <- gg_get_plot_background(built@plot, bg)
+  bg <- plot_background(built, bg)
   size <- list(width = dim[1], height = dim[2], units = "in", res = dpi, bg = bg, scaling = scaling, ...)
-  out <- render_raster(built, size)
-  if (is.null(out$raster)) {
-    render_ggplot2(built, filename, size)
-  } else {
+  out <- render_raster(built, size, filename)
+  if (!is.null(out$raster)) {
     write_png(out$raster, filename, bg, dpi)
+  } else if (out$tier == "ggplot2") {
+    render_ggplot2(built, filename, size)
   }
   invisible(structure(filename, tier = out$tier))
+}
+
+# get_plot_background() (ggplot2 R/save.R) of a built plot, whose theme is
+# already plot_theme()'s (ggplot_build()), so it isn't completed and checked
+# again.
+plot_background <- function(built, bg = NULL) {
+  if (!is.null(bg)) {
+    return(bg)
+  }
+  gg_try_prop(ggplot2::calc_element("plot.background", built@plot@theme), "fill") %||% "transparent"
 }
 
 # Writes a nativeRaster as ragg's agg_png() would for this background and
@@ -66,22 +76,27 @@ alot_png <- function(plot, filename, width = 7, height = 7, units = c("in", "cm"
 # not opaque, a bKGD chunk from `bg`, and a pHYs chunk from `dpi` unless it
 # is NA.
 write_png <- function(raster, filename, bg = "white", dpi = NA) {
-  rgba <- as.integer(grDevices::col2rgb(bg, alpha = TRUE)[, 1])
-  rs_write_png(raster, filename, rgba, if (is.na(dpi)) 0 else as.double(dpi))
+  rs_write_png(raster, filename, png_bg(bg), png_dpi(dpi))
 }
+
+# write_png()'s background as RGBA and resolution (0: no pHYs chunk).
+png_bg <- function(bg) as.integer(grDevices::col2rgb(bg, alpha = TRUE)[, 1])
+png_dpi <- function(dpi) if (is.na(dpi)) 0 else as.double(dpi)
 
 # Draws a built plot with the first tier that supports it. Returns the
 # `tier` and, for alot's tiers, the page as a nativeRaster; for the ggplot2
-# tier, `raster` is NULL and the caller draws with ggplot2. An internal
-# error in alot's tier warns (class "alot_render_fallback") and drops to
-# ggplot2.
-render_raster <- function(built, size) {
+# tier, `raster` is NULL and the caller draws with ggplot2. With a `file`,
+# the full tier writes the page there as write_png() would (`size$bg`,
+# `size$res`) and `raster` is NULL. An internal error in alot's tier warns
+# (class "alot_render_fallback") and drops to ggplot2.
+render_raster <- function(built, size, file = NULL) {
+  if (font_cache_open()) on.exit(font_cache_close())
   # options(alot.full_tier = FALSE) skips the full tier.
   full <- !isFALSE(getOption("alot.full_tier"))
   why <- NULL
   if (full) {
     out <- tryCatch(
-      render_full(built, size),
+      render_full(built, size, file),
       error = function(e) {
         cli::cli_warn(
           c("alot's full renderer failed; trying another tier.", "x" = conditionMessage(e)),
@@ -92,6 +107,9 @@ render_raster <- function(built, size) {
     )
     if (inherits(out, "nativeRaster")) {
       return(list(tier = "full", raster = out))
+    }
+    if (isTRUE(out)) {
+      return(list(tier = "full", raster = NULL))
     }
     why <- attr(out, "reason") %||% "the full tier declined the plot"
   }
@@ -149,6 +167,7 @@ below_full_message <- function(tier, reason) {
 #' @export
 alot_render_coverage <- function(plot) {
   built <- if (ggplot2::is_ggplot(plot)) alot_build(plot) else plot
+  if (font_cache_open()) on.exit(font_cache_close())
   ir <- render_ir(built)
   out <- render_coverage(built)
   # As full_decline() and page_spec() decide (R/render-full.R), so `tier`

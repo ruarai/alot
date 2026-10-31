@@ -41,6 +41,22 @@ pub fn default_threads() -> usize {
     std::thread::available_parallelism().map_or(1, |n| n.get()).min(8)
 }
 
+/// `f` of each of `items`, in order: the first on this thread and the rest
+/// on scoped threads. Starting a thread costs tens of microseconds, more
+/// than the small batches of a page's axes and grid lines take, so callers
+/// pass one item for small inputs and nothing is spawned.
+pub fn par_map<I: Send, T: Send>(items: impl IntoIterator<Item = I>, f: impl Fn(I) -> T + Sync) -> Vec<T> {
+    let mut items = items.into_iter();
+    let Some(first) = items.next() else { return Vec::new() };
+    let f = &f;
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = items.map(|i| scope.spawn(move || f(i))).collect();
+        let mut out = vec![f(first)];
+        out.extend(handles.into_iter().map(|h| h.join().unwrap()));
+        out
+    })
+}
+
 /// Band buffers kept between calls: fresh multi-megabyte buffers cost more
 /// in page faults than drawing into them.
 static POOL: Mutex<Vec<Vec<[f32; 4]>>> = Mutex::new(Vec::new());
@@ -73,26 +89,18 @@ impl Buckets {
             }
             _ => (0, -1),
         };
-        let chunk = n.div_ceil(default_threads()).max(1 << 16);
+        let chunk = n.div_ceil(default_threads()).max(1 << 14);
         let chunks: Vec<(usize, usize)> = (0..n).step_by(chunk.max(1)).map(|a| (a, (a + chunk).min(n))).collect();
         let span = &span;
-        let counts: Vec<Vec<usize>> = std::thread::scope(|scope| {
-            let handles: Vec<_> = chunks
-                .iter()
-                .map(|&(a, b)| {
-                    scope.spawn(move || {
-                        let mut c = vec![0usize; n_bands];
-                        for i in a..b {
-                            let (lo, hi) = span(i);
-                            for band in lo..=hi {
-                                c[band as usize] += 1;
-                            }
-                        }
-                        c
-                    })
-                })
-                .collect();
-            handles.into_iter().map(|h| h.join().unwrap()).collect()
+        let counts: Vec<Vec<usize>> = par_map(chunks.iter(), |&(a, b)| {
+            let mut c = vec![0usize; n_bands];
+            for i in a..b {
+                let (lo, hi) = span(i);
+                for band in lo..=hi {
+                    c[band as usize] += 1;
+                }
+            }
+            c
         });
         // Each band's run of the index holds its marks chunk by chunk, so
         // data order is kept.
@@ -112,20 +120,15 @@ impl Buckets {
         unsafe impl Sync for Out {}
         let out = Out(index.as_mut_ptr());
         let out = &out;
-        std::thread::scope(|scope| {
-            for (&(a, b), offsets) in chunks.iter().zip(offsets) {
-                scope.spawn(move || {
-                    let mut offsets = offsets;
-                    for i in a..b {
-                        let (lo, hi) = span(i);
-                        for band in lo..=hi {
-                            // SAFETY: (chunk, band) ranges are disjoint and
-                            // within `index`, by construction above.
-                            unsafe { *out.0.add(offsets[band as usize]) = i as u32 };
-                            offsets[band as usize] += 1;
-                        }
-                    }
-                });
+        par_map(chunks.iter().zip(offsets), |(&(a, b), mut offsets)| {
+            for i in a..b {
+                let (lo, hi) = span(i);
+                for band in lo..=hi {
+                    // SAFETY: (chunk, band) ranges are disjoint and within
+                    // `index`, by construction above.
+                    unsafe { *out.0.add(offsets[band as usize]) = i as u32 };
+                    offsets[band as usize] += 1;
+                }
             }
         });
         Buckets { starts, index }
@@ -238,16 +241,7 @@ fn draw_bands(page: &Page, first: usize, out: &mut [u32], threads: usize) {
             *d = unpremultiply(r, g, b, a);
         }
     };
-    if workers == 1 {
-        work(&mut buffers[0]);
-    } else {
-        std::thread::scope(|scope| {
-            for buf in buffers.iter_mut() {
-                let work = &work;
-                scope.spawn(move || work(buf));
-            }
-        });
-    }
+    par_map(buffers.iter_mut(), work);
     POOL.lock().unwrap_or_else(|e| e.into_inner()).extend(buffers);
 }
 
@@ -371,7 +365,14 @@ pub fn unpremultiply(r: f32, g: f32, b: f32, a: f32) -> u32 {
     if a <= 0.0 {
         return 0;
     }
-    let byte = |v: f32| (v * 255.0).round().clamp(0.0, 255.0) as u32;
+    // `(v * 255).round().clamp(0, 255)` without libm's `roundf()` (a call
+    // on the baseline x86-64 target): for t >= 0, round half away from zero
+    // is floor(t + 0.5), exact in f64; negative and NaN t cast to 0.
+    let byte = |v: f32| (((v * 255.0) as f64 + 0.5) as u32).min(255);
+    if a == 1.0 {
+        // Opaque pixels, most of a page: r / 1 is r.
+        return byte(r) | byte(g) << 8 | byte(b) << 16 | 255 << 24;
+    }
     byte(r / a) | byte(g / a) << 8 | byte(b / a) << 16 | byte(a) << 24
 }
 
@@ -477,6 +478,40 @@ mod tests {
                 assert!((over - got).abs() <= 2.0, "{over} vs {got}");
             }
             assert_eq!(p >> 24, 255);
+        }
+    }
+
+    #[test]
+    fn unpremultiply_rounds_as_roundf() {
+        let reference = |r: f32, g: f32, b: f32, a: f32| {
+            if a <= 0.0 {
+                return 0;
+            }
+            let byte = |v: f32| (v * 255.0).round().clamp(0.0, 255.0) as u32;
+            byte(r / a) | byte(g / a) << 8 | byte(b / a) << 16 | byte(a) << 24
+        };
+        let mut seed = 11u64;
+        let mut rnd = || {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (seed >> 40) as f32 / (1u64 << 24) as f32
+        };
+        // Exact halves, the values either side of them, and random pixels.
+        let mut vals: Vec<f32> = (0..=510).map(|k| k as f32 / 510.0).collect();
+        vals.extend((0..=255).flat_map(|k| {
+            let h = (k as f32 + 0.5) / 255.0;
+            [h, f32::from_bits(h.to_bits() - 1), f32::from_bits(h.to_bits() + 1)]
+        }));
+        vals.extend([-0.1, -0.002, 1.0, 1.0001, 1.5, f32::NAN]);
+        for &v in &vals {
+            for a in [1.0, 0.5, 0.3, 0.0, -1.0, f32::NAN] {
+                assert_eq!(unpremultiply(v * a, v, v * 0.7, a), reference(v * a, v, v * 0.7, a), "{v} {a}");
+            }
+        }
+        for _ in 0..100_000 {
+            let a = rnd();
+            let (r, g, b) = (rnd() * a, rnd() * a, rnd() * a);
+            assert_eq!(unpremultiply(r, g, b, a), reference(r, g, b, a));
+            assert_eq!(unpremultiply(r, g, b, 1.0), reference(r, g, b, 1.0));
         }
     }
 

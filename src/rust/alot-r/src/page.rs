@@ -5,7 +5,8 @@ use alot_core::render::agg::{Cap, Join};
 use alot_core::render::axis::{Axis, Side, Ticks};
 use alot_core::render::layout::TitleGrob;
 use alot_core::render::legend::{Bar, BarTicks, Bins, Body, Glyph, Guide, Keys, LegendGroup};
-use alot_core::render::display::Rect;
+use alot_core::render::display::{DisplayList, Rect};
+use alot_core::render::png::{render_png, PngOptions};
 use alot_core::render::page::{draw_page, FacetDraw, LineStyle, PageSpec, Painter, RectEl, StripDraw, TextStyle};
 use alot_core::render::layers::{Label, LabelLayer, PathLayer, RectLayer, TextLayer};
 use alot_core::render::panel::{GridLines, Layer, Panel, PointLayer};
@@ -138,6 +139,81 @@ fn point_layer(l: &List) -> Option<PointLayer> {
     point_layers(l, 1)?.pop()
 }
 
+/// One panel's dealt columns: `reals`, then the colours.
+type Dealt<const K: usize> = (Vec<Vec<f64>>, [Vec<[u8; 4]>; K]);
+
+/// Columns `reals` and packed colours `ints` dealt out to `n_panels` panels
+/// by `panel` (1-based; every row to the first if `None`), keeping row
+/// order. Each column is read once, in parallel chunks of rows that write
+/// their own ranges of every panel's columns, so a million rows' fresh pages
+/// are first touched in parallel. `None` if a panel is out of range or a
+/// row fails `valid`.
+fn deal<const K: usize>(
+    n: usize,
+    panel: Option<&[i32]>,
+    n_panels: usize,
+    valid: impl Fn(usize) -> bool + Sync,
+    reals: &[&[f64]],
+    ints: [&[i32]; K],
+) -> Option<Vec<Dealt<K>>> {
+    struct Dst<T>(*mut T);
+    unsafe impl<T> Sync for Dst<T> {}
+    let chunk = n.div_ceil(raster::default_threads()).max(1 << 15);
+    let starts: Vec<usize> = (0..n).step_by(chunk).collect();
+    let counts: Vec<Option<Vec<usize>>> = raster::par_map(starts.iter(), |&a| {
+        let mut c = vec![0usize; n_panels];
+        for i in a..(a + chunk).min(n) {
+            let p = panel.map_or(1, |p| p[i]);
+            if p < 1 || p as usize > n_panels || !valid(i) {
+                return None;
+            }
+            c[p as usize - 1] += 1;
+        }
+        Some(c)
+    });
+    let counts: Vec<Vec<usize>> = counts.into_iter().collect::<Option<_>>()?;
+    // Each chunk's first position in each panel's columns.
+    let mut offsets = vec![vec![0usize; n_panels]; counts.len()];
+    let mut totals = vec![0usize; n_panels];
+    for (c, cnt) in counts.iter().enumerate() {
+        for p in 0..n_panels {
+            offsets[c][p] = totals[p];
+            totals[p] += cnt[p];
+        }
+    }
+    let mut out: Vec<Dealt<K>> = totals
+        .iter()
+        .map(|&m| (reals.iter().map(|_| Vec::with_capacity(m)).collect(), std::array::from_fn(|_| Vec::with_capacity(m))))
+        .collect();
+    let r_dst: Vec<Vec<Dst<f64>>> = out.iter_mut().map(|(r, _)| r.iter_mut().map(|v| Dst(v.as_mut_ptr())).collect()).collect();
+    let c_dst: Vec<Vec<Dst<[u8; 4]>>> = out.iter_mut().map(|(_, c)| c.iter_mut().map(|v| Dst(v.as_mut_ptr())).collect()).collect();
+    raster::par_map(starts.iter().zip(offsets), |(&a, mut at)| {
+        for i in a..(a + chunk).min(n) {
+            let p = panel.map_or(0, |p| p[i] as usize - 1);
+            let k = at[p];
+            at[p] += 1;
+            // SAFETY: chunks write disjoint ranges of each panel's columns
+            // (offsets above), within the capacity reserved for them.
+            for (src, d) in reals.iter().zip(&r_dst[p]) {
+                unsafe { d.0.add(k).write(src[i]) };
+            }
+            for (src, d) in ints.iter().zip(&c_dst[p]) {
+                unsafe { d.0.add(k).write((src[i] as u32).to_le_bytes()) };
+            }
+        }
+    });
+    // SAFETY: every row of each panel was written above.
+    for ((r, c), &m) in out.iter_mut().zip(&totals) {
+        for v in r.iter_mut() {
+            unsafe { v.set_len(m) };
+        }
+        for v in c.iter_mut() {
+            unsafe { v.set_len(m) };
+        }
+    }
+    Some(out)
+}
+
 /// A point layer dealt out to `n_panels` panels by its `panel` column
 /// (1-based; absent for one panel): a layer for each panel with rows.
 fn point_layers(l: &List, n_panels: usize) -> Option<Vec<PointLayer>> {
@@ -150,45 +226,40 @@ fn point_layers(l: &List, n_panels: usize) -> Option<Vec<PointLayer>> {
     let (shape, size, stroke) = (shape_r.as_real_slice()?, size_r.as_real_slice()?, stroke_r.as_real_slice()?);
     let (col, fill) = (col_r.as_integer_slice()?, fill_r.as_integer_slice()?);
     let n = x.len();
-    let recycles = |v: &[f64]| (v.len() == 1 || v.len() == n) && !v.iter().any(|v| v.is_nan());
     let (xr, yr) = (ranges(l, "x_range", n_panels)?, ranges(l, "y_range", n_panels)?);
     let [pt, stroke_scale, res] = nums(l, "consts")?[..] else { return None };
-    if y.len() != n || col.len() != n || fill.len() != n || ![shape, size, stroke].into_iter().all(recycles) {
+    let styles = [shape, size, stroke];
+    // Columns of length 1 recycle; NA is declined (the long ones' rows as
+    // they are dealt out).
+    let recycles = |v: &[f64]| v.len() == n || (v.len() == 1 && !v[0].is_nan());
+    if y.len() != n || col.len() != n || fill.len() != n || !styles.into_iter().all(recycles) {
         return None;
     }
-    let make = |idx: Option<&[u32]>, k: usize| {
-        let pick = |v: &[f64]| match idx {
-            Some(i) if v.len() == n => i.iter().map(|&k| v[k as usize]).collect(),
-            _ => v.to_vec(),
-        };
-        let pick_c = |v: &[i32]| -> Vec<[u8; 4]> {
-            match idx {
-                Some(i) => i.iter().map(|&k| (v[k as usize] as u32).to_le_bytes()).collect(),
-                None => v.iter().map(|&c| (c as u32).to_le_bytes()).collect(),
-            }
-        };
-        PointLayer {
-            x: pick(x), y: pick(y), x_range: xr[k], y_range: yr[k], shape: pick(shape), size: pick(size),
-            stroke: pick(stroke), col: pick_c(col), fill: pick_c(fill), pt, stroke_scale, res,
-        }
+    let panel_r = field(l, "panel");
+    let panel = match &panel_r {
+        Some(p) => Some(p.as_integer_slice()?).filter(|p| p.len() == n),
+        None => None,
     };
-    let Some(panel_r) = field(l, "panel") else {
-        return Some(vec![make(None, 0)]);
-    };
-    let panel = panel_r.as_integer_slice()?;
-    if panel.len() != n || panel.iter().any(|&p| p < 1 || p as usize > n_panels) {
+    if panel_r.is_some() && panel.is_none() {
         return None;
     }
-    let mut counts = vec![0usize; n_panels];
-    for &p in panel {
-        counts[p as usize - 1] += 1;
-    }
-    let mut rows: Vec<Vec<u32>> = counts.iter().map(|&c| Vec::with_capacity(c)).collect();
-    for (i, &p) in panel.iter().enumerate() {
-        rows[p as usize - 1].push(i as u32);
-    }
+    let long: Vec<&[f64]> = [x, y, shape, size, stroke].into_iter().filter(|v| v.len() == n).collect();
+    let checked: Vec<&[f64]> = styles.into_iter().filter(|v| v.len() == n).collect();
+    let valid = |i: usize| !checked.iter().any(|v| v[i].is_nan());
+    let dealt = deal(n, panel, if panel.is_some() { n_panels } else { 1 }, valid, &long, [col, fill])?;
     // One element per panel, empty ones as zero-point layers.
-    Some(rows.iter().enumerate().map(|(k, r)| make(Some(r), k)).collect())
+    Some(
+        dealt
+            .into_iter()
+            .enumerate()
+            .map(|(k, (reals, [col, fill]))| {
+                let mut reals = reals.into_iter();
+                let mut pick = |v: &[f64]| if v.len() == n { reals.next().unwrap() } else { v.to_vec() };
+                let (x, y, shape, size, stroke) = (pick(x), pick(y), pick(shape), pick(size), pick(stroke));
+                PointLayer { x, y, x_range: xr[k], y_range: yr[k], shape, size, stroke, col, fill, pt, stroke_scale, res }
+            })
+            .collect(),
+    )
 }
 
 /// The 1-based rows of each panel in a rect, path or text layer's
@@ -607,6 +678,35 @@ fn render_page(spec: List, threads: i32) -> Robj {
 }
 
 fn render(spec: &List, threads: i32) -> Option<Robj> {
+    let (list, w, h) = page_list(spec, threads)?;
+    let (out, ptr) = crate::render::native_raster(w, h);
+    let pixels = unsafe { std::slice::from_raw_parts_mut(ptr, w * h) };
+    let opts = raster::Options { threads: threads.max(0) as usize, ..Default::default() };
+    raster::render_into(&list, w, h, &opts, pixels);
+    Some(out)
+}
+
+/// `rs_render_page()` streamed to a PNG file at `path`, as `write_png()`
+/// in R/render.R writes a page for background `bg` (RGBA) and `dpi` (0:
+/// no pHYs chunk), without the page as a nativeRaster in between. `TRUE`,
+/// or NULL (decline) as `rs_render_page()`.
+/// @noRd
+#[extendr(r_name = "rs_render_page_png")]
+fn render_page_png(spec: List, threads: i32, path: &str, bg: &[i32], dpi: f64) -> extendr_api::Result<Robj> {
+    let &[r, g, b, a] = bg else {
+        return Err(Error::Other("expected an RGBA background".into()));
+    };
+    let Some((list, w, h)) = page_list(&spec, threads) else { return Ok(Robj::from(())) };
+    let byte = |v: i32| v.clamp(0, 255) as u8;
+    let png_opts = PngOptions::for_background([byte(r), byte(g), byte(b), byte(a)], (dpi > 0.0).then_some(dpi));
+    let opts = raster::Options { threads: threads.max(0) as usize, ..Default::default() };
+    let file = std::fs::File::create(path).map_err(|e| Error::Other(e.to_string()))?;
+    render_png(&list, w, h, &opts, &png_opts, std::io::BufWriter::new(file)).map_err(|e| Error::Other(e.to_string()))?;
+    Ok(Robj::from(true))
+}
+
+/// The display list of a page spec, with its width and height.
+fn page_list(spec: &List, threads: i32) -> Option<(DisplayList, usize, usize)> {
     let &[w, h] = field(spec, "page")?.as_integer_slice()? else { return None };
     let (w, h) = (w as usize, h as usize);
     let layout = list_of(spec, "layout")?;
@@ -716,12 +816,7 @@ fn render(spec: &List, threads: i32) -> Option<Robj> {
     };
     let data: Vec<std::sync::Arc<Vec<u8>>> = fonts.keys.iter().map(|k| font_data(&k.0)).collect::<Option<_>>()?;
     let faces: Vec<Font> = data.iter().zip(&fonts.keys).map(|(d, k)| Font::new(d, k.1)).collect::<Option<_>>()?;
-    let list = draw_page(&page, &faces)?;
-    let (out, ptr) = crate::render::native_raster(w, h);
-    let pixels = unsafe { std::slice::from_raw_parts_mut(ptr, w * h) };
-    let opts = raster::Options { threads: threads.max(0) as usize, ..Default::default() };
-    raster::render_into(&list, w, h, &opts, pixels);
-    Some(out)
+    Some((draw_page(&page, &faces)?, w, h))
 }
 
 /// One panel of the full tier's layer specs (`full_layer_specs()` in
@@ -769,5 +864,6 @@ fn panel_layers(specs: &List, n_panels: i32, panel: i32, rect: &[f64], dims: &[i
 extendr_module! {
     mod page;
     fn render_page;
+    fn render_page_png;
     fn render_panel_layers;
 }

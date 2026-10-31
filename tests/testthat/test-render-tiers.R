@@ -23,6 +23,20 @@ test_that("layers without rows don't keep a plot out of the full tier", {
   }
 })
 
+test_that("alot_png() writes the full tier's page as write_png() would", {
+  withr::local_options(alot.full_tier = TRUE)
+  p <- ggplot(mtcars, aes(wt, mpg, colour = factor(cyl))) + geom_point() + facet_wrap(~am)
+  b <- suppressMessages(alot_build(p))
+  for (bg in list(NULL, "transparent")) {
+    file <- withr::local_tempfile(fileext = ".png")
+    expect_identical(attr(alot_png(b, file, width = 3, height = 2, dpi = 96, bg = bg), "tier"), "full")
+    size <- list(width = 3, height = 2, units = "in", res = 96, bg = plot_background(b, bg), scaling = 1)
+    ref <- withr::local_tempfile(fileext = ".png")
+    write_png(render_full(b, size), ref, size$bg, 96)
+    expect_identical(readBin(file, "raw", 1e6), readBin(ref, "raw", 1e6))
+  }
+})
+
 test_that("alot_render_coverage() explains every plot not drawn in full", {
   withr::local_options(alot.full_tier = TRUE)
   p <- ggplot(marks_df, aes(x, y)) + geom_point() + labs(title = quote(alpha))

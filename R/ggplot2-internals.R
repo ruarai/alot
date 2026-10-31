@@ -52,7 +52,7 @@ gg_is_waiver         <- function(...) gg("is_waiver")(...)
 # ggsave() helpers (ggplot2 R/save.R), for alot_png() and alot_ggsave().
 gg_parse_dpi         <- function(...) gg("parse_dpi")(...)
 gg_plot_dim          <- function(...) gg("plot_dim")(...)
-gg_get_plot_background <- function(...) gg("get_plot_background")(...)
+gg_try_prop          <- function(...) gg("try_prop")(...)
 gg_validate_path     <- function(...) gg("validate_path")(...)
 gg_translate_shape_string <- function(...) gg("translate_shape_string")(...)
 gg_combine_elements  <- function(...) gg("combine_elements")(...)

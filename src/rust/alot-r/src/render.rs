@@ -49,39 +49,95 @@ fn at(v: &[f64], i: usize) -> f64 {
 #[extendr(r_name = "rs_point_colours")]
 fn point_colours(colour: Strings, alpha: Robj) -> Robj {
     let n = colour.len();
-    let alpha: Vec<f64> = match Column::new(&alpha).data {
-        ColumnData::Double(v) if v.len() == 1 || v.len() == n => v.to_vec(),
-        ColumnData::Logical(v) if (v.len() == 1 || v.len() == n) && v.iter().all(|v| v.is_none()) => vec![f64::NAN],
+    const NO_ALPHA: [f64; 1] = [f64::NAN];
+    let alpha_col = Column::new(&alpha);
+    let alpha: &[f64] = match alpha_col.data {
+        ColumnData::Double(v) if v.len() == 1 || v.len() == n => v,
+        ColumnData::Logical(v) if (v.len() == 1 || v.len() == n) && v.iter().all(|v| v.is_none()) => &NO_ALPHA,
         _ => return Robj::from(()),
     };
-    // R caches CHARSXPs, so parse each distinct pointer once.
-    let mut cache: HashMap<extendr_api::SEXP, Option<Colour>> = HashMap::new();
-    let mut out = Vec::with_capacity(n);
-    let na = unsafe { R_NaString };
-    // col2rgb(NA): transparent white.
-    const NA: i32 = 0x00FF_FFFF;
-    // Runs of one colour skip the map.
-    let mut last: (extendr_api::SEXP, Option<Colour>) = (na, Some(Colour::Na));
-    for (i, &p) in convert::str_ptrs(&colour).iter().enumerate() {
-        if p != last.0 {
-            last = (p, *cache.entry(p).or_insert_with(|| if p == na { Some(Colour::Na) } else { parse_colour(colour.elt(i).as_bytes()) }));
-        }
-        let [r, g, b, mut a] = match last.1 {
-            Some(Colour::Rgba(v)) => v,
-            Some(Colour::Na) => {
-                out.push(NA);
-                continue;
+    // R caches CHARSXPs, so each distinct pointer is parsed once: the
+    // distinct ones are found in parallel, parsed here (reading R's
+    // strings), and the rows mapped in parallel. Pointers travel as usize.
+    let ptrs = convert::str_ptrs(&colour);
+    let ptrs: &[usize] = unsafe { std::slice::from_raw_parts(ptrs.as_ptr() as *const usize, ptrs.len()) };
+    let chunk = n.div_ceil(raster::default_threads()).max(1 << 15);
+    let found: Vec<PtrMap<usize>> = raster::par_map((0..n).step_by(chunk), |a| {
+        let mut seen = PtrMap::default();
+        let mut last = None;
+        for (i, &p) in ptrs[a..(a + chunk).min(n)].iter().enumerate() {
+            if last != Some(p) {
+                seen.entry(p).or_insert(a + i);
+                last = Some(p);
             }
+        }
+        seen
+    });
+    let na = unsafe { R_NaString } as usize;
+    // Each distinct colour's RGBA, None for NA.
+    let mut parsed: PtrMap<Option<[u8; 4]>> = PtrMap::default();
+    for (p, i) in found.into_iter().flatten() {
+        if parsed.contains_key(&p) {
+            continue;
+        }
+        let rgba = match if p == na { Some(Colour::Na) } else { parse_colour(colour.elt(i).as_bytes()) } {
+            Some(Colour::Rgba(v)) => Some(v),
+            Some(Colour::Na) => None,
             None => return Robj::from(()),
         };
-        let al = at(&alpha, i);
-        if !al.is_nan() {
-            a = hex::double2int(al * 255.0).clamp(0, 255) as u8;
-        }
-        out.push((r as u32 | (g as u32) << 8 | (b as u32) << 16 | (a as u32) << 24) as i32);
+        parsed.insert(p, rgba);
     }
-    Integers::from_values(out).into()
+    // col2rgb(NA): transparent white.
+    const NA: i32 = 0x00FF_FFFF;
+    let mut out = Integers::new(n);
+    struct Dst(*mut i32);
+    unsafe impl Sync for Dst {}
+    let dst = Dst(out.as_mut_ptr() as *mut i32);
+    let (dst, parsed) = (&dst, &parsed);
+    raster::par_map((0..n).step_by(chunk), |a| {
+        // Runs of one colour skip the map.
+        let mut last = (usize::MAX, None);
+        for i in a..(a + chunk).min(n) {
+            let p = ptrs[i];
+            if p != last.0 {
+                last = (p, parsed[&p]);
+            }
+            let v = match last.1 {
+                Some([r, g, b, mut a]) => {
+                    let al = at(alpha, i);
+                    if !al.is_nan() {
+                        a = hex::double2int(al * 255.0).clamp(0, 255) as u8;
+                    }
+                    (r as u32 | (g as u32) << 8 | (b as u32) << 16 | (a as u32) << 24) as i32
+                }
+                None => NA,
+            };
+            // SAFETY: chunks write disjoint rows of `out`, which has `n`.
+            unsafe { dst.0.add(i).write(v) };
+        }
+    });
+    out.into()
 }
+
+/// A hasher for pointers (CHARSXPs as usize): their bits, spread.
+#[derive(Default)]
+struct PtrHash(u64);
+
+impl std::hash::Hasher for PtrHash {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.0 = (self.0.rotate_left(5) ^ b as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        }
+    }
+    fn write_usize(&mut self, p: usize) {
+        self.0 = ((p as u64) >> 3).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    }
+}
+
+type PtrMap<V> = HashMap<usize, V, std::hash::BuildHasherDefault<PtrHash>>;
 
 /// Whether every shape is one the renderer draws (double or integer
 /// codes, no NA).
@@ -434,13 +490,9 @@ fn render_rects(
     let spec = &spec;
     let blank = RectSpec { x0: f64::NAN, y0: 0.0, x1: 0.0, y1: 0.0, fill: [0; 4], col: [0; 4], lwd: 0.0 };
     let mut specs = vec![blank; rows.len()];
-    std::thread::scope(|scope| {
-        for (src, dst) in rows.chunks(chunk.max(1)).zip(specs.chunks_mut(chunk.max(1))) {
-            scope.spawn(move || {
-                for (&r, d) in src.iter().zip(dst.iter_mut()) {
-                    *d = spec(r);
-                }
-            });
+    raster::par_map(rows.chunks(chunk.max(1)).zip(specs.chunks_mut(chunk.max(1))), |(src, dst)| {
+        for (&r, d) in src.iter().zip(dst.iter_mut()) {
+            *d = spec(r);
         }
     });
     let (w, h) = (w as usize, h as usize);

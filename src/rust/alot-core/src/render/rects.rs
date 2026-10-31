@@ -74,10 +74,7 @@ impl RectBatch {
             rs.iter().filter_map(Self::span).fold((i64::MAX, i64::MIN), |(lo, hi), (top, bottom)| (lo.min(top), hi.max(bottom)))
         };
         let chunk = rects.len().div_ceil(raster::default_threads()).max(1 << 16);
-        let parts: Vec<(i64, i64)> = std::thread::scope(|scope| {
-            let handles: Vec<_> = rects.chunks(chunk).map(|c| scope.spawn(move || fold(c))).collect();
-            handles.into_iter().map(|h| h.join().unwrap()).collect()
-        });
+        let parts: Vec<(i64, i64)> = raster::par_map(rects.chunks(chunk), fold);
         let mut rows = parts.into_iter().fold((i64::MAX, i64::MIN), |(lo, hi), (a, b)| (lo.min(a), hi.max(b)));
         if rows.0 > rows.1 {
             rows = (0, 0);

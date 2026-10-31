@@ -110,12 +110,8 @@ impl PathBatch {
     /// Prepares the paths' outlines in parallel. Rings with a non-finite
     /// vertex are dropped (callers split polylines at NA, as grid does).
     pub fn new(specs: &[PathSpec]) -> Self {
-        let threads = raster::default_threads();
-        let chunk = specs.len().div_ceil(threads).max(1);
-        let paths: Vec<Prepared> = std::thread::scope(|scope| {
-            let handles: Vec<_> = specs.chunks(chunk).map(|c| scope.spawn(move || c.iter().map(prepare).collect::<Vec<_>>())).collect();
-            handles.into_iter().flat_map(|h| h.join().unwrap()).collect()
-        });
+        let chunk = specs.len().div_ceil(raster::default_threads()).max(64);
+        let paths: Vec<Prepared> = raster::par_map(specs.chunks(chunk), |c| c.iter().map(prepare).collect::<Vec<_>>()).into_iter().flatten().collect();
         let rows = paths.iter().filter_map(Self::span).fold((i64::MAX, i64::MIN), |(lo, hi), (a, b)| (lo.min(a), hi.max(b)));
         let rows = if rows.0 > rows.1 { (0, 0) } else { rows };
         PathBatch { paths, rows }

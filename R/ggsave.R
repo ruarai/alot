@@ -37,8 +37,8 @@ alot_ggsave <- function(filename, plot = ggplot2::get_last_plot(),
   filename <- gg_validate_path(path, filename, create.dir)
   dpi <- gg_parse_dpi(dpi)
   dim <- gg_plot_dim(c(width, height), scale = scale, units = units[1], limitsize = limitsize, dpi = dpi)
-  ggplot <- if (ggplot2::is_ggplot(plot)) plot else plot@plot
-  bg <- gg_get_plot_background(ggplot, bg)
+  # alot_png() takes a NULL `bg` from the built plot's theme, as
+  # get_plot_background() would from the plot's.
   out <- alot_png(plot, filename, width = dim[1], height = dim[2], units = "in", dpi = dpi, bg = bg, ...)
   invisible(structure(filename, tier = attr(out, "tier")))
 }

@@ -100,14 +100,28 @@ fn adler32_combine(a1: u32, a2: u32, len2: usize) -> u32 {
     (sum2 << 16) | sum1
 }
 
-/// Filters raw rows (Sub) and deflates them: the IDAT chunk, the filtered
-/// length and its Adler-32.
-fn compress_chunk(raw: &[u8], row_bytes: usize, bpp: usize, last: bool) -> (Vec<u8>, usize, u32) {
-    let mut filtered = Vec::with_capacity(raw.len() + raw.len() / row_bytes.max(1));
-    for row in raw.chunks(row_bytes.max(1)) {
+/// Packs nativeRaster rows of `width` pixels as RGBA or RGB bytes, filters
+/// them (Sub) and deflates them: the IDAT chunk, the filtered length and
+/// its Adler-32.
+fn compress_chunk(pixels: &[u32], width: usize, alpha: bool, last: bool) -> (Vec<u8>, usize, u32) {
+    let bpp = if alpha { 4 } else { 3 };
+    let row_bytes = width * bpp;
+    let rows = pixels.len() / width.max(1);
+    let mut filtered = Vec::with_capacity(rows * (row_bytes + 1));
+    let mut line = vec![0u8; row_bytes];
+    for row in pixels.chunks(width.max(1)) {
+        if alpha {
+            for (d, &p) in line.chunks_exact_mut(4).zip(row) {
+                d.copy_from_slice(&p.to_le_bytes());
+            }
+        } else {
+            for (d, &p) in line.chunks_exact_mut(3).zip(row) {
+                d.copy_from_slice(&p.to_le_bytes()[..3]);
+            }
+        }
         filtered.push(1);
-        filtered.extend_from_slice(&row[..bpp]);
-        filtered.extend((bpp..row.len()).map(|i| row[i].wrapping_sub(row[i - bpp])));
+        filtered.extend_from_slice(&line[..bpp]);
+        filtered.extend((bpp..row_bytes).map(|i| line[i].wrapping_sub(line[i - bpp])));
     }
     let mut z = Compress::new(Compression::fast(), false);
     let mut out = Vec::with_capacity(filtered.len() / 2 + 1024);
@@ -127,14 +141,14 @@ fn compress_chunk(raw: &[u8], row_bytes: usize, bpp: usize, last: bool) -> (Vec<
 /// A PNG being written row by row, top to bottom.
 pub struct Encoder<W: Write + 'static> {
     out: W,
-    row_bytes: usize,
-    bpp: usize,
+    width: usize,
     alpha: bool,
     threads: usize,
     rows_left: usize,
     rows_per_chunk: usize,
-    /// Raw rows not yet compressed, one buffer per pending chunk.
-    pending: Vec<Vec<u8>>,
+    /// Rows not yet compressed, one buffer of pixels per pending chunk:
+    /// packed to bytes by the compressing workers.
+    pending: Vec<Vec<u32>>,
     adler: u32,
 }
 
@@ -161,8 +175,7 @@ impl<W: Write + 'static> Encoder<W> {
         let row_bytes = width as usize * bpp;
         Ok(Encoder {
             out,
-            row_bytes,
-            bpp,
+            width: width as usize,
             alpha: opts.alpha,
             threads: raster::default_threads(),
             rows_left: height as usize,
@@ -175,21 +188,16 @@ impl<W: Write + 'static> Encoder<W> {
     /// Writes whole rows of nativeRaster pixels (`R | G << 8 | B << 16 | A
     /// << 24`, non-premultiplied).
     pub fn write_rows(&mut self, pixels: &[u32]) -> std::io::Result<()> {
-        let width = self.row_bytes / self.bpp;
+        let width = self.width;
         for row in pixels.chunks(width.max(1)) {
-            let full = self.pending.last().map_or(true, |c| c.len() >= self.rows_per_chunk * self.row_bytes);
+            let full = self.pending.last().map_or(true, |c| c.len() >= self.rows_per_chunk * width);
             if full {
                 if self.pending.len() == self.threads {
                     self.flush(false)?;
                 }
-                self.pending.push(Vec::with_capacity(self.rows_per_chunk * self.row_bytes));
+                self.pending.push(Vec::with_capacity(self.rows_per_chunk * width));
             }
-            let buf = self.pending.last_mut().unwrap();
-            if self.alpha {
-                buf.extend(row.iter().flat_map(|&p| p.to_le_bytes()));
-            } else {
-                buf.extend(row.iter().flat_map(|&p| [p as u8, (p >> 8) as u8, (p >> 16) as u8]));
-            }
+            self.pending.last_mut().unwrap().extend_from_slice(row);
             self.rows_left = self.rows_left.saturating_sub(1);
         }
         Ok(())
@@ -200,15 +208,8 @@ impl<W: Write + 'static> Encoder<W> {
     fn flush(&mut self, last: bool) -> std::io::Result<()> {
         let chunks = std::mem::take(&mut self.pending);
         let n = chunks.len();
-        let (row_bytes, bpp) = (self.row_bytes, self.bpp);
-        let parts: Vec<(Vec<u8>, usize, u32)> = std::thread::scope(|scope| {
-            let handles: Vec<_> = chunks
-                .iter()
-                .enumerate()
-                .map(|(i, raw)| scope.spawn(move || compress_chunk(raw, row_bytes, bpp, last && i + 1 == n)))
-                .collect();
-            handles.into_iter().map(|h| h.join().unwrap()).collect()
-        });
+        let (width, alpha) = (self.width, self.alpha);
+        let parts: Vec<(Vec<u8>, usize, u32)> = raster::par_map(chunks.iter().enumerate(), |(i, px)| compress_chunk(px, width, alpha, last && i + 1 == n));
         for (idat, len, adler) in parts {
             self.out.write_all(&idat)?;
             self.adler = adler32_combine(self.adler, adler, len);

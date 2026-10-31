@@ -179,6 +179,13 @@ rs_layout <- function(spec, page) .Call(wrap__layout_boxes, spec, page)
 #' @noRd
 rs_render_page <- function(spec, threads) .Call(wrap__render_page, spec, threads)
 
+#' `rs_render_page()` streamed to a PNG file at `path`, as `write_png()`
+#' in R/render.R writes a page for background `bg` (RGBA) and `dpi` (0:
+#' no pHYs chunk), without the page as a nativeRaster in between. `TRUE`,
+#' or NULL (decline) as `rs_render_page()`.
+#' @noRd
+rs_render_page_png <- function(spec, threads, path, bg, dpi) .Call(wrap__render_page_png, spec, threads, path, bg, dpi)
+
 #' One panel of the full tier's layer specs (`full_layer_specs()` in
 #' R/render-full.R), for the hybrid tier's lazy grobs: the marks of panel
 #' `panel` (1-based, of `n_panels`) drawn as `Panel::draw()` draws a page's

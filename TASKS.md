@@ -1173,12 +1173,21 @@ anything else.
   `Guides$setup` when a scale's guide isn't the default, so a misplaced
   guide warns once.
 
-### R7.2 Performance pass
+### R7.2 Performance pass — done except the 10-row target
 - **Depends:** R6.3, R6.4
 - **Do:** Profile the render suite end to end. Remove serial stages and
   per-call allocations, and check thread scaling and memory at 300 dpi.
 - **Done when:** the PHASE2.md performance targets are met and recorded in
   `RESULTS.md`.
+- **Result:** README plot, `alot_png()` from a built plot, release build:
+  105 ms at 1600 × 1000 (< 120), 190 ms for the 300 dpi page (< 200), 37
+  ms for 10 rows (target < 25, not met: about 25 ms of it is R's IR and
+  layout, spread over many small calls; accepted as optimistic). Thread
+  starts for small batches removed (`raster::par_map()`), fresh buffers
+  filled in parallel (point spec dealt to panels in one pass, placements),
+  colours mapped in parallel, `alot_png()` streams the full tier to the
+  PNG encoder without a nativeRaster, font matches cached per render.
+  Thread scaling and memory are in inst/bench/RESULTS.md (R7.2).
 
 ### R7.3 Phase 2 exit
 - **Depends:** everything above

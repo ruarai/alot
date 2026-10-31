@@ -62,14 +62,9 @@ impl RectLayer {
         let chunk = n.div_ceil(raster::default_threads()).max(1 << 15);
         let blank = RectSpec { x0: f64::NAN, y0: 0.0, x1: 0.0, y1: 0.0, fill: [0; 4], col: [0; 4], lwd: 0.0 };
         let mut specs = vec![blank; n];
-        std::thread::scope(|scope| {
-            for (k, dst) in specs.chunks_mut(chunk).enumerate() {
-                let spec = &spec;
-                scope.spawn(move || {
-                    for (j, d) in dst.iter_mut().enumerate() {
-                        *d = spec(k * chunk + j);
-                    }
-                });
+        raster::par_map(specs.chunks_mut(chunk).enumerate(), |(k, dst)| {
+            for (j, d) in dst.iter_mut().enumerate() {
+                *d = spec(k * chunk + j);
             }
         });
         RectBatch::new(specs, RectStyle { join: self.join, mitre: 10.0, snap: true })

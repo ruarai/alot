@@ -435,50 +435,48 @@ impl PointBatch {
         let threads = if threads == 0 { raster::default_threads() } else { threads };
         let mut placed = PLACED_POOL.lock().unwrap_or_else(|e| e.into_inner()).pop().unwrap_or_default();
         placed.clear();
-        placed.resize(n, SKIPPED);
+        placed.reserve(n);
         // Small batches aren't worth a thread each.
         let chunk = n.div_ceil(threads).max(4096);
         let point = &point;
-        let lookups: Vec<Lookup> = std::thread::scope(|scope| {
-            let handles: Vec<_> = placed
-                .chunks_mut(chunk)
-                .enumerate()
-                .map(|(c, dst)| {
-                    scope.spawn(move || {
-                        let mut lookup = Lookup::new();
-                        for (k, d) in dst.iter_mut().enumerate() {
-                            if let Some(p) = point(c * chunk + k) {
-                                *d = place(&p, &mut lookup);
-                            }
-                        }
-                        lookup
-                    })
-                })
-                .collect();
-            handles.into_iter().map(|h| h.join().unwrap()).collect()
+        // Workers write every element of their chunk, so a fresh buffer's
+        // pages are first touched in parallel: faulting in a million
+        // placements on one thread takes longer than placing them.
+        let lookups: Vec<(Lookup, i64, i64)> = raster::par_map(placed.spare_capacity_mut()[..n].chunks_mut(chunk).enumerate(), |(c, dst)| {
+            let mut lookup = Lookup::new();
+            let (mut lo, mut hi) = (i64::MAX, i64::MIN);
+            for (k, d) in dst.iter_mut().enumerate() {
+                let p = match point(c * chunk + k) {
+                    Some(p) => place(&p, &mut lookup),
+                    None => SKIPPED,
+                };
+                if p.set != NONE {
+                    let r = lookup.sets[p.set as usize].reach;
+                    lo = lo.min(p.iy as i64 + r.0 as i64);
+                    hi = hi.max(p.iy as i64 + r.1 as i64);
+                }
+                d.write(p);
+            }
+            (lookup, lo, hi)
         });
+        // SAFETY: the workers above initialised all `n` elements.
+        unsafe { placed.set_len(n) };
         // Workers numbered their own sets; offset them into one list.
         let mut sets = Vec::new();
         let mut offsets = Vec::new();
-        for mut l in lookups {
+        let (mut lo, mut hi) = (i64::MAX, i64::MIN);
+        for (mut l, a, b) in lookups {
             offsets.push(sets.len() as u32);
             sets.append(&mut l.sets);
+            (lo, hi) = (lo.min(a), hi.max(b));
         }
         if offsets.iter().any(|&o| o > 0) {
-            std::thread::scope(|scope| {
-                for (dst, &off) in placed.chunks_mut(chunk).zip(&offsets) {
-                    scope.spawn(move || {
-                        for d in dst.iter_mut().filter(|d| d.set != NONE) {
-                            d.set += off;
-                        }
-                    });
+            raster::par_map(placed.chunks_mut(chunk).zip(&offsets), |(dst, &off)| {
+                for d in dst.iter_mut().filter(|d| d.set != NONE) {
+                    d.set += off;
                 }
             });
         }
-        let (lo, hi) = placed.iter().filter(|p| p.set != NONE).fold((i64::MAX, i64::MIN), |(lo, hi), p| {
-            let r = sets[p.set as usize].reach;
-            (lo.min(p.iy as i64 + r.0 as i64), hi.max(p.iy as i64 + r.1 as i64))
-        });
         let rows = if lo > hi { (0, 0) } else { (lo, hi) };
         PointBatch { placed, sets, rows }
     }
