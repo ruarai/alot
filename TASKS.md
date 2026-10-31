@@ -716,7 +716,7 @@ alongside Phase 1's remaining tasks.
 
 ## R4 Layout (milestone 2.1)
 
-### R4.1 Table solver
+### R4.1 Table solver — done
 - **Depends:** R2.1, R3.1
 - **Touches:** `alot-core/src/render/layout.rs`
 - **Do:** Build a gtable-like row and column solver over absolute, `null`,
@@ -726,6 +726,17 @@ alongside Phase 1's remaining tasks.
   positions). Add the debug box export.
 - **Done when:** the layout export matches grid within 0.5 px for every
   single-panel corpus plot.
+- **Result:** `layout.rs` has the table (gtable's add rows, columns, padding
+  and grobs), grid's `calcViewportLayout()` and the single-panel plot
+  table (`FacetNull`, axis titles, legends, title, subtitle, caption, tag,
+  margin, background). Text-measured units are `titleGrob()` sizes from
+  `text_metrics()`, and axis sizes follow `GuideAxis$measure_grobs()` (tick
+  length plus label grobs, `angle`, `n.dodge`, minor ticks).
+  `layout_boxes_rust()` is the debug export; every single-panel render
+  corpus plot matches grid's boxes (`test-render-corpus.R`).
+  Facets with more than one panel decline ("more than one panel"; R5.2, R6.x).
+  Legend boxes are inputs: the corpus test takes their sizes from grid until
+  the legend layout lands in R5.
 
 ### R4.2 Panel decorations and axes
 - **Depends:** R4.1, R1.3, R1.4, R2.2

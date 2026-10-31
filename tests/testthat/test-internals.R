@@ -211,3 +211,24 @@ test_that("upstream theme and label resolution match what the render IR mirrors"
   expect_snapshot(print(body(utils::getFromNamespace("combine_elements", "ggplot2"))))
   expect_snapshot(print(body(environment(ggplot2::Layout$render)$f)))
 })
+
+test_that("upstream table assembly matches what the Rust layout mirrors", {
+  # layout_spec() (R/render-layout.R) and alot-core/src/render/layout.rs
+  # mirror these for a single panel. If these fail, update the mirror, then
+  # the snapshots.
+  gg_fn <- function(f) utils::getFromNamespace(f, "ggplot2")
+  expect_snapshot(print(body(utils::getS3method("ggplot_gtable", "ggplot2::ggplot_built", envir = asNamespace("ggplot2")))))
+  for (f in c("table_add_tag", "table_add_legends", "plot_extent", "find_panel", "titleGrob", "widthDetails.titleGrob", "heightDetails.titleGrob", "rotate_just", "font_descent", "draw_axis_labels", "label_angle_heuristic", "panel_guides_grob")) {
+    expect_snapshot(print(body(gg_fn(f))))
+  }
+  expect_snapshot(print(body(environment(ggplot2::FacetNull$draw_panels)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Facet$draw_labels)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Facet$set_panel_size)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GuideAxis$measure_grobs)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GuideAxis$override_elements)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GuideAxis$build_labels)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Guide$draw)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Layout$render_labels)$f)))
+  expect_snapshot(print(body(environment(ggplot2::CoordCartesian$labels)$f)))
+  expect_snapshot(print(body(gtable::gtable_add_padding)))
+})

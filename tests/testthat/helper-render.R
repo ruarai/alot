@@ -41,14 +41,15 @@ render_px_diff <- function(a, b) {
 # if alot raised a fallback warning or used another tier. On failure writes
 # reference, result and diff PNGs to a temporary directory (under
 # ALOT_RENDER_DIFF_DIR if set). `label` names
-# the plot in failure messages.
-expect_render_close <- function(p, ..., max = 32, share = 0.01, tier = "full", label = NULL) {
+# the plot in failure messages. `reference`, a nativeRaster, replaces the live
+# reference (see render_cached_reference()).
+expect_render_close <- function(p, ..., max = 32, share = 0.01, tier = "full", label = NULL, reference = NULL) {
   size <- utils::modifyList(render_size, list(...))
   if (ggplot2::is_ggplot(p)) {
     set.seed(1)
     p <- ggplot2::ggplot_build(p)
   }
-  ref <- render_reference(p, size)
+  ref <- reference %||% render_reference(p, size)
   fallback <- NULL
   out <- withCallingHandlers(
     render_raster(p, size),
@@ -114,7 +115,11 @@ expect_render_close <- function(p, ..., max = 32, share = 0.01, tier = "full", l
 layout_boxes <- function(built, size = render_size) {
   do.call(ragg::agg_capture, size)
   on.exit(grDevices::dev.off())
-  gtable <- ggplot2::ggplot_gtable(built)
+  gtable_boxes(ggplot2::ggplot_gtable(built))
+}
+
+# The boxes of `gtable` on the open device (see layout_boxes()).
+gtable_boxes <- function(gtable) {
   grid::grid.newpage()
   res <- grDevices::dev.size("px")[1] / grDevices::dev.size("in")[1]
   dev_h <- grDevices::dev.size("in")[2]
@@ -158,8 +163,12 @@ layout_boxes <- function(built, size = render_size) {
 }
 
 # Compares two layout exports (see layout_boxes()) by name: every box in
-# `expected` must be in `object` with each edge within `tol` pixels.
+# `expected` must be in `object` with each edge within `tol` pixels. Repeated
+# names match in order.
 expect_layout_close <- function(object, expected, tol = 0.5) {
+  # Names repeat (the table's spacers): the nth "spacer" matches the nth.
+  object$name <- make.unique(object$name)
+  expected$name <- make.unique(expected$name)
   m <- match(expected$name, object$name)
   missing <- expected$name[is.na(m)]
   if (length(missing)) {
@@ -174,5 +183,82 @@ expect_layout_close <- function(object, expected, tol = 0.5) {
       "Boxes off by more than %g px: %s",
       tol, paste(sprintf("%s (%.2f px)", expected$name[bad], apply(d[bad, , drop = FALSE], 1, max)), collapse = ", ")
     )
+  )
+}
+
+# The sizes in pixels of the legend boxes in ggplot2's gtable for `built`,
+# as list(position = c(width, height)) for the positions that have one, and
+# the boxes of the top-level table, from one gtable. The Rust layout takes
+# the legends' sizes until their layout is mirrored.
+grid_layout <- function(built, size = render_size) {
+  do.call(ragg::agg_capture, size)
+  on.exit(grDevices::dev.off())
+  gtable <- ggplot2::ggplot_gtable(built)
+  res <- size$res
+  legends <- list()
+  for (pos in c("right", "left", "bottom", "top")) {
+    i <- match(paste0("guide-box-", pos), gtable$layout$name)
+    g <- gtable$grobs[[i]]
+    if (!inherits(g, "zeroGrob")) {
+      legends[[pos]] <- c(
+        grid::convertWidth(gtable::gtable_width(g), "in", valueOnly = TRUE),
+        grid::convertHeight(gtable::gtable_height(g), "in", valueOnly = TRUE)
+      ) * res
+    }
+  }
+  boxes <- gtable_boxes(gtable)
+  list(legends = legends, boxes = boxes[!grepl("/", boxes$name, fixed = TRUE), ])
+}
+
+# Whether alot's layout of `built` (a built plot) matches grid's within
+# `tol` pixels, or why alot declines it: returns NULL when it matches,
+# otherwise the reason (a string); fails the expectation on a mismatch.
+expect_layout_matches <- function(built, size = render_size, tol = 0.5, label = NULL) {
+  ir <- render_ir(built)
+  info <- grid_layout(built, size)
+  mine <- layout_boxes_rust(built, size$width, size$height, size$res, ir, info$legends)
+  if (length(mine) == 0) {
+    return(attr(mine, "reason"))
+  }
+  expected <- info$boxes
+  # The Rust table has the cells of the gtable, in the same order.
+  testthat::expect(
+    identical(make.unique(mine$name), make.unique(expected$name)),
+    paste0(label, if (!is.null(label)) ": ", "alot's cells are ", paste(mine$name, collapse = ", "))
+  )
+  expect_layout_close(mine, expected, tol)
+  NULL
+}
+
+# A reference raster cached on disk under the directory in the environment
+# variable ALOT_RENDER_CACHE (off if unset): `key` names the plot (a string
+# that changes whenever the plot, the page, or anything the reference
+# depends on does), `build` makes the reference. The cache is local; nothing
+# in it is committed.
+render_cached_reference <- function(key, build) {
+  dir <- Sys.getenv("ALOT_RENDER_CACHE")
+  if (!nzchar(dir)) {
+    return(build())
+  }
+  dir.create(dir, showWarnings = FALSE, recursive = TRUE)
+  path <- file.path(dir, paste0(rlang::hash(key), ".rds"))
+  hit <- tryCatch(readRDS(path), error = function(e) NULL)
+  if (!is.null(hit)) {
+    return(hit)
+  }
+  ref <- build()
+  tryCatch(saveRDS(ref, path), error = function(e) NULL)
+  ref
+}
+
+# What a cached reference depends on besides the plot: the page, R and the
+# packages that draw it, and the fonts it resolves.
+render_cache_context <- function(size = render_size) {
+  fonts <- systemfonts::match_fonts(c("", "sans", "serif", "mono"))
+  list(
+    size, R.version.string,
+    as.character(utils::packageVersion("ggplot2")), as.character(utils::packageVersion("ragg")),
+    as.character(utils::packageVersion("systemfonts")), as.character(utils::packageVersion("textshaping")),
+    fonts$path, unname(tools::md5sum(unique(fonts$path)))
   )
 }

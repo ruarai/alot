@@ -1,5 +1,6 @@
 pub mod convert;
 pub mod grouped;
+pub mod layout;
 pub mod render;
 pub mod text;
 
@@ -768,6 +769,7 @@ fn build_profile() -> &'static str {
 
 extendr_module! {
     mod alot;
+    use layout;
     use render;
     use text;
     fn build_profile;

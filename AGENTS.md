@@ -51,8 +51,14 @@ wait
 
 `'^corpus$'` matches only `test-corpus.R`, so `rest.log` is "everything except
 `test-corpus.R`". That includes `test-render-corpus.R`, a separate Phase 2
-corpus that renders about 1,700 plots on every run and ignores `ALOT_CORPUS`.
-It dominates the run time. When your change cannot affect rendering (Phase 1
+corpus of about 1,700 plots that ignores `ALOT_CORPUS`. By default it runs
+one plot in eight (`ALOT_RENDER_SAMPLE`); `ALOT_RENDER_FULL=1` runs all of
+them, `ALOT_RENDER_CORPUS=<regex>` runs every plot in the matching files, and
+`ALOT_RENDER_CACHE=<dir>` caches ggplot2's reference renders locally between
+runs. `NOT_CRAN=true Rscript tools/render-corpus-sharded.R [shards]` splits
+it across processes. The page-layout check runs once per distinct structure
+(`ALOT_LAYOUT_ALL=1` for every plot). The full render corpus dominates the
+run time, so run it in full only for render-path changes. When your change cannot affect rendering (Phase 1
 build-path work), exclude it too, e.g. `run '^(corpus|render-corpus)$' TRUE`.
 Run it when you touch the render path (`R/render*.R`, or the rendering code in `alot-core` or `alot-r`).
 Don't start overlapping runs that write to the same log file.

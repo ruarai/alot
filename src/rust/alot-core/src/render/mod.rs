@@ -4,6 +4,7 @@
 
 pub mod agg;
 pub mod display;
+pub mod layout;
 pub mod paths;
 pub mod png;
 pub mod points;

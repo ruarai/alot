@@ -2500,3 +2500,733 @@
               theme, labels, self$params)
       }
 
+# upstream table assembly matches what the Rust layout mirrors
+
+    Code
+      print(body(utils::getS3method("ggplot_gtable", "ggplot2::ggplot_built", envir = asNamespace(
+        "ggplot2"))))
+    Output
+      {
+          plot <- data@plot
+          layout <- data@layout
+          data <- data@data
+          theme <- plot@theme
+          geom_grobs <- by_layer(function(l, d) l$draw_geom(d, layout), 
+              plot@layers, data, "converting geom to grob")
+          plot_table <- layout$render(geom_grobs, data, theme, plot@labels)
+          legend_box <- plot@guides$assemble(theme)
+          plot_table <- table_add_legends(plot_table, legend_box, theme)
+          title <- element_render(theme, "plot.title", plot@labels$title, 
+              margin_y = TRUE, margin_x = TRUE)
+          title_height <- grobHeight(title)
+          subtitle <- element_render(theme, "plot.subtitle", plot@labels$subtitle, 
+              margin_y = TRUE, margin_x = TRUE)
+          subtitle_height <- grobHeight(subtitle)
+          caption <- element_render(theme, "plot.caption", plot@labels$caption, 
+              margin_y = TRUE, margin_x = TRUE)
+          caption_height <- grobHeight(caption)
+          title_pos <- arg_match0(theme$plot.title.position %||% "panel", 
+              c("panel", "plot"), arg_nm = "plot.title.position", error_call = expr(theme()))
+          caption_pos <- arg_match0(theme$plot.caption.position %||% 
+              "panel", values = c("panel", "plot"), arg_nm = "plot.caption.position", 
+              error_call = expr(theme()))
+          pans <- plot_table$layout[grepl("^panel", plot_table$layout$name), 
+              , drop = FALSE]
+          if (title_pos == "panel") {
+              title_l <- min(pans$l)
+              title_r <- max(pans$r)
+          }
+          else {
+              title_l <- 1
+              title_r <- ncol(plot_table)
+          }
+          if (caption_pos == "panel") {
+              caption_l <- min(pans$l)
+              caption_r <- max(pans$r)
+          }
+          else {
+              caption_l <- 1
+              caption_r <- ncol(plot_table)
+          }
+          plot_table <- gtable_add_rows(plot_table, subtitle_height, 
+              pos = 0)
+          plot_table <- gtable_add_grob(plot_table, subtitle, name = "subtitle", 
+              t = 1, b = 1, l = title_l, r = title_r, clip = "off")
+          plot_table <- gtable_add_rows(plot_table, title_height, pos = 0)
+          plot_table <- gtable_add_grob(plot_table, title, name = "title", 
+              t = 1, b = 1, l = title_l, r = title_r, clip = "off")
+          plot_table <- gtable_add_rows(plot_table, caption_height, 
+              pos = -1)
+          plot_table <- gtable_add_grob(plot_table, caption, name = "caption", 
+              t = -1, b = -1, l = caption_l, r = caption_r, clip = "off")
+          plot_table <- table_add_tag(plot_table, plot@labels$tag, 
+              theme)
+          plot_margin <- calc_element("plot.margin", theme) %||% margin()
+          plot_table <- gtable_add_padding(plot_table, plot_margin)
+          if (is_theme_element(theme$plot.background)) {
+              plot_table <- gtable_add_grob(plot_table, element_render(theme, 
+                  "plot.background"), t = 1, l = 1, b = -1, r = -1, 
+                  name = "background", z = -Inf)
+              plot_table$layout <- plot_table$layout[c(nrow(plot_table$layout), 
+                  1:(nrow(plot_table$layout) - 1)), ]
+              plot_table$grobs <- plot_table$grobs[c(nrow(plot_table$layout), 
+                  1:(nrow(plot_table$layout) - 1))]
+          }
+          attr(plot_table, "alt-label") <- plot@labels$alt
+          plot_table
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          table <- gtable_add_padding(table, unit(0, "pt"))
+          if (length(label) < 1) {
+              return(table)
+          }
+          element <- calc_element("plot.tag", theme)
+          if (is_theme_element(element, "blank")) {
+              return(table)
+          }
+          position <- calc_element("plot.tag.position", theme) %||% 
+              "topleft"
+          location <- calc_element("plot.tag.location", theme) %||% 
+              (if (is.numeric(position)) 
+                  "plot"
+              else "margin")
+          if (is.numeric(position)) {
+              if (location == "margin") {
+                  cli::cli_abort(paste0("A {.cls numeric} {.arg plot.tag.position} cannot be used with ", 
+                      "`{.val margin}` as {.arg plot.tag.location}."), 
+                      call = expr(theme()))
+              }
+              check_length(position, 2L, call = expr(theme()), arg = I("A {.cls numeric} {.arg plot.tag.position}"))
+              top <- left <- right <- bottom <- FALSE
+          }
+          else {
+              position <- arg_match0(position[1], c("topleft", "top", 
+                  "topright", "left", "right", "bottomleft", "bottom", 
+                  "bottomright"), arg_nm = "plot.tag.position", error_call = expr(theme()))
+              top <- position %in% c("topleft", "top", "topright")
+              left <- position %in% c("topleft", "left", "bottomleft")
+              right <- position %in% c("topright", "right", "bottomright")
+              bottom <- position %in% c("bottomleft", "bottom", "bottomright")
+          }
+          tag <- element_grob(element, label = label, margin_y = TRUE, 
+              margin_x = TRUE)
+          height <- grobHeight(tag)
+          width <- grobWidth(tag)
+          if (location %in% c("plot", "panel")) {
+              if (!is.numeric(position)) {
+                  hjust <- try_prop(element, "hjust", default = 0.5)
+                  if (right || left) {
+                      x <- (1 - hjust) * width
+                      if (right) {
+                        x <- unit(1, "npc") - x
+                      }
+                  }
+                  else {
+                      x <- unit(hjust, "npc")
+                  }
+                  if (top || bottom) {
+                      vjust <- try_prop(element, "vjust", default = 0.5)
+                      y <- (1 - vjust) * height
+                      if (top) {
+                        y <- unit(1, "npc") - y
+                      }
+                  }
+                  else {
+                      y <- unit(vjust, "npc")
+                  }
+              }
+              else {
+                  x <- unit(position[1], "npc")
+                  y <- unit(position[2], "npc")
+              }
+              tag <- element_grob(element, x = x, y = y, label = label, 
+                  margin_y = TRUE, margin_x = TRUE)
+              if (location == "plot") {
+                  table <- gtable_add_grob(table, tag, name = "tag", 
+                      clip = "off", t = 1, b = nrow(table), l = 1, 
+                      r = ncol(table))
+                  return(table)
+              }
+          }
+          if (location == "panel") {
+              place <- find_panel(table)
+          }
+          else {
+              n_col <- ncol(table)
+              n_row <- nrow(table)
+              if (top) 
+                  table$heights <- unit.c(height, table$heights[-1])
+              if (left) 
+                  table$widths <- unit.c(width, table$widths[-1])
+              if (right) 
+                  table$widths <- unit.c(table$widths[-n_col], width)
+              if (bottom) 
+                  table$heights <- unit.c(table$heights[-n_row], height)
+              place <- data_frame0(t = 1L, r = n_col, b = n_row, l = 1L)
+          }
+          if (top) 
+              place$b <- place$t
+          if (left) 
+              place$r <- place$l
+          if (right) 
+              place$l <- place$r
+          if (bottom) 
+              place$t <- place$b
+          gtable_add_grob(table, tag, name = "tag", clip = "off", t = place$t, 
+              l = place$l, b = place$b, r = place$r)
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (is_zero(legends)) {
+              legends <- rep(list(zeroGrob()), 5)
+              names(legends) <- c(.trbl, "inside")
+          }
+          widths <- heights <- set_names(rep(list(unit(0, "cm")), length(legends)), 
+              names(legends))
+          empty <- vapply(legends, is_zero, logical(1))
+          widths[!empty] <- lapply(legends[!empty], gtable_width)
+          heights[!empty] <- lapply(legends[!empty], gtable_height)
+          spacing <- calc_element("legend.box.spacing", theme) %||% 
+              unit(0.2, "cm")
+          zero <- unit(0, "pt")
+          spacing <- lapply(empty, function(is_empty) if (is_empty) 
+              zero
+          else spacing)
+          location <- switch(theme$legend.location %||% "panel", plot = plot_extent, 
+              find_panel)
+          place <- location(table)
+          table <- gtable_add_cols(table, spacing$right, pos = -1)
+          table <- gtable_add_cols(table, widths$right, pos = -1)
+          table <- gtable_add_grob(table, legends$right, clip = "off", 
+              t = place$t, b = place$b, l = -1, r = -1, name = "guide-box-right")
+          table <- gtable_add_cols(table, spacing$left, pos = 0)
+          table <- gtable_add_cols(table, widths$left, pos = 0)
+          table <- gtable_add_grob(table, legends$left, clip = "off", 
+              t = place$t, b = place$b, l = 1, r = 1, name = "guide-box-left")
+          place <- location(table)
+          table <- gtable_add_rows(table, spacing$bottom, pos = -1)
+          table <- gtable_add_rows(table, heights$bottom, pos = -1)
+          table <- gtable_add_grob(table, legends$bottom, clip = "off", 
+              t = -1, b = -1, l = place$l, r = place$r, name = "guide-box-bottom")
+          table <- gtable_add_rows(table, spacing$top, pos = 0)
+          table <- gtable_add_rows(table, heights$top, pos = 0)
+          table <- gtable_add_grob(table, legends$top, clip = "off", 
+              t = 1, b = 1, l = place$l, r = place$r, name = "guide-box-top")
+          place <- find_panel(table)
+          table <- gtable_add_grob(table, legends$inside, clip = "off", 
+              t = place$t, b = place$b, l = place$l, r = place$r, name = "guide-box-inside")
+          table
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          layout <- table$layout
+          data_frame0(t = min(layout[["t"]]), r = max(layout[["r"]]), 
+              b = max(layout[["b"]]), l = min(layout[["l"]]), .size = 1L)
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          layout <- table$layout
+          panels <- layout[grepl("^panel", layout$name), , drop = FALSE]
+          data_frame0(t = min(.subset2(panels, "t")), r = max(.subset2(panels, 
+              "r")), b = max(.subset2(panels, "b")), l = min(.subset2(panels, 
+              "l")), .size = 1)
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (is.null(label)) {
+              return(zeroGrob())
+          }
+          just <- rotate_just(angle, hjust, vjust)
+          n <- max(length(x), length(y), 1)
+          x <- x %||% unit(rep(just$hjust, n), "npc")
+          y <- y %||% unit(rep(just$vjust, n), "npc")
+          if (!is.unit(x)) {
+              x <- unit(x, "npc")
+          }
+          if (!is.unit(y)) {
+              y <- unit(y, "npc")
+          }
+          grob <- textGrob(label, x, y, hjust = hjust, vjust = vjust, 
+              rot = angle, gp = gp, check.overlap = check.overlap)
+          descent <- font_descent(gp$fontfamily, gp$fontface, gp$fontsize, 
+              gp$cex)
+          rad <- (angle[1]%%360)/180 * pi
+          x_descent <- abs(sin(rad)) * descent
+          y_descent <- abs(cos(rad)) * descent
+          width <- unit(1, "grobwidth", grob) + x_descent
+          height <- unit(1, "grobheight", grob) + y_descent
+          if (is.null(margin)) {
+              margin <- margin(0, 0, 0, 0)
+          }
+          margin_x <- isTRUE(margin_x)
+          margin_y <- isTRUE(margin_y)
+          new_x <- NULL
+          new_y <- NULL
+          new_width <- NULL
+          new_height <- NULL
+          if (margin_x) {
+              new_width <- unit.c(margin[4], width, margin[2])
+              new_x <- x - margin[2] * just$hjust + margin[4] * (1 - 
+                  just$hjust)
+          }
+          if (margin_y) {
+              new_height <- unit.c(margin[1], height, margin[3])
+              new_y <- y - margin[1] * just$vjust + margin[3] * (1 - 
+                  just$vjust)
+          }
+          if (xor(margin_x, margin_y)) {
+              new_width <- new_width %||% unit(1, "null")
+              new_height <- new_height %||% unit(1, "null")
+          }
+          new_width <- new_width %||% width
+          new_height <- new_height %||% height
+          x <- new_x %||% x
+          y <- new_y %||% y
+          grob$x <- x
+          grob$y <- y
+          if (isTRUE(debug)) {
+              children <- gList(rectGrob(x = x, y = y, width = width, 
+                  height = height, hjust = just$hjust, vjust = just$vjust, 
+                  gp = gg_par(fill = "cornsilk", col = NA)), pointsGrob(x, 
+                  y, pch = 20, gp = gg_par(col = "gold")), grob)
+          }
+          else {
+              children <- gList(grob)
+          }
+          gTree(children = children, widths = new_width, heights = new_height, 
+              cl = "titleGrob")
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          sum(x$widths)
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          sum(x$heights)
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (S7::S7_inherits(element)) {
+              element <- S7::props(element)
+          }
+          if (!is.null(element)) {
+              angle <- element$angle
+              hjust <- element$hjust
+              vjust <- element$vjust
+          }
+          angle <- (angle %||% 0)%%360
+          if (is.character(hjust)) {
+              hjust <- match(hjust, c("left", "right")) - 1
+              hjust[is.na(hjust)] <- 0.5
+          }
+          if (is.character(vjust)) {
+              vjust <- match(vjust, c("bottom", "top")) - 1
+              vjust[is.na(vjust)] <- 0.5
+          }
+          size <- vec_size_common(angle, hjust, vjust)
+          angle <- vec_recycle(angle, size)
+          hjust <- vec_recycle(hjust, size)
+          vjust <- vec_recycle(vjust, size)
+          case <- findInterval(angle, c(0, 90, 180, 270, 360))
+          hnew <- hjust
+          vnew <- vjust
+          is_case <- which(case == 2)
+          hnew[is_case] <- 1 - vjust[is_case]
+          vnew[is_case] <- hjust[is_case]
+          is_case <- which(case == 3)
+          hnew[is_case] <- 1 - hjust[is_case]
+          vnew[is_case] <- 1 - vjust[is_case]
+          is_case <- which(case == 4)
+          hnew[is_case] <- vjust[is_case]
+          vnew[is_case] <- 1 - hjust[is_case]
+          list(hjust = hnew, vjust = vnew)
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          cur_dev <- names(grDevices::dev.cur())
+          if (cur_dev == "null device") {
+              cache <- FALSE
+          }
+          else {
+              cache <- TRUE
+          }
+          key <- paste0(cur_dev, ":", family, ":", face, ":", size, 
+              ":", cex)
+          key <- key[1]
+          descent <- descent_cache[[key]]
+          if (is.null(descent)) {
+              descent <- convertHeight(grobDescent(textGrob(label = "gjpqyQ", 
+                  gp = gg_par(fontsize = size, cex = cex, fontfamily = family, 
+                      fontface = face))), "inches")
+              if (cache) {
+                  descent_cache[[key]] <- descent
+              }
+          }
+          descent
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          position_dim <- if (is_vertical) 
+              "y"
+          else "x"
+          label_margin_name <- if (is_vertical) 
+              "margin_x"
+          else "margin_y"
+          n_breaks <- length(break_positions)
+          break_positions <- unit(break_positions, "native")
+          if (check.overlap) {
+              priority <- axis_label_priority(n_breaks)
+              break_labels <- break_labels[priority]
+              break_positions <- break_positions[priority]
+          }
+          labels_grob <- exec(element_grob, label_element, `:=`(!!position_dim, 
+              break_positions), `:=`(!!label_margin_name, TRUE), label = break_labels, 
+              check.overlap = check.overlap)
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (!is_theme_element(element, "text") || is.null(position) || 
+              is.null(angle %|W|% NULL)) {
+              return(element)
+          }
+          arg_match0(position, .trbl)
+          check_number_decimal(angle)
+          radian <- deg2rad(angle)
+          digits <- 3
+          cosine <- sign(round(cos(radian), digits))/2 + 0.5
+          sine <- sign(round(sin(radian), digits))/2 + 0.5
+          hjust <- switch(position, left = cosine, right = 1 - cosine, 
+              top = 1 - sine, sine)
+          vjust <- switch(position, left = 1 - sine, right = sine, 
+              top = 1 - cosine, cosine)
+          element@angle <- angle %||% try_prop(element, "angle")
+          element@hjust <- hjust %||% try_prop(element, "hjust")
+          element@vjust <- vjust %||% try_prop(element, "vjust")
+          element
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (!is_guides(guides)) {
+              return(zeroGrob())
+          }
+          pair <- guides$get_position(position)
+          pair$params$draw_label <- labels %||% NULL
+          pair$guide$draw(theme, params = pair$params)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::FacetNull$draw_panels)$f))
+    Output
+      {
+          range <- ranges[[1]]
+          aspect_ratio <- theme$aspect.ratio %||% coord$aspect(range)
+          if (is.null(aspect_ratio)) {
+              aspect_ratio <- 1
+              respect <- FALSE
+          }
+          else {
+              respect <- TRUE
+          }
+          axis_h <- coord$render_axis_h(range, theme)
+          axis_v <- coord$render_axis_v(range, theme)
+          all <- matrix(list(zeroGrob(), axis_h$top, zeroGrob(), axis_v$left, 
+              panels[[1]], axis_v$right, zeroGrob(), axis_h$bottom, 
+              zeroGrob()), ncol = 3, byrow = TRUE)
+          z_matrix <- matrix(c(5, 6, 4, 7, 1, 8, 3, 9, 2), ncol = 3, 
+              byrow = TRUE)
+          grob_widths <- unit.c(grobWidth(axis_v$left), unit(1, "null"), 
+              grobWidth(axis_v$right))
+          grob_heights <- unit.c(grobHeight(axis_h$top), unit(abs(aspect_ratio), 
+              "null"), grobHeight(axis_h$bottom))
+          grob_names <- c("spacer", "axis-l", "spacer", "axis-t", "panel", 
+              "axis-b", "spacer", "axis-r", "spacer")
+          layout <- gtable_matrix("layout", all, widths = grob_widths, 
+              heights = grob_heights, respect = respect, clip = "off", 
+              z = z_matrix)
+          layout$layout$name <- grob_names
+          layout
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Facet$draw_labels)$f))
+    Output
+      {
+          panel_dim <- find_panel(panels)
+          xlab_height_top <- grobHeight(labels$x[[1]])
+          panels <- gtable_add_rows(panels, xlab_height_top, pos = 0)
+          panels <- gtable_add_grob(panels, labels$x[[1]], name = "xlab-t", 
+              l = panel_dim$l, r = panel_dim$r, t = 1, clip = "off")
+          xlab_height_bottom <- grobHeight(labels$x[[2]])
+          panels <- gtable_add_rows(panels, xlab_height_bottom, pos = -1)
+          panels <- gtable_add_grob(panels, labels$x[[2]], name = "xlab-b", 
+              l = panel_dim$l, r = panel_dim$r, t = -1, clip = "off")
+          panel_dim <- find_panel(panels)
+          ylab_width_left <- grobWidth(labels$y[[1]])
+          panels <- gtable_add_cols(panels, ylab_width_left, pos = 0)
+          panels <- gtable_add_grob(panels, labels$y[[1]], name = "ylab-l", 
+              l = 1, b = panel_dim$b, t = panel_dim$t, clip = "off")
+          ylab_width_right <- grobWidth(labels$y[[2]])
+          panels <- gtable_add_cols(panels, ylab_width_right, pos = -1)
+          panels <- gtable_add_grob(panels, labels$y[[2]], name = "ylab-r", 
+              l = -1, b = panel_dim$b, t = panel_dim$t, clip = "off")
+          panels
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Facet$set_panel_size)$f))
+    Output
+      {
+          new_widths <- calc_element("panel.widths", theme)
+          new_heights <- calc_element("panel.heights", theme)
+          if (is.null(new_widths) && is.null(new_heights)) {
+              return(table)
+          }
+          rows <- panel_rows(table)
+          cols <- panel_cols(table)
+          if (isTRUE(table$respect) && xor(is.null(new_widths), is.null(new_heights)) && 
+              nrow(rows) == 1 && nrow(cols) == 1) {
+              old_width <- table$widths[cols$l]
+              old_height <- table$heights[rows$t]
+              if (identical(unitType(old_width), "null") && identical(unitType(old_height), 
+                  "null")) {
+                  ratio <- as.numeric(old_height)/as.numeric(old_width)
+                  new_widths <- (new_widths %||% (new_heights/ratio))[1]
+                  new_heights <- (new_heights %||% (new_widths * ratio))[1]
+              }
+          }
+          if (length(new_widths) == 1L && nrow(cols) > 1L) {
+              extra <- setdiff(seq(min(cols$l), max(cols$r)), union(cols$l, 
+                  cols$r))
+              extra <- unit(sum(width_cm(table$widths[extra])), "cm")
+              relative <- as.numeric(table$widths[cols$l])
+              new_widths <- (new_widths - extra) * (relative/sum(relative))
+          }
+          if (!is.null(new_widths)) {
+              table$widths[cols$l] <- rep(new_widths, length.out = nrow(cols))
+          }
+          if (length(new_heights) == 1L && nrow(rows) > 1L) {
+              extra <- setdiff(seq(min(rows$t), max(rows$t)), union(rows$t, 
+                  rows$b))
+              extra <- unit(sum(height_cm(table$heights[extra])), "cm")
+              relative <- as.numeric(table$heights[rows$t])
+              new_heights <- (new_heights - extra) * (relative/sum(relative))
+          }
+          if (!is.null(new_heights)) {
+              table$heights[rows$t] <- rep(new_heights, length.out = nrow(rows))
+          }
+          table
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideAxis$measure_grobs)$f))
+    Output
+      {
+          measure <- params$measure_text
+          major_cm <- convertUnit(elements$major_length, "cm", valueOnly = TRUE)
+          range <- range(0, major_cm)
+          if (params$minor.ticks && !is_theme_element(elements$minor, 
+              "blank")) {
+              minor_cm <- convertUnit(elements$minor_length, "cm", 
+                  valueOnly = TRUE)
+              range <- range(range, minor_cm)
+          }
+          length <- unit(range[2], "cm")
+          spacer <- max(unit(0, "pt"), unit(-1 * diff(range), "cm"))
+          labels <- unit(measure(grobs$labels), "cm")
+          title <- unit(measure(grobs$title), "cm")
+          sizes <- unit.c(length, spacer, labels, title)
+          if (params$lab_first) {
+              sizes <- rev(sizes)
+          }
+          sizes
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideAxis$override_elements)$f))
+    Output
+      {
+          elements$text <- label_angle_heuristic(elements$text, params$position, 
+              params$angle)
+          if (is_theme_element(elements$ticks, "blank")) {
+              elements$major_length <- unit(0, "cm")
+          }
+          if (is_theme_element(elements$minor, "blank") || isFALSE(params$minor.ticks)) {
+              elements$minor_length <- unit(0, "cm")
+          }
+          return(elements)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideAxis$build_labels)$f))
+    Output
+      {
+          if (".type" %in% names(key)) {
+              key <- vec_slice(key, key$.type == "major")
+          }
+          labels <- validate_labels(key$.label)
+          n_labels <- length(labels)
+          if (n_labels < 1) {
+              return(list(zeroGrob()))
+          }
+          pos <- key[[params$aes]]
+          dodge_pos <- rep(seq_len(params$n.dodge %||% 1), length.out = n_labels)
+          dodge_indices <- unname(split(seq_len(n_labels), dodge_pos))
+          lapply(dodge_indices, function(indices) {
+              draw_axis_labels(break_positions = pos[indices], break_labels = labels[indices], 
+                  label_element = elements$text, is_vertical = params$vertical, 
+                  check.overlap = params$check.overlap %||% FALSE)
+          })
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Guide$draw)$f))
+    Output
+      {
+          params <- replace_null(params, position = position, direction = direction)
+          params <- self$setup_params(params)
+          key <- params$key
+          elems <- self$setup_elements(params, self$elements, theme)
+          elems <- self$override_elements(params, elems, theme)
+          if (prod(dim(key)) == 0) {
+              out <- self$draw_early_exit(params, elems)
+              return(out)
+          }
+          grobs <- list(title = self$build_title(params$title, elems, 
+              params), ticks = self$build_ticks(key, elems, params))
+          if (params$draw_label %||% TRUE) {
+              grobs$labels <- self$build_labels(key, elems, params)
+          }
+          else {
+              grobs$labels <- list(zeroGrob())
+          }
+          grobs$decor <- self$build_decor(params$decor, grobs, elems, 
+              params)
+          sizes <- self$measure_grobs(grobs, params, elems)
+          layout <- self$arrange_layout(key, sizes, params, elems)
+          self$assemble_drawing(grobs, layout, sizes, params, elems)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Layout$render_labels)$f))
+    Output
+      {
+          label_grobs <- lapply(names(labels), function(label) {
+              lapply(c(1, 2), function(i) {
+                  modify <- if (i == 1) {
+                      switch(label, x = ".top", y = ".left")
+                  }
+                  else {
+                      switch(label, x = ".bottom", y = ".right")
+                  }
+                  if (is.null(labels[[label]][[i]]) || is_waiver(labels[[label]][[i]])) 
+                      return(zeroGrob())
+                  element_render(theme = theme, element = paste0("axis.title.", 
+                      label, modify), label = labels[[label]][[i]], 
+                      margin_x = label == "y", margin_y = label == 
+                        "x")
+              })
+          })
+          names(label_grobs) <- names(labels)
+          label_grobs
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::CoordCartesian$labels)$f))
+    Output
+      {
+          labels
+      }
+
+---
+
+    Code
+      print(body(gtable::gtable_add_padding))
+    Output
+      {
+          padding <- rep(padding, length.out = 4)
+          x <- gtable_add_rows(x, pos = 0, heights = padding[1])
+          x <- gtable_add_cols(x, pos = -1, widths = padding[2])
+          x <- gtable_add_rows(x, pos = -1, heights = padding[3])
+          x <- gtable_add_cols(x, pos = 0, widths = padding[4])
+          x
+      }
+

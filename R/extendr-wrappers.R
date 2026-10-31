@@ -166,6 +166,13 @@ rs_grouped_test_stat <- function(df, cols) .Call(wrap__grouped_test_stat, df, co
 #' @noRd
 rs_grouped_test_position <- function(df, col) .Call(wrap__grouped_test_position, df, col)
 
+#' The boxes of the cells of a single-panel plot's table on a page of
+#' `page` (width, height) pixels, as a list of `name`, `x0`, `y0`, `x1`,
+#' `y1`, or NULL if `spec` is malformed. See R/render-layout.R for the
+#' spec.
+#' @noRd
+rs_layout <- function(spec, page) .Call(wrap__layout_boxes, spec, page)
+
 #' Writes a nativeRaster (`dim` = height, width) to `path` as PNG with the
 #' metadata ragg's `agg_png()` writes for device background `bg` (R, G, B,
 #' A, 0-255): RGBA unless `bg` is opaque, `bKGD`, and `pHYs` if `dpi` is
