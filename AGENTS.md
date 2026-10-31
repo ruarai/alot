@@ -49,6 +49,14 @@ run '^corpus$' TRUE > rest.log 2>&1 &
 wait
 ```
 
+`'^corpus$'` matches only `test-corpus.R`, so `rest.log` is "everything except
+`test-corpus.R`". That includes `test-render-corpus.R`, a separate Phase 2
+corpus that renders about 1,700 plots on every run and ignores `ALOT_CORPUS`.
+It dominates the run time. When your change cannot affect rendering (Phase 1
+build-path work), exclude it too, e.g. `run '^(corpus|render-corpus)$' TRUE`.
+Run it when you touch the render path (`R/render*.R`, or the rendering code in `alot-core` or `alot-r`).
+Don't start overlapping runs that write to the same log file.
+
 The full corpus (`test-corpus.R`, about 2,000 plots) is slow. Unless the
 user asks for the full corpus, limit it with `ALOT_CORPUS`, a regex on the
 file names in `tests/testthat/corpus/`, to a small subset (around ten files)

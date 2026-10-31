@@ -4,7 +4,6 @@
 
 gg <- function(name) utils::getFromNamespace(name, "ggplot2")
 
-gg_attach_plot_env   <- function(...) gg("attach_plot_env")(...)
 gg_try_prop          <- function(...) gg("try_prop")(...)
 gg_plot_clone        <- function(...) gg("plot_clone")(...)
 gg_by_layer          <- function(...) gg("by_layer")(...)

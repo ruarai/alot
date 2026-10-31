@@ -17,7 +17,12 @@ alot_build <- function(plot) {
   }
   env <- gg_try_prop(plot, "plot_env")
   if (!is.null(env)) {
-    gg_attach_plot_env(env)
+    # Mirrors attach_plot_env (ggplot2 R/utilities.R). Done inline because it
+    # resets the option when its caller's frame exits, which a gg_*() wrapper
+    # would do at once; deprecation warnings then name the wrong user env.
+    old_env <- getOption("ggplot2_plot_env")
+    options(ggplot2_plot_env = env)
+    on.exit(options(ggplot2_plot_env = old_env))
   }
   build_plot(plot)
 }

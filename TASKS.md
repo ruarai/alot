@@ -129,7 +129,7 @@ not repeated below:
 - **Done when:** one command per suite reproduces the tables in
   `RESULTS.md`.
 
-### T0.7 Warning and message parity
+### T0.7 Warning and message parity — done
 - **Depends:** —
 - **Touches:** `tests/testthat/test-warnings.R`, `helper-equivalence.R`
 - **Do:** Extend `expect_build_equal()` (or add `expect_build_conditions_equal()`)
