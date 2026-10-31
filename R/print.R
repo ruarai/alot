@@ -15,9 +15,10 @@
 #' when the device is resized, or RStudio replays the plot to export it,
 #' the plot is laid out and rendered again at the new size. Only the built
 #' plot is kept between draws. Vector devices (`pdf()`, `svg()`,
-#' `postscript()` and the like), rotated viewports and plots whose tier is
-#' ggplot2 are drawn from [ggplot2::ggplot_gtable()] instead. Warnings are
-#' raised on the first draw only.
+#' `postscript()` and the like), Quartz devices other than RStudio's plot
+#' pane (whose resolution R can't see), rotated viewports and plots whose
+#' tier is ggplot2 are drawn from [ggplot2::ggplot_gtable()] instead.
+#' Warnings are raised on the first draw only.
 #'
 #' In RStudio's plot pane the page is rendered at the resolution of the
 #' bitmap RStudio draws the pane into: 96 dpi times the screen's device pixel
@@ -92,10 +93,17 @@ rstudio_pixel_ratio <- function() {
 # the Quartz backend reports points (72 dpi) whatever the ratio. The device's
 # size in inches is the same for all of them, so the page has the shadow
 # device's pixels. Without RStudio's ratio, Quartz is assumed to be retina.
-# `options(alot.pixel_ratio = )` overrides this in the plot pane only; other
-# devices (png(), RStudio's exports) render at their own density.
+# Other Quartz devices (quartz(), png() on a Mac, RStudio's exports with that
+# backend) report points whatever their resolution (ipr 1/72, R
+# src/library/grDevices/src/devQuartz.c) and can't capture, so their density
+# is unknown: NA, and the plot is drawn from the gtable. Other devices render
+# at their own density. `options(alot.pixel_ratio = )` overrides this in the
+# plot pane only.
 device_res <- function(device = names(grDevices::dev.cur()), dpi = grDevices::dev.size("px")[1] / grDevices::dev.size("in")[1],
                        dpr = if (identical(device, "RStudioGD")) rstudio_pixel_ratio(), system = Sys.info()[["sysname"]]) {
+  if (grepl("^quartz", device)) {
+    return(NA_real_)
+  }
   if (!identical(device, "RStudioGD") || !is.finite(dpi)) {
     return(dpi)
   }

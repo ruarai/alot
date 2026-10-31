@@ -30,9 +30,10 @@ raster. The plot is a grid grob that renders each time it is drawn, so
 when the device is resized, or RStudio replays the plot to export it,
 the plot is laid out and rendered again at the new size. Only the built
 plot is kept between draws. Vector devices (`pdf()`, `svg()`,
-`postscript()` and the like), rotated viewports and plots whose tier is
-ggplot2 are drawn from [ggplot2::ggplot_gtable()] instead. Warnings are
-raised on the first draw only.
+`postscript()` and the like), Quartz devices other than RStudio's plot
+pane (whose resolution R can't see), rotated viewports and plots whose
+tier is ggplot2 are drawn from [ggplot2::ggplot_gtable()] instead.
+Warnings are raised on the first draw only.
 
 In RStudio's plot pane the page is rendered at the resolution of the
 bitmap RStudio draws the pane into: 96 dpi times the screen's device pixel

@@ -130,6 +130,9 @@ test_that("the page is rendered at the density of RStudio's bitmap", {
   # Other devices render at their own density, whatever the ratio.
   expect_equal(device_res("agg_capture", 96, 2, "Darwin"), 96)
   expect_equal(device_res("png", 72, NULL, "Darwin"), 72)
+  # Quartz devices report points whatever their resolution: unknown.
+  expect_identical(device_res("quartz_off_screen", 72, NULL, "Darwin"), NA_real_)
+  expect_identical(device_res("quartz", 72, 2, "Darwin"), NA_real_)
   # RStudio: trunc(96 * dpr), whichever density the backend reports.
   expect_equal(device_res("RStudioGD", 192, 2, "Darwin"), 192)
   expect_equal(device_res("RStudioGD", 72, 2, "Darwin"), 192)
