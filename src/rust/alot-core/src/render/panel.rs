@@ -3,7 +3,9 @@
 //! the panel's cell and clipped to it when the coord's `clip` is "on".
 
 use crate::render::display::Rect;
+use crate::render::display::Item;
 use crate::render::page::{LineStyle, Painter, RectEl};
+use crate::render::points::{Point, PointBatch};
 
 /// One `breaks_as_grid()` call: a line per break, across the panel.
 pub struct GridLines {
@@ -14,12 +16,67 @@ pub struct GridLines {
     pub style: LineStyle,
 }
 
+/// A `geom_point()` layer (ggplot2 R/geom-point.R `GeomPoint$draw_panel()`):
+/// positions in data units, rescaled linearly into the panel as
+/// `Coord$transform()` does, and the aesthetics `pointsGrob()` is given.
+pub struct PointLayer {
+    pub x: Vec<f64>,
+    pub y: Vec<f64>,
+    pub x_range: [f64; 2],
+    pub y_range: [f64; 2],
+    /// pch, `size` and `stroke`, each of length 1 or `x.len()`.
+    pub shape: Vec<f64>,
+    pub size: Vec<f64>,
+    pub stroke: Vec<f64>,
+    pub col: Vec<[u8; 4]>,
+    pub fill: Vec<[u8; 4]>,
+    /// `.pt`, `.stroke` and the resolution in pixels per inch.
+    pub pt: f64,
+    pub stroke_scale: f64,
+    pub res: f64,
+}
+
+fn at(v: &[f64], i: usize) -> f64 {
+    if v.len() == 1 { v[0] } else { v[i] }
+}
+
+impl PointLayer {
+    /// The layer's points in panel cell `c`, as the hybrid tier's
+    /// `rs_render_points()` places them.
+    fn batch(&self, c: &Rect, threads: usize) -> PointBatch {
+        let (pw, ph) = (c.x1 - c.x0, c.y1 - c.y0);
+        let npc = |v: f64, r: &[f64; 2]| {
+            if v == f64::INFINITY {
+                1.0
+            } else if v == f64::NEG_INFINITY {
+                0.0
+            } else {
+                (v - r[0]) / (r[1] - r[0])
+            }
+        };
+        PointBatch::from_fn(self.x.len(), threads, |i| {
+            let st = at(&self.stroke, i);
+            Some(Point {
+                x: c.x0 + npc(self.x[i], &self.x_range) * pw,
+                y: c.y0 + (1.0 - npc(self.y[i], &self.y_range)) * ph,
+                shape: at(&self.shape, i) as i32,
+                size: (at(&self.size, i) * self.pt + st * self.stroke_scale / 2.0) * self.res / 72.0,
+                lwd: st * self.stroke_scale / 2.0 * self.res / 96.0,
+                col: self.col[i],
+                fill: self.fill[i],
+            })
+        })
+    }
+}
+
 pub struct Panel {
     pub clip: bool,
     /// `panel.background`.
     pub background: Option<RectEl>,
     /// In drawing order: minor y, minor x, major y, major x.
     pub grid: Vec<GridLines>,
+    /// The layers, in order, drawn over the grid.
+    pub points: Vec<PointLayer>,
     /// `panel.border`.
     pub border: Option<RectEl>,
 }
@@ -49,6 +106,9 @@ impl Panel {
                 })
                 .collect();
             p.lines(lines, &g.style);
+        }
+        for layer in &self.points {
+            p.list.push(Item::Points(layer.batch(c, p.threads)));
         }
         if let Some(border) = &self.border {
             p.rect(c, border);

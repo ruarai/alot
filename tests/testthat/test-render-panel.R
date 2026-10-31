@@ -1,7 +1,7 @@
 # Panel decorations and axes in the full tier (R4.2): plots of blank layers
 # drawn by alot-core's page drawers (R/render-full.R) against ggplot2 on
 # ragg, and their layout against grid's. Layers aren't drawn in the full
-# tier until R5, so the plots have none (geom_blank()).
+# tier until R5, so the plots have none (geom_blank(); points are in test-render-points.R).
 
 skip_on_cran()
 library(ggplot2)
@@ -130,9 +130,9 @@ test_that("plots the full tier doesn't draw decline to another tier", {
     suppressMessages(render_raster(b, utils::modifyList(render_size, list(...)))$tier)
   }
   expect_identical(tier(base), "full")
-  # Layers are not drawn yet.
-  expect_identical(tier(ggplot(mtcars, aes(wt, mpg)) + geom_point()), "hybrid")
-  expect_identical(tier(base + geom_blank() + geom_point()), "hybrid")
+  # Other layers aren't drawn yet.
+  expect_identical(tier(ggplot(mtcars, aes(wt, mpg)) + geom_line()), "hybrid")
+  expect_identical(tier(base + geom_blank() + geom_line()), "hybrid")
   # Facets, coords, legends, axis caps and scaling aren't drawn yet.
   expect_identical(tier(base + facet_wrap(vars(cyl))), "ggplot2")
   expect_identical(tier(base + coord_flip()), "ggplot2")
@@ -143,8 +143,8 @@ test_that("plots the full tier doesn't draw decline to another tier", {
   # Plotmath labels and glyphs the font lacks.
   expect_identical(tier(base + labs(x = expression(alpha^2))), "ggplot2")
   expect_identical(tier(base + labs(title = "漢字")), "ggplot2")
-  # The option is off by default.
-  withr::local_options(alot.full_tier = NULL)
+  # The option turns the tier off.
+  withr::local_options(alot.full_tier = FALSE)
   expect_identical(tier(base), "ggplot2")
 })
 
@@ -152,8 +152,8 @@ test_that("the full tier names why it declines", {
   set.seed(1)
   b <- ggplot_build(base + guides(x = guide_axis(cap = "both")))
   expect_match(attr(render_full(b, render_size), "reason"), "axis cap")
-  b <- ggplot_build(ggplot(mtcars, aes(wt, mpg)) + geom_point())
-  expect_match(attr(render_full(b, render_size), "reason"), "layers other than geom_blank")
+  b <- ggplot_build(ggplot(mtcars, aes(wt, mpg)) + geom_line())
+  expect_match(attr(render_full(b, render_size), "reason"), "layers other than")
 })
 
 test_that("a higher resolution and a larger page", {

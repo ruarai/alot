@@ -1060,3 +1060,23 @@ only partly remove. The glyph drawer stays for the full tier, where there is
 no grid; the hybrid integration remains as the way the tests compare Rust
 glyphs with ragg's. Pixel differences from ragg on the tested plots: none
 in text pixels.
+
+## R5.1: points in the full tier (2026-10-31)
+
+Release build (`pkgbuild::compile_dll(debug = FALSE)`), 7 × 7 in at 150 dpi,
+`alot_png()` end to end (build excluded, PNG written), full tier vs hybrid
+tier with reps interleaved, medians:
+
+| case | full | hybrid |
+|---|---:|---:|
+| 1e3 points | 30 ms | 58 ms |
+| 1e6 points | 146 ms | 193 ms |
+| 1e6 points, alpha 0.3 | 254 ms (15 reps) | 242 ms (15 reps) |
+
+The alpha case is within run-to-run noise (ranges 205-399 and 227-286 ms).
+Its stages, 9-rep medians: `render_ir` 9 ms, `full_points` 24 ms (the point
+colours, which the hybrid computes too), `rs_render_page` 157 ms; the whole
+`render_full` takes 196 ms against 219 ms for `render_hybrid`, so the full
+tier is no slower at drawing. The full tier avoids the hybrid's gtable build
+and grid drawing, which is the whole gain at 1e3 points. ggplot2 on ragg took
+7.7 s for 1e6 points in an earlier run (debug build of alot, unaffected).

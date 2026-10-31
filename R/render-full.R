@@ -8,8 +8,8 @@
 # Mirrors Coord$draw_panel(), Coord$render_bg()/render_fg() and
 # guide_grid() (ggplot2 R/coord-.R, R/guides-grid.R), GuideAxis
 # (R/guide-axis.R) and the plot background of ggplot_gtable()
-# (R/plot-build.R). Layers other than geom_blank() are not drawn yet (R5),
-# so such plots decline.
+# (R/plot-build.R). Only geom_point() and geom_blank() layers are drawn so
+# far (R5.1); other layers decline.
 
 # Pixels of a page of `size` (agg_capture()'s arguments): ragg's get_dims()
 # (ragg R/aaa.R).
@@ -96,17 +96,44 @@ full_panel <- function(built, ir, res) {
   )
 }
 
-# Why the full tier can't draw `built`, or NULL: it draws no layers yet,
-# and only the cartesian axes and guides above.
+# The point layers of the panel as rs_render_page() reads them, mirroring
+# draw_points_layer() (R/render.R) and GeomPoint$draw_panel() (ggplot2
+# R/geom-point.R): `ir`'s layer data has missing rows removed and shapes
+# translated. Positions rescale linearly (hybrid_decline() checked).
+full_points <- function(built, ir, res) {
+  pp <- built@layout$panel_params[[1]]
+  x_range <- linear_range(pp$x)
+  y_range <- linear_range(pp$y)
+  out <- list()
+  for (layer in ir$layers) {
+    data <- layer$data
+    if (is.null(layer$kind) || layer$kind != "points" || nrow(data) == 0) next
+    colour <- point_colours(data$colour, data$alpha)
+    fill <- if (!is.null(colour)) point_colours(as.character(data$fill), data$alpha)
+    if (is.null(fill)) {
+      layout_decline("a point colour alot doesn't parse")
+    }
+    out[[length(out) + 1L]] <- list(
+      x = as.double(data$x), y = as.double(data$y), x_range = as.double(x_range), y_range = as.double(y_range),
+      shape = as.double(data$shape), size = as.double(data$size), stroke = as.double(data$stroke),
+      colour = colour, fill = fill, consts = c(ggplot2::.pt, ggplot2::.stroke, res)
+    )
+  }
+  out
+}
+
+# Why the full tier can't draw `built`, or NULL: it draws geom_point() and
+# geom_blank() layers, and only the cartesian axes and guides above.
 full_decline <- function(built, ir) {
-  blank <- vapply(built@plot@layers, function(l) {
-    ir_is_ggplot2(l$geom, "GeomBlank")
+  drawn <- vapply(built@plot@layers, function(l) {
+    ir_is_ggplot2(l$geom, "GeomBlank") || identical(l$geom, ggplot2::GeomPoint)
   }, logical(1))
-  if (!all(blank)) {
-    return("layers other than geom_blank()")
+  if (!all(drawn)) {
+    return("layers other than geom_point() and geom_blank()")
   }
   support <- ir$support
-  support <- support[!(support$component == "layer" & support$name == "GeomBlank"), ]
+  # Layers without rows draw nothing.
+  support <- support[!(support$component == "layer" & (support$name == "GeomBlank" | support$reason == "no rows")), ]
   if (nrow(support) > 0) {
     return(support$reason[1])
   }
@@ -142,7 +169,7 @@ page_spec <- function(built, ir, size) {
   list(
     page = page_px(size), bg = bg, layout = layout,
     background = full_rect(ir$theme[["plot.background"]], res),
-    panel = full_panel(built, ir, res)
+    panel = c(full_panel(built, ir, res), list(points = full_points(built, ir, res)))
   )
 }
 
@@ -155,5 +182,14 @@ render_full <- function(built, size) {
     return(decline(conditionMessage(spec)))
   }
   out <- rs_render_page(spec, render_threads())
-  if (is.null(out)) decline("the page spec is not one the Rust drawer reads") else out
+  if (is.null(out)) {
+    return(decline("the page spec is not one the Rust drawer reads"))
+  }
+  # ggplot2 warns of the rows it removes as it draws the layers.
+  for (i in seq_along(built@plot@layers)) {
+    layer <- built@plot@layers[[i]]
+    data <- built@data[[i]]
+    if (identical(layer$geom, ggplot2::GeomPoint) && !gg_empty(data)) point_handle_na(layer, data)
+  }
+  out
 }

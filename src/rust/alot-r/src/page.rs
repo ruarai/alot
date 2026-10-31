@@ -5,7 +5,7 @@ use alot_core::render::agg::{Cap, Join};
 use alot_core::render::axis::{Axis, Side, Ticks};
 use alot_core::render::layout::TitleGrob;
 use alot_core::render::page::{draw_page, LineStyle, PageSpec, RectEl, TextStyle};
-use alot_core::render::panel::{GridLines, Panel};
+use alot_core::render::panel::{GridLines, Panel, PointLayer};
 use alot_core::render::raster;
 use alot_core::render::text::Font;
 use alot_core::render::title::Title;
@@ -118,13 +118,41 @@ fn axis(l: &List, fonts: &mut Fonts) -> Option<Axis> {
     })
 }
 
+/// A column of packed colours (`R | G << 8 | B << 16 | A << 24`).
+fn colours(l: &List, name: &str) -> Option<Vec<[u8; 4]>> {
+    let v = field(l, name)?.as_integer_slice()?.to_vec();
+    Some(v.into_iter().map(|c| (c as u32).to_le_bytes()).collect())
+}
+
+/// A point layer: see `full_points()` in R/render-full.R. Columns of
+/// length 1 or n recycle; NA is declined.
+fn point_layer(l: &List) -> Option<PointLayer> {
+    let x = nums(l, "x")?;
+    let n = x.len();
+    let y = nums(l, "y")?;
+    let (shape, size, stroke) = (nums(l, "shape")?, nums(l, "size")?, nums(l, "stroke")?);
+    let (col, fill) = (colours(l, "colour")?, colours(l, "fill")?);
+    let recycles = |v: &Vec<f64>| (v.len() == 1 || v.len() == n) && !v.iter().any(|v| v.is_nan());
+    let [x0, x1] = nums(l, "x_range")?[..] else { return None };
+    let [y0, y1] = nums(l, "y_range")?[..] else { return None };
+    let [pt, stroke_scale, res] = nums(l, "consts")?[..] else { return None };
+    if y.len() != n || col.len() != n || fill.len() != n || ![&shape, &size, &stroke].into_iter().all(recycles) {
+        return None;
+    }
+    Some(PointLayer { x, y, x_range: [x0, x1], y_range: [y0, y1], shape, size, stroke, col, fill, pt, stroke_scale, res })
+}
+
 fn panel(l: &List) -> Option<Panel> {
     let mut grid = Vec::new();
     for (_, g) in list_of(l, "grid")?.iter() {
         let g = List::try_from(g).ok()?;
         grid.push(GridLines { pos: nums(&g, "pos")?, horizontal: flag(&g, "horizontal")?, style: line_style(&list_of(&g, "style")?)? });
     }
-    Some(Panel { clip: flag(l, "clip")?, background: opt(l, "background", rect_el)?, grid, border: opt(l, "border", rect_el)? })
+    let mut points = Vec::new();
+    for (_, p) in list_of(l, "points")?.iter() {
+        points.push(point_layer(&List::try_from(p).ok()?)?);
+    }
+    Some(Panel { clip: flag(l, "clip")?, background: opt(l, "background", rect_el)?, grid, points, border: opt(l, "border", rect_el)? })
 }
 
 /// Draws a single-panel plot's page (see `page_spec()` in
@@ -168,6 +196,7 @@ fn render(spec: &List, threads: i32) -> Option<Robj> {
         panel: panel(&list_of(spec, "panel")?)?,
         axes,
         titles,
+        threads: threads.max(0) as usize,
     };
     let data: Vec<std::sync::Arc<Vec<u8>>> = fonts.keys.iter().map(|k| font_data(&k.0)).collect::<Option<_>>()?;
     let faces: Vec<Font> = data.iter().zip(&fonts.keys).map(|(d, k)| Font::new(d, k.1)).collect::<Option<_>>()?;

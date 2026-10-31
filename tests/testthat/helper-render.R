@@ -262,3 +262,8 @@ render_cache_context <- function(size = render_size) {
     fonts$path, unname(tools::md5sum(unique(fonts$path)))
   )
 }
+
+# alot_png() tries the full tier first. The hybrid tier's tests (and the
+# rest of the suite) keep it off; test files for the full tier turn it on
+# with withr::local_options(alot.full_tier = TRUE).
+options(alot.full_tier = FALSE)

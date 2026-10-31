@@ -55,11 +55,13 @@ pub struct Painter<'f, 'a> {
     hinted: HashMap<(usize, u64), Option<Hinted<'f, 'a>>>,
     /// ragg's clip box for text: the whole page.
     page_clip: [i32; 4],
+    /// Worker threads for placing points (0: the default).
+    pub threads: usize,
 }
 
 impl<'f, 'a> Painter<'f, 'a> {
     pub fn new(fonts: &'f [Font<'a>], width: usize, height: usize) -> Self {
-        Painter { list: DisplayList::new(), fonts, hinted: HashMap::new(), page_clip: [0, 0, width as i32 - 1, height as i32 - 1] }
+        Painter { list: DisplayList::new(), fonts, hinted: HashMap::new(), page_clip: [0, 0, width as i32 - 1, height as i32 - 1], threads: 0 }
     }
 
     pub fn push_clip(&mut self, r: Rect) {
@@ -125,6 +127,7 @@ pub struct PageSpec {
     pub axes: Vec<(String, Axis)>,
     /// Titles by cell name (axis titles, title, subtitle, caption, tag).
     pub titles: Vec<(String, Title)>,
+    pub threads: usize,
 }
 
 fn rect_of(b: &Cell) -> Rect {
@@ -137,6 +140,7 @@ fn rect_of(b: &Cell) -> Rect {
 /// they were added. `None` if something can't be drawn as ragg does.
 pub fn draw_page(spec: &PageSpec, fonts: &[Font]) -> Option<DisplayList> {
     let mut p = Painter::new(fonts, spec.width, spec.height);
+    p.threads = spec.threads;
     p.list.push(Item::Clear(spec.bg));
     let boxes = spec.table.solve(spec.width as f64, spec.height as f64);
     let find = |name: &str| boxes.iter().find(|b| b.name == name);
