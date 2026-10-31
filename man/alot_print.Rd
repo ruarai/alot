@@ -34,11 +34,11 @@ plot is kept between draws. Vector devices (`pdf()`, `svg()`,
 ggplot2 are drawn from [ggplot2::ggplot_gtable()] instead. Warnings are
 raised on the first draw only.
 
-In RStudio's plot pane, whose device reports points, the page is rendered
-at the screen's density (96 / 72 screen pixels per device unit, twice that
-on a Mac) and drawn into the pane, so it is sharp. Set
-`options(alot.pixel_ratio = )` to the number of screen pixels per device
-unit to override this.
+In RStudio's plot pane the page is rendered at the resolution of the
+bitmap RStudio draws the pane into: 96 dpi times the screen's device pixel
+ratio, which includes the display's scaling and RStudio's zoom. Set
+`options(alot.pixel_ratio = )` to the number of rendered pixels per device
+pixel to override this in the plot pane.
 
 With `options(alot.autoprint = TRUE)`, printing a ggplot (including
 autoprinting `p` at the console) calls `alot_print()`.

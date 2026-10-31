@@ -125,17 +125,29 @@ test_that("options(alot.autoprint) sends ggplot's print to alot_print", {
   expect_equal(calls, 2)
 })
 
-test_that("the page is rendered at the screen's density", {
+test_that("the page is rendered at the density of RStudio's bitmap", {
   withr::local_options(alot.pixel_ratio = NULL)
-  expect_equal(device_pixel_ratio("agg_capture", 96, "Darwin"), 1)
-  expect_equal(device_pixel_ratio("RStudioGD", 72, "Linux"), 96 / 72)
-  expect_equal(device_pixel_ratio("RStudioGD", 72, "Darwin"), 96 / 72 * 2)
-  expect_equal(device_pixel_ratio("RStudioGD", 96, "Darwin"), 1)
+  # Other devices render at their own density, whatever the ratio.
+  expect_equal(device_res("agg_capture", 96, 2, "Darwin"), 96)
+  expect_equal(device_res("png", 72, NULL, "Darwin"), 72)
+  # RStudio: trunc(96 * dpr), whichever density the backend reports.
+  expect_equal(device_res("RStudioGD", 192, 2, "Darwin"), 192)
+  expect_equal(device_res("RStudioGD", 72, 2, "Darwin"), 192)
+  expect_equal(device_res("RStudioGD", 72, 1, "Darwin"), 96)
+  expect_equal(device_res("RStudioGD", 72, 2.2, "Darwin"), 211)
+  expect_equal(device_res("RStudioGD", 120, 1.25, "Windows"), 120)
+  expect_equal(device_res("RStudioGD", 86, 0.9, "Linux"), 86)
+  # Without the ratio: Quartz is assumed retina, other backends are right.
+  expect_equal(device_res("RStudioGD", 72, NULL, "Darwin"), 192)
+  expect_equal(device_res("RStudioGD", 86, NULL, "Darwin"), 86)
+  expect_equal(device_res("RStudioGD", 72, NULL, "Linux"), 72)
+  expect_null(rstudio_pixel_ratio())
+  # The option overrides the ratio in the plot pane only.
   withr::local_options(alot.pixel_ratio = 3)
-  expect_equal(device_pixel_ratio("RStudioGD", 72, "Darwin"), 3)
-  expect_equal(device_pixel_ratio("agg_capture", 96, "Linux"), 3)
+  expect_equal(device_res("RStudioGD", 72, 2, "Darwin"), 216)
+  expect_equal(device_res("agg_capture", 96, NULL, "Linux"), 96)
   withr::local_options(alot.pixel_ratio = "x")
-  expect_equal(device_pixel_ratio("agg_capture", 96, "Linux"), 1)
+  expect_equal(device_res("RStudioGD", 72, 1.5, "Linux"), 144)
 })
 
 test_that("alot_print renders at the ratio and draws it into the device's size", {
@@ -145,9 +157,11 @@ test_that("alot_print renders at the ratio and draws it into the device's size",
     sizes[[length(sizes) + 1L]] <<- c(size$width, size$height, size$res)
     real_render_raster(built, size)
   })
+  ratio <- 1
+  local_mocked_bindings(device_res = function(dpi, ...) dpi * ratio)
   cap <- capture_device(400, 300)
   alot_print(p)
-  withr::local_options(alot.pixel_ratio = 2)
+  ratio <- 2
   alot_print(p)
   drawn <- cap(native = TRUE)
   grDevices::dev.off()

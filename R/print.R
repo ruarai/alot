@@ -19,11 +19,11 @@
 #' ggplot2 are drawn from [ggplot2::ggplot_gtable()] instead. Warnings are
 #' raised on the first draw only.
 #'
-#' In RStudio's plot pane, whose device reports points, the page is rendered
-#' at the screen's density (96 / 72 screen pixels per device unit, twice that
-#' on a Mac) and drawn into the pane, so it is sharp. Set
-#' `options(alot.pixel_ratio = )` to the number of screen pixels per device
-#' unit to override this.
+#' In RStudio's plot pane the page is rendered at the resolution of the
+#' bitmap RStudio draws the pane into: 96 dpi times the screen's device pixel
+#' ratio, which includes the display's scaling and RStudio's zoom. Set
+#' `options(alot.pixel_ratio = )` to the number of rendered pixels per device
+#' pixel to override this in the plot pane.
 #'
 #' With `options(alot.autoprint = TRUE)`, printing a ggplot (including
 #' autoprinting `p` at the console) calls `alot_print()`.
@@ -74,21 +74,42 @@ vector_device <- function() {
   grepl("^(pdf|postscript|cairo_pdf|cairo_ps|svg|svglite|xfig|pictex|tikz|devSVG|win\\.metafile|emf)", names(grDevices::dev.cur()))
 }
 
-# Screen pixels per device pixel. RStudio's plot pane draws in points
-# (72 dpi) and shows them at 96 dpi CSS pixels, with each CSS pixel two
-# screen pixels on a retina display: 96 / 72 * 2 = 2.67 on a Mac, which is
-# assumed to be retina, and 96 / 72 elsewhere. Other devices have 1.
-# `options(alot.pixel_ratio = )` overrides this.
-device_pixel_ratio <- function(device = names(grDevices::dev.cur()), dpi = grDevices::dev.size("px")[1] / grDevices::dev.size("in")[1],
-                               system = Sys.info()[["sysname"]]) {
+# RStudio's device pixel ratio (screen pixels per CSS pixel, including the
+# IDE's zoom), or NULL outside RStudio. RStudio registers rs_devicePixelRatio
+# as a native routine of the embedding process (rstudio
+# src/cpp/session/modules/SessionGraphics.cpp).
+rstudio_pixel_ratio <- function() {
+  dpr <- tryCatch(.Call("rs_devicePixelRatio", PACKAGE = "(embedding)"), error = function(e) NULL)
+  if (is.numeric(dpr) && length(dpr) == 1 && is.finite(dpr) && dpr > 0) dpr else NULL
+}
+
+# Pixels per inch to render the page at on the current device, whose own
+# density is `dpi`. RStudio's plot pane forwards drawing to a shadow bitmap
+# device opened with res = trunc(96 * dpr) at the pane's CSS size times dpr
+# (Mirrors shadowDevDesc, rstudio
+# src/cpp/r/session/graphics/RShadowPngGraphicsHandler.cpp), and copies its
+# ipr, so the ragg, cairo and windows backends already report that density;
+# the Quartz backend reports points (72 dpi) whatever the ratio. The device's
+# size in inches is the same for all of them, so the page has the shadow
+# device's pixels. Without RStudio's ratio, Quartz is assumed to be retina.
+# `options(alot.pixel_ratio = )` overrides this in the plot pane only; other
+# devices (png(), RStudio's exports) render at their own density.
+device_res <- function(device = names(grDevices::dev.cur()), dpi = grDevices::dev.size("px")[1] / grDevices::dev.size("in")[1],
+                       dpr = if (identical(device, "RStudioGD")) rstudio_pixel_ratio(), system = Sys.info()[["sysname"]]) {
+  if (!identical(device, "RStudioGD") || !is.finite(dpi)) {
+    return(dpi)
+  }
   ratio <- getOption("alot.pixel_ratio")
   if (is.numeric(ratio) && length(ratio) == 1 && is.finite(ratio) && ratio > 0) {
-    return(ratio)
+    return(dpi * ratio)
   }
-  if (identical(device, "RStudioGD") && is.finite(dpi) && dpi > 0 && dpi < 96) {
-    return(96 / dpi * if (identical(system, "Darwin")) 2 else 1)
+  if (!is.null(dpr)) {
+    return(trunc(96 * dpr))
   }
-  1
+  if (dpi == 72 && identical(system, "Darwin")) {
+    return(192)
+  }
+  dpi
 }
 
 # Mirrors ggplot2's print method's drawing of the gtable, which lays the
@@ -108,25 +129,23 @@ drawDetails.alot_page <- function(x, recording) {
   tr <- grid::current.transform()
   w_in <- grid::convertWidth(grid::unit(1, "npc"), "in", valueOnly = TRUE)
   h_in <- grid::convertHeight(grid::unit(1, "npc"), "in", valueOnly = TRUE)
-  # The device's pixels can be larger than the screen's (RStudio's plot pane
-  # reports points, and a retina Mac shows 2.67 screen pixels to each). The
-  # page is rendered at the screen's density and drawn into the same
-  # viewport, so the device scales it 1:1 to the screen.
+  # The device's pixels can be larger than the bitmap behind it (RStudio's
+  # Quartz backend reports points). The page is rendered at the bitmap's
+  # density and drawn into the same viewport, so it lands 1:1 on the bitmap.
   dev_res <- grDevices::dev.size("px")[1] / grDevices::dev.size("in")[1]
-  ratio <- device_pixel_ratio(dpi = dev_res)
-  res <- dev_res * ratio
+  res <- device_res(dpi = dev_res)
   w <- round(w_in * res)
   h <- round(h_in * res)
   if (vector_device() || tr[1, 2] != 0 || tr[2, 1] != 0 || !is.finite(res) || !is.finite(w) || !is.finite(h) || w < 1 || h < 1) {
     return(quiet(draw_gtable(x$built)))
   }
   built <- x$built
-  bg <- plot_background(built)
+  bg <- gg_get_plot_background(built@plot, NULL)
   out <- quiet(render_raster(built, list(width = w, height = h, units = "px", res = res, bg = bg, scaling = 1)))
   if (is.null(out$raster)) {
     return(quiet(draw_gtable(built)))
   }
-  grid::grid.raster(out$raster, x = 0, y = 0, just = c(0, 0), width = grid::unit(1, "npc"), height = grid::unit(1, "npc"), interpolate = ratio != 1)
+  grid::grid.raster(out$raster, x = 0, y = 0, just = c(0, 0), width = grid::unit(1, "npc"), height = grid::unit(1, "npc"), interpolate = res != dev_res)
 }
 
 # options(alot.autoprint = TRUE): ggplot2's print and plot methods for
