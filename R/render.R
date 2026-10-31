@@ -165,7 +165,7 @@ hybrid_gtable <- function(data) {
   plot <- data@plot
   plot@layers <- lapply(plot@layers, hybrid_layer)
   data@plot <- plot
-  ggplot2::ggplot_gtable(data)
+  hybrid_text(ggplot2::ggplot_gtable(data))
 }
 
 hybrid_layer <- function(layer) {

@@ -136,6 +136,8 @@ fn columns_complete(cols: List, threads: i32) -> bool {
             parts.push(Col::Int(v));
         } else if let Some(v) = c.as_logical_slice() {
             parts.push(Col::Int(unsafe { std::slice::from_raw_parts(v.as_ptr() as *const i32, v.len()) }));
+        } else if c.is_string() && c.len() == 0 {
+            // A zero-length vector's data pointer isn't aligned; nothing to scan.
         } else if c.is_string() {
             // STRSXP elements are CHARSXP pointers; NA is R_NaString.
             let v = unsafe { std::slice::from_raw_parts(STRING_PTR_RO(c.get()) as *const usize, c.len()) };
@@ -247,7 +249,7 @@ fn render_points(
 }
 
 /// A nativeRaster of `w` x `h` pixels and its pixels as packed `u32`s.
-fn native_raster(w: usize, h: usize) -> (Robj, *mut u32) {
+pub(crate) fn native_raster(w: usize, h: usize) -> (Robj, *mut u32) {
     let mut out: Robj = Integers::new(w * h).into();
     let ints = out.as_integer_slice_mut().unwrap();
     let ptr = ints.as_mut_ptr() as *mut u32;

@@ -340,7 +340,8 @@ fn premultiply([r, g, b, a]: [u8; 4]) -> [f32; 4] {
     [r as f32 / 255.0 * a, g as f32 / 255.0 * a, b as f32 / 255.0 * a, a]
 }
 
-fn unpremultiply(r: f32, g: f32, b: f32, a: f32) -> u32 {
+/// A premultiplied f32 pixel as packed nativeRaster RGBA.
+pub fn unpremultiply(r: f32, g: f32, b: f32, a: f32) -> u32 {
     if a <= 0.0 {
         return 0;
     }

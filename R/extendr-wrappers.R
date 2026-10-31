@@ -244,6 +244,18 @@ rs_render_rects <- function(xmin, xmax, ymin, ymax, rows, x_range, y_range, rect
 #' @noRd
 rs_render_paths <- function(x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads) .Call(wrap__render_paths, x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads)
 
+#' Draws strings `text` (UTF-8) as grid's text on a ragg device does:
+#' anchors (`x`, `y`, device pixels from the top left), `hjust`, `vjust` and
+#' `rot` (degrees) recycled per string, in one font (file `path`, face
+#' `index`) at `size` pixels with line height `line` pixels, in `colour`
+#' (packed RGBA as from `rs_point_colours()`), clipped to `clip` (x0, y0,
+#' x1, y1: ragg's inclusive integer clip box). Returns a list of `x0`, `y0`
+#' (the image's top-left pixel) and `raster` (a nativeRaster), a list with
+#' `raster = NULL` if nothing is visible, or `NULL` (decline) where ragg
+#' would use a fallback font or alot doesn't mirror the font.
+#' @noRd
+rs_render_text <- function(text, x, y, hjust, vjust, rot, path, index, size, line, colour, clip) .Call(wrap__render_text, text, x, y, hjust, vjust, rot, path, index, size, line, colour, clip)
+
 #' Metrics in device pixels of each UTF-8 string `text[i]` in font
 #' `font[i]` (1-based into the files `path` with face `index`) at `size[i]`
 #' pixels and line height `line[i]` pixels: a list of `width`, `ascent`,

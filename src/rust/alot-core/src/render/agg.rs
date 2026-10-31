@@ -392,11 +392,19 @@ pub fn clip_contours(contours: &[Vec<[f64; 2]>], x0: f64, y0: f64, x1: f64, y1: 
 
 /// Appends the vertices `conv_curve` emits for a quadratic Bézier from
 /// `p1` (already emitted) through control `p2` to `p3`: `curve3_div` with
-/// approximation scale 1 and no angle tolerance (agg_curves.cpp), so the
-/// interior points of the subdivision followed by `p3`.
-pub fn curve3(p1: [f64; 2], p2: [f64; 2], p3: [f64; 2], out: &mut Vec<[f64; 2]>) {
-    const DISTANCE_TOLERANCE_SQUARE: f64 = 0.5 * 0.5;
-    fn rec(out: &mut Vec<[f64; 2]>, [x1, y1]: [f64; 2], [x2, y2]: [f64; 2], [x3, y3]: [f64; 2], level: u32) {
+/// approximation scale `scale` and no angle tolerance (agg_curves.cpp), so
+/// the interior points of the subdivision followed by `p3`.
+pub fn curve3(p1: [f64; 2], p2: [f64; 2], p3: [f64; 2], scale: f64, out: &mut Vec<[f64; 2]>) {
+    let tol = 0.5 / scale;
+    let tol = tol * tol;
+    rec(out, p1, p2, p3, 0, tol);
+    out.push(p3);
+}
+
+fn rec(out: &mut Vec<[f64; 2]>, [x1, y1]: [f64; 2], [x2, y2]: [f64; 2], [x3, y3]: [f64; 2], level: u32, tol: f64) {
+    {
+        #[allow(non_snake_case)]
+        let DISTANCE_TOLERANCE_SQUARE = tol;
         if level > 32 {
             return;
         }
@@ -433,11 +441,9 @@ pub fn curve3(p1: [f64; 2], p2: [f64; 2], p3: [f64; 2], out: &mut Vec<[f64; 2]>)
                 return;
             }
         }
-        rec(out, [x1, y1], [x12, y12], [x123, y123], level + 1);
-        rec(out, [x123, y123], [x23, y23], [x3, y3], level + 1);
+        rec(out, [x1, y1], [x12, y12], [x123, y123], level + 1, tol);
+        rec(out, [x123, y123], [x23, y23], [x3, y3], level + 1, tol);
     }
-    rec(out, p1, p2, p3, 0);
-    out.push(p3);
 }
 
 /// `agg::ellipse` vertices for a circle with `n` steps, from angle 0

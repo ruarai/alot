@@ -76,3 +76,44 @@ test_that("fonts resolve once per style as ragg does", {
   expect_identical(f$path[2], systemfonts::match_fonts("serif", weight = "bold")$path)
   expect_true(is.na(f$path[4]))
 })
+
+# Glyph drawing (R2.2): the hybrid tier draws the gtable's text grobs in
+# Rust, mirroring ragg's hinted glyph cache, so text matches ragg pixel
+# for pixel at the default tolerance.
+test_that("axis labels, rotated and multi-line titles render like ragg", {
+  base <- ggplot2::ggplot(ggplot2::mpg, ggplot2::aes(displ, hwy, colour = class)) + ggplot2::geom_point()
+  plots <- list(
+    titles = base + ggplot2::facet_wrap(~drv) + ggplot2::labs(
+      title = "Fuel economy\nby engine size", subtitle = "Two lines\nof subtitle",
+      caption = "Source: EPA", y = "Highway\nmpg", tag = "A"
+    ),
+    angled = ggplot2::ggplot(ggplot2::mpg, ggplot2::aes(class, hwy)) + ggplot2::geom_point() +
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_text(angle = 30, vjust = 0.5),
+        axis.text.y = ggplot2::element_text(angle = 45, hjust = 1),
+        axis.title.y = ggplot2::element_text(angle = 0)
+      ),
+    strips = base + ggplot2::facet_grid(drv ~ cyl) +
+      ggplot2::theme_bw(base_family = "serif", base_size = 14) +
+      ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"), legend.position = "bottom") +
+      ggplot2::labs(title = "Bold serif"),
+    mono = base + ggplot2::theme_classic(base_family = "mono") + ggplot2::labs(x = "x\ny\nz")
+  )
+  for (nm in names(plots)) {
+    for (res in c(96, 300)) {
+      expect_render_close(
+        plots[[nm]], width = 1000 * res / 150, height = 700 * res / 150, res = res,
+        tier = "hybrid", label = paste(nm, res)
+      )
+    }
+  }
+})
+
+test_that("text alot doesn't mirror falls back to grid", {
+  p <- ggplot2::ggplot(ggplot2::mpg, ggplot2::aes(displ, hwy)) + ggplot2::geom_point() +
+    ggplot2::labs(title = quote(alpha^2), x = "排気量")
+  expect_render_close(p, tier = "hybrid")
+  g <- hybrid_text(grid::gTree(children = grid::gList(grid::textGrob("a"), grid::rectGrob())))
+  expect_s3_class(g$children[[1]], "alot_text")
+  expect_false(inherits(g$children[[2]], "alot_text"))
+})

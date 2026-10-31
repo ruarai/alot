@@ -74,7 +74,7 @@ render_ir <- function(built) {
     unlist(lapply(legends, function(l) c(ir_text(l$title, support, "legend title"), ir_text(l$key$.label, support, "legend label"))), use.names = FALSE)
   )
   text <- unique(as.character(text[!is.na(text)]))
-  for (k in which(!is.na(fonts$path))) {
+  for (k in which(!is.na(fonts$path) & length(text) > 0)) {
     covered <- rs_text_covered(enc2utf8(text), fonts$path[k], fonts$index[k])
     if (!all(covered)) {
       support$add("text", fonts$path[k], sprintf("glyph missing from the font in \"%s\"", text[!covered][1]))
