@@ -130,3 +130,17 @@ test_that("a guide perpendicular to its axis still warns", {
   p <- point + guides(x = guide_axis(position = "left"))
   expect_panel_guides(p, "ggplot2")
 })
+
+test_that("a non-position guide on a position scale warns once, as in ggplot2", {
+  p <- point + scale_x_continuous(guide = guide_legend())
+  expect_panel_guides(p, "ggplot2")
+  count <- function(f) {
+    n <- 0L
+    withCallingHandlers(f(p), warning = function(w) {
+      if (grepl("cannot be used for", conditionMessage(w))) n <<- n + 1L
+      invokeRestart("muffleWarning")
+    })
+    n
+  }
+  expect_identical(count(alot_build), count(ggplot_build))
+})

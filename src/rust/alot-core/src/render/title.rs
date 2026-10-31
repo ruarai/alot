@@ -22,6 +22,10 @@ pub struct Title {
     /// (`rotate_just()` of the angle, hjust and vjust).
     pub x: Option<Vec<f64>>,
     pub y: Option<Vec<f64>>,
+    /// Pixels added to every label's x and y (y up), for positions such as
+    /// `unit(1, "npc") - (1 - hjust) * width` (`table_add_tag()`, ggplot2
+    /// R/plot-build.R).
+    pub shift: (f64, f64),
     /// `rotate_just(angle, hjust, vjust)`.
     pub just: (f64, f64),
     pub style: TextStyle,
@@ -81,7 +85,8 @@ impl Title {
         let mut kept: Vec<Quad> = Vec::new();
         let mut runs = Vec::with_capacity(n);
         for (i, text) in self.labels.iter().enumerate() {
-            let (mut x, mut y) = (at(&self.x, i, self.just.0) * w, at(&self.y, i, self.just.1) * h);
+            let (mut x, mut y) =
+                (at(&self.x, i, self.just.0) * w + self.shift.0, at(&self.y, i, self.just.1) * h + self.shift.1);
             if g.margin_x {
                 x += -g.margin[1] * self.just.0 + g.margin[3] * (1.0 - self.just.0);
             }

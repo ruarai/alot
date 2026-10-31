@@ -1167,6 +1167,11 @@ anything else.
   faster than ggplot2 + ragg (render step, release build: a 2e5-row ribbon
   0.40 s vs 0.49 s, 1e6-row boxplots 0.13 s vs 0.44 s, 5e4 segments 0.19 s
   vs 0.27 s; ragg's time includes its PNG encoding).
+- **Follow-up (full-corpus fixes):** tags in the plot or panel area are
+  now drawn at `table_add_tag()`'s manual positions (left/right ones
+  decline: ggplot2 errors on them); `setup_panel_guides` declines before
+  `Guides$setup` when a scale's guide isn't the default, so a misplaced
+  guide warns once.
 
 ### R7.2 Performance pass
 - **Depends:** R6.3, R6.4

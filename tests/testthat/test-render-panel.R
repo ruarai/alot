@@ -109,6 +109,16 @@ test_that("margins, backgrounds, titles and tags", {
   check_page(base + theme(plot.background = element_blank()), "no plot background")
   check_page(base + theme(plot.background = element_rect(fill = "grey90", colour = "red", linewidth = 3)), "plot background")
   check_page(base + labs(tag = "T") + theme(plot.tag.position = "bottomright"), "tag")
+  # Tags in the plot or panel area are drawn at manual positions (table_add_tag()).
+  tagged <- base + labs(tag = "Fig. A)")
+  check_page(tagged + theme(plot.tag.position = "topright", plot.tag.location = "panel"), "tag topright in the panel")
+  check_page(tagged + theme(plot.tag.position = "bottom", plot.tag.location = "panel"), "tag bottom in the panel")
+  check_page(tagged + theme(plot.tag.position = c(0.25, 0.25), plot.tag.location = "panel"), "numeric tag in the panel")
+  check_page(
+    tagged + theme(plot.tag.position = "bottomleft", plot.tag.location = "plot", plot.tag = element_text(hjust = 0.2, vjust = 0.8)),
+    "tag bottomleft in the plot"
+  )
+  check_page(tagged + theme(plot.tag.position = c(0.05, 0.05), plot.tag.location = "plot"), "numeric tag in the plot")
   check_page(
     base + labs(title = "T", caption = "C") + theme(plot.title.position = "plot", plot.caption.position = "plot"),
     "title and caption on the plot"
@@ -156,6 +166,9 @@ test_that("the full tier names why it declines", {
   expect_match(attr(render_full(b, render_size), "reason"), "axis cap")
   b <- ggplot_build(ggplot(mtcars, aes(wt, mpg)) + geom_curve(aes(xend = wt + 1, yend = mpg)))
   expect_match(attr(render_full(b, render_size), "reason"), "layers other than")
+  # ggplot2 itself fails on these ("object 'vjust' not found").
+  b <- ggplot_build(base + labs(tag = "A") + theme(plot.tag.position = "left", plot.tag.location = "panel"))
+  expect_match(attr(render_full(b, render_size), "reason"), "left or right tag position")
 })
 
 test_that("a higher resolution and a larger page", {

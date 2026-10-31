@@ -90,7 +90,7 @@ for (file in corpus_files) {
 
 test_that("every allow-listed plot is in the corpus", {
   skip_if(nzchar(corpus_filter), "ALOT_CORPUS runs a subset")
-  expect_equal(setdiff(names(corpus_allow), corpus_ids), character())
+  expect_equal(as.character(setdiff(names(corpus_allow), corpus_ids)), character())
 })
 
 message(sprintf(

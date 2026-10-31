@@ -524,9 +524,36 @@ layout_tag <- function(theme, label, res) {
     )
   }
   item <- layout_title(element, label, res, TRUE, TRUE)
+  # In the plot or panel, the tag is re-rendered at a manual position:
+  # numeric positions in npc; otherwise hjust (vjust) npc, or an edge
+  # inset by (1 - hjust) times the tag's width (height). `shift` holds
+  # those multipliers of the grob's width and height, applied in Rust
+  # (alot-r/src/page.rs) where the grob is measured.
+  shift <- c(0, 0)
+  if (location %in% c("plot", "panel") && !is.null(item)) {
+    if (is.numeric(position)) {
+      item$x <- as.numeric(position[1])
+      item$y <- as.numeric(position[2])
+    } else {
+      # ggplot2 reads `vjust` only inside `if (top || bottom)`, so "left"
+      # and "right" fail there ("object 'vjust' not found").
+      if (!(flags[1] || flags[4])) {
+        layout_decline("a left or right tag position in the plot or panel")
+      }
+      hjust <- as.numeric(element$hjust)
+      vjust <- as.numeric(element$vjust)
+      if (length(hjust) != 1 || length(vjust) != 1) {
+        layout_decline("a tag hjust or vjust that is not a single number")
+      }
+      item$x <- if (flags[2]) 0 else if (flags[3]) 1 else hjust
+      shift[1] <- if (flags[2]) 1 - hjust else if (flags[3]) -(1 - hjust) else 0
+      item$y <- if (flags[1]) 1 else 0
+      shift[2] <- if (flags[1]) -(1 - vjust) else 1 - vjust
+    }
+  }
   list(
     item = item, top = as.numeric(flags[1]), left = as.numeric(flags[2]), right = as.numeric(flags[3]),
-    bottom = as.numeric(flags[4]), location = match(location, c("margin", "plot", "panel")) - 1
+    bottom = as.numeric(flags[4]), location = match(location, c("margin", "plot", "panel")) - 1, shift = shift
   )
 }
 

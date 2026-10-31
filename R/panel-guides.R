@@ -54,6 +54,19 @@ kernel_panel_guides <- function(layout, guides, coord) {
   scale_x <- panels$SCALE_X[index]
   scale_y <- panels$SCALE_Y[index]
 
+  # Decline before setting up anything the kernel would decline after:
+  # Guides$setup (ggplot2 R/guides-.R) warns about some scale guides (e.g. a
+  # guide_legend() on x), and the fallback would warn a second time. With
+  # waiver guides on x and y and guide_none() on the secondary scales, setup
+  # signals nothing.
+  plain <- vapply(panel_params, function(pp) {
+    gg_is_waiver(.subset2(pp$x, "guide")) && gg_is_waiver(.subset2(pp$y, "guide")) &&
+      inherits(.subset2(pp$x.sec, "guide"), "GuideNone") && inherits(.subset2(pp$y.sec, "guide"), "GuideNone")
+  }, logical(1))
+  if (!all(plain)) {
+    return(NULL)
+  }
+
   # Coord$setup_panel_guides, as ggplot2 calls it for every COORD. The Guides
   # objects it returns capture the call's frame, so they are not cloned.
   set_up <- lapply(panel_params, function(pp) coord$setup_panel_guides(pp, guides, params))

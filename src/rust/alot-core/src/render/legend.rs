@@ -633,6 +633,7 @@ mod tests {
             labels: vec!["x".into()],
             x: None,
             y: None,
+            shift: (0.0, 0.0),
             just: (0.0, 0.5),
             style: TextStyle { font: 0, size: 10.0, line: 12.0, colour: [0, 0, 0, 255] },
             check_overlap: false,

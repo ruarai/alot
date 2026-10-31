@@ -91,6 +91,7 @@ fn title(l: &List, fonts: &mut Fonts) -> Option<Title> {
         labels,
         x: nums(l, "x"),
         y: nums(l, "y"),
+        shift: (0.0, 0.0),
         just: (*just.first()?, *just.get(1)?),
         style,
         check_overlap: flag(l, "check_overlap")?,
@@ -619,7 +620,15 @@ fn render(spec: &List, threads: i32) -> Option<Robj> {
             titles.push((name.to_string(), t));
         }
     }
-    if let Some(tag) = opt(&layout, "tag", |t| title(&list_of(t, "item")?, &mut fonts))? {
+    // table_add_tag() (ggplot2 R/plot-build.R): `shift` multiplies the
+    // tag grob's width and height (see layout_tag() in R/render-layout.R).
+    let tag = opt(&layout, "tag", |t| {
+        let mut tag = title(&list_of(t, "item")?, &mut fonts)?;
+        let shift = nums(t, "shift")?;
+        tag.shift = (*shift.first()? * tag.grob.width(), *shift.get(1)? * tag.grob.height());
+        Some(tag)
+    })?;
+    if let Some(tag) = tag {
         titles.push(("tag".to_string(), tag));
     }
     let bg = rgba(spec, "bg")?;
