@@ -1,4 +1,5 @@
 S3method(grid::drawDetails, alot_hybrid_layer)
+S3method(grid::drawDetails, alot_page)
 S3method(grid::drawDetails, alot_text)
 export(alot_build)
 export(alot_coverage)

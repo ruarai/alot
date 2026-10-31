@@ -23,6 +23,7 @@ Imports:
     scales,
     systemfonts (>= 1.2.0),
     rlang,
+    S7,
     utils,
     vctrs
 Suggests:

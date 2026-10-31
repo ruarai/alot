@@ -7,7 +7,9 @@ library(ggplot2)
 p <- ggplot(mtcars, aes(wt, mpg)) + geom_point()
 b <- alot::alot_build(p)  # identical to ggplot2::ggplot_build(p)
 alot::alot_coverage(p)    # which components ran in Rust vs ggplot2
-alot::alot_print(p)       # like print(p), but builds with alot
+alot::alot_print(p)       # like print(p), but builds with alot and renders with the best tier;
+                          # re-renders at the new size when the plot pane is resized
+options(alot.autoprint = TRUE)  # makes print(p), and autoprinting p, do the same
 ```
 
 `alot_build()` mirrors `ggplot2:::build_ggplot()` step by step. Pipeline

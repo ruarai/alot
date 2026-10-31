@@ -20,6 +20,20 @@ Invisibly returns `x`.
 }
 \description{
 The counterpart of `print()` for a ggplot: builds `x` with [alot_build()]
-instead of [ggplot2::ggplot_build()], then renders it with
-[ggplot2::ggplot_gtable()] and draws it on the current device.
+instead of [ggplot2::ggplot_build()], then draws it on the current device.
+}
+\details{
+On a raster device (RStudio's plot pane, a window, a PNG device) the page
+is rendered by the best tier alot has for the plot (see
+[alot_render_coverage()]) at the device's size in pixels and drawn as a
+raster. The plot is a grid grob that renders each time it is drawn, so
+when the device is resized, or RStudio replays the plot to export it,
+the plot is laid out and rendered again at the new size. Only the built
+plot is kept between draws. Vector devices (`pdf()`, `svg()`,
+`postscript()` and the like), rotated viewports and plots whose tier is
+ggplot2 are drawn from [ggplot2::ggplot_gtable()] instead. Warnings are
+raised on the first draw only.
+
+With `options(alot.autoprint = TRUE)`, printing a ggplot (including
+autoprinting `p` at the console) calls `alot_print()`.
 }

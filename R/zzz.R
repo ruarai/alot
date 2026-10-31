@@ -22,4 +22,5 @@
                   "ScaleBinned", "ScaleBinnedPosition")) {
     register_kernel("scale_transform", class, kernel_transform)
   }
+  install_autoprint()
 }

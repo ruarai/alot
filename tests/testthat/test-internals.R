@@ -99,6 +99,11 @@ test_that("upstream discrete non-position training and mapping match what alot r
 test_that("upstream print method matches the version alot_print mirrors", {
   # Mirrored by alot_print() (R/print.R). If this fails, update the mirror to
   # match, then update the snapshot.
+  # alot's autoprint method (R/print.R) wraps ggplot2's, which it keeps.
+  getS3method <- function(...) {
+    method <- utils::getS3method(...)
+    environment(method)$print_original %||% method
+  }
   expect_snapshot(print(body(getS3method("print", "ggplot2::ggplot"))))
 })
 
