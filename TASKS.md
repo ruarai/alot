@@ -1,7 +1,8 @@
 # alot — sub-tasks
 
-Breaks [PLAN.md](PLAN.md) (Phase 1) and [PHASE2.md](PHASE2.md) (Phase 2,
-from "Phase 2: rendering" below) into tasks of about one PR each. IDs follow
+Breaks [PLAN.md](PLAN.md) (Phase 1), [PHASE2.md](PHASE2.md) (Phase 2,
+from "Phase 2: rendering" below) and [SPATIAL.md](SPATIAL.md) (from
+"Spatial" below) into tasks of about one PR each. IDs follow
 the plans' milestones. Each task lists what it depends on, the files it touches,
 and when it is done.
 
@@ -21,6 +22,8 @@ criteria.
 2. **Phase 2:** in "Suggested order (Phase 2)": R0.1, R0.2 → R0.3, R0.4 →
    R1.1 → R1.2–R1.5 → R2.1, R3.1 → R3.2, R2.2, R4.1 → R4.2 → R5.1 → R5.2 →
    R5.3 → R6.1–R6.6 → R7.1 → R7.2 → R7.3.
+3. **Spatial** ([SPATIAL.md](SPATIAL.md)): S0.1 → S0.2 → S1.1 → S1.2 →
+   S2.1 → S2.2 → S3.1 → S3.2 → S3.3 → S4.1 → S5.1 → S5.2 → S5.3.
 
 ## Phase 1 completion criteria
 
@@ -1207,3 +1210,206 @@ anything else.
 6. R7.1 → R7.2 → R7.3.
 
 The README plot's remaining build time (about 195 ms) is Phase 1's T6.2.
+
+---
+
+# Spatial
+
+Spatial tasks use IDs `S<milestone>.<n>`, with branches named as before
+(`task/S1.1-raster-drawer`). [SPATIAL.md](SPATIAL.md) has the north star
+(the combined SDM map), the decisions and the architecture. Build tasks
+follow the Phase 1 completion criteria and render tasks follow the Phase 2
+ones. sf is in Suggests: every sf test and corpus file uses
+`skip_if_not_installed("sf")`.
+
+## Shared completion criteria (Spatial)
+
+- The phase criteria above apply: Phase 1's for build steps, Phase 2's
+  for drawers.
+- **sf untouched:** build kernels never rewrite a geometry column. The
+  sfc's attributes and sfg classes must equal ggplot2's under
+  `expect_build_equal()`.
+- **Projection in sf:** no task ports a PROJ projection or calls PROJ from
+  Rust.
+- **Bench:** each task records its case of `inst/bench/spatial.R` in
+  `RESULTS.md`, as ggplot2 + ragg vs hybrid vs full where both tiers apply.
+
+## S0 Foundations
+
+### S0.1 sf environment and corpus
+- **Depends:** —
+- **Touches:** `DESCRIPTION`, `AGENTS.md`, `tests/testthat/helper-*.R`,
+  `tests/testthat/corpus/`, `tests/testthat/render-corpus` files
+- **Do:** Install `libgdal-dev`, `libgeos-dev` and `libproj-dev` (apt) and
+  sf (CRAN). Add sf to Suggests. Add the install line to AGENTS.md's
+  commands. Regenerate the corpus with `tools/extract-corpus.R` so it
+  picks up ggplot2's sf examples and tests. Corpus files that use sf get a
+  `skip_if_not_installed("sf")` guard. Record which new plots pass and
+  which fall back today.
+- **Done when:** the full R suite passes with sf installed and with it
+  absent (the sf files skip), and the new corpus plots pass through the
+  ggplot2 fallback.
+
+### S0.2 Spatial bench suite and profile
+- **Depends:** S0.1
+- **Touches:** `inst/bench/spatial.R` (new), `inst/bench/RESULTS.md`
+- **Do:** Add generators for rasters of 500², 1000² and 2000² cells
+  (continuous fill, about 50% absent cells), sf layers of 1e2, 1e3 and 1e4
+  polygon features at about 1e6 total vertices (in EPSG:3577 and in
+  EPSG:4326), the north star and its faceted variant (SPATIAL.md). Add
+  the opt-in real-data cases read from `ALOT_SPATIAL_DATA`. Time and
+  `Rprof` each case's build, gtable and draw for ggplot2 + ragg and for
+  alot's current path. Report the PROJ floor separately.
+- **Done when:** RESULTS.md has the baseline table and the profile per
+  stage. It lists which build steps are worth a kernel (S1.2, S2.2) and
+  confirms the ≥5× north-star target, or records a revised one with the
+  reason.
+
+## S1 Raster
+
+### S1.1 `geom_raster()` drawer
+- **Depends:** S0.2
+- **Touches:** `R/render-raster.R` (new), `alot-core/src/render/raster.rs`,
+  `alot-r/src/render.rs`, `tests/testthat/test-render-raster.R` (new),
+  `tests/testthat/test-internals.R`
+- **Do:** Mirror `GeomRaster$draw_panel` (ggplot2 R/geom-raster.R): the
+  `x_pos` and `y_pos` cell indices from `resolution(x, FALSE)` with
+  `as.integer()` truncation, an image built in Rust from the parsed fill
+  colours (transparent for absent and NA cells), and the `rasterGrob()`
+  placement over the xmin–xmax and ymin–ymax range. Draw it as ragg's
+  `drawRaster()` does with `interpolate = FALSE` (ragg `src/AggDevice.h`,
+  R `GERaster()`), starting from R5.3's `bar_image()`. Use it in the full
+  tier (cartesian, `coord_fixed()`, `coord_flip()`, reversed and
+  transformed scales, facets) and as a hybrid lazy grob.
+- **Declines:** `interpolate = TRUE`, any alpha other than 0 or 1, pattern
+  fills, non-linear coords (GeomRaster's `GeomRect` fallback),
+  `annotation_raster()`, `coord_sf()` (S4.1).
+- **Done when:** the raster render-corpus plots draw in full and match
+  ragg. The 1000² and 2000² cases draw faster than ragg, and the 2000²
+  case's draw step is at least 5× faster than ragg's.
+
+### S1.2 Raster build steps (conditional)
+- **Depends:** S0.2
+- **Touches:** `R/kernels-geom.R` (new), `alot-core/src/geom/` (new)
+- **Do:** Only if S0.2's profile shows a build step of the raster cases
+  (e.g. `GeomRaster$setup_data`'s `resolution()` and per-row
+  xmin/xmax/ymin/ymax) worth at least 1.25× at 1e6 rows: mirror it and
+  add a kernel. If not, mark this task dropped and record why in
+  RESULTS.md.
+- **Done when:** the Phase 1 criteria hold, or the task is dropped with
+  the reason recorded.
+
+## S2 sf build
+
+### S2.1 Mirror the sf build steps
+- **Depends:** S0.1
+- **Touches:** `R/build.R`, `R/sf.R` (new), `R/ggplot2-internals.R`,
+  `tests/testthat/test-sf-build.R` (new), `tests/testthat/test-internals.R`
+- **Do:** In `alot_build()`, mirror the steps that sf layers and
+  `coord_sf()` add: `LayerSf`'s `setup_layer` and `compute_geom_1/2`
+  (ggplot2 R/layer-sf.R), `StatSf$compute_panel` (R/stat-sf.R), and
+  `CoordSf`'s `setup_params`, `setup_data`, `record_bbox` and
+  `setup_panel_params` (R/coord-sf.R), so `alot_coverage()` reports each
+  one. `st_transform()`, `sf_project()` and `st_graticule()` are still
+  called through sf. Add `gg_*` wrappers for the unexported helpers
+  (`sf_transform_xy`, `calc_limits_bbox`, `sf_breaks`, ...).
+- **Done when:** `expect_build_equal()` passes on the sf corpus plots and
+  on the targeted cases in SPATIAL.md's Verification section, and each
+  mirrored method has a snapshot.
+
+### S2.2 sf build kernels (conditional)
+- **Depends:** S2.1, S0.2
+- **Touches:** `R/kernels-sf.R` (new), `alot-core/src/sf/` (new),
+  `alot-r/src/sf.rs` (new)
+- **Do:** Write a kernel only for the per-feature steps that S0.2's
+  profile picks (candidates: the geometry-type scan in `LayerSf`, bboxes
+  when the sfc's cached bbox can't be used). The sfc reader from
+  SPATIAL.md lands here if S2.2 needs it, otherwise in S3.1. Any other
+  candidate fails the 1.25× rule and is recorded in RESULTS.md.
+- **Done when:** the Phase 1 criteria hold for each kept kernel.
+
+## S3 sf render (hybrid)
+
+### S3.1 sfc reader and transform
+- **Depends:** S0.1
+- **Touches:** `alot-r/src/sf.rs`, `alot-core/src/sf/`
+- **Do:** Walk an sfc in one pass into the flat `Geometry` struct
+  (coordinates; ring, part and feature offsets; kind), borrowing each
+  matrix. Decline anything other than XY, GEOMETRYCOLLECTION, and empty
+  features. Mirror `CoordSf$transform` → `sf_rescale01()`
+  (`st_normalize()`, with `reverse`) and the npc → device-pixel step.
+- **Done when:** `cargo test` covers each type and the declines, and an R
+  test shows the rescaled coordinates equal `sf_rescale01()`'s
+  (`st_coordinates()` of the result) to 1e-12.
+
+### S3.2 `geom_sf()` polygons
+- **Depends:** S3.1
+- **Touches:** `R/render-sf.R` (new), `alot-core/src/render/paths.rs`,
+  `tests/testthat/test-render-sf.R` (new), `tests/testthat/test-internals.R`
+- **Do:** Mirror `GeomSf$draw_panel` and `sf_grob()` for (MULTI)POLYGON:
+  the per-feature gp (`fill`, `colour`, `linewidth`, `linetype`, `alpha`,
+  `linejoin`, `lineend`, `linemitre`) and `st_as_grob()`'s
+  `pathGrob(rule = "evenodd")`, drawn fill then stroke per feature in data
+  order. Batch features whose bboxes don't overlap. Let the hybrid tier
+  accept `CoordSf` panels for these lazy grobs.
+- **Declines:** `default_crs` set, legend-only layers, linetypes or
+  arrows the path drawer declines elsewhere.
+- **Done when:** the sf polygon corpus plots render through the hybrid
+  tier and match ragg, and the 1e6-vertex outline and choropleth cases
+  draw faster than ragg.
+
+### S3.3 `geom_sf()` lines and points
+- **Depends:** S3.2
+- **Touches:** `R/render-sf.R`, `tests/testthat/test-render-sf.R`
+- **Do:** (MULTI)LINESTRING as `polylineGrob()` and (MULTI)POINT through
+  the point sprites, with `sf_grob()`'s size, stroke and `pch`
+  arithmetic, in mixed-type layers too (one display item per type run, in
+  data order).
+- **Done when:** the remaining `geom_sf()` corpus plots that don't need
+  GEOMETRYCOLLECTION render through the hybrid tier and match ragg.
+
+## S4 North star
+
+### S4.1 Combined SDM map
+- **Depends:** S1.1, S2.1, S3.2
+- **Touches:** `R/render-raster.R`, `R/render.R`, `inst/bench/spatial.R`
+- **Do:** Let the raster drawer run under `coord_sf()` (linear when
+  `default_crs` is NULL) as a hybrid lazy grob, with raster and sf layers
+  in the same panels and fixed-scale facets. Do a performance pass on the
+  north star and its faceted variant: IR time, per-panel overhead,
+  threads, buffer reuse.
+- **Done when:** both north-star cases render through the hybrid tier,
+  match ragg, and meet SPATIAL.md's target (≥5× end to end, or the target
+  revised in S0.2).
+
+## S5 `coord_sf()` full tier
+
+### S5.1 Graticule, panel grid and axes
+- **Depends:** S4.1
+- **Touches:** `R/render-ir.R`, `R/render-full.R`, `R/panel-guides.R`,
+  `alot-core/src/render/{panel,axis}.rs`
+- **Do:** Carry `panel_params$graticule` (from `st_graticule()`, in R)
+  in the IR. Mirror `CoordSf$render_bg` and `render_axis_*`
+  (ggplot2 R/coord-sf.R): graticule lines as paths, and ticks and labels
+  where they cross the panel edge. Non-plotmath labels (e.g.
+  `label_axes`, or user labels that are strings) draw in full.
+- **Done when:** the `coord_sf()` corpus plots with string labels pass
+  the layout and image checks in the full tier.
+
+### S5.2 Degree labels
+- **Depends:** S5.1
+- **Touches:** `R/render-text.R`, `alot-core/src/render/text.rs`
+- **Do:** Draw the plotmath forms that `st_graticule()` and
+  `CoordSf$fixup_graticule_labels` generate for degree labels (a number,
+  `degree` and a hemisphere letter), laid out as plotmath does (R
+  `src/main/plotmath.c`). Any other expression still sends the plot to the
+  hybrid tier.
+- **Done when:** the default-labelled `coord_sf()` corpus plots, and the
+  north star, render in the full tier and match ragg.
+
+### S5.3 Spatial exit
+- **Depends:** everything above
+- **Do:** Verify that the corpus passes with and without sf, that the
+  targets are met, that SPATIAL.md reflects what shipped, and that the
+  README mentions spatial support. Update PHASE2.md's out-of-scope list.
+- **Done when:** the checklist is recorded in this file.
