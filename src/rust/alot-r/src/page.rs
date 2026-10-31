@@ -5,7 +5,8 @@ use alot_core::render::agg::{Cap, Join};
 use alot_core::render::axis::{Axis, Side, Ticks};
 use alot_core::render::layout::TitleGrob;
 use alot_core::render::legend::{Bar, BarTicks, Bins, Body, Glyph, Guide, Keys, LegendGroup};
-use alot_core::render::page::{draw_page, FacetDraw, LineStyle, PageSpec, RectEl, StripDraw, TextStyle};
+use alot_core::render::display::Rect;
+use alot_core::render::page::{draw_page, FacetDraw, LineStyle, PageSpec, Painter, RectEl, StripDraw, TextStyle};
 use alot_core::render::layers::{Label, LabelLayer, PathLayer, RectLayer, TextLayer};
 use alot_core::render::panel::{GridLines, Layer, Panel, PointLayer};
 use alot_core::render::raster;
@@ -714,7 +715,50 @@ fn render(spec: &List, threads: i32) -> Option<Robj> {
     Some(out)
 }
 
+/// One panel of the full tier's layer specs (`full_layer_specs()` in
+/// R/render-full.R), for the hybrid tier's lazy grobs: the marks of panel
+/// `panel` (1-based, of `n_panels`) drawn as `Panel::draw()` draws a page's
+/// layers, clipped to the panel at `rect` (left, top, width, height in
+/// pixels) on a transparent raster of `dims` (width, height). `NULL`
+/// (decline) for a spec it doesn't read and for text, which needs fonts.
+/// @noRd
+#[extendr(r_name = "rs_render_panel_layers")]
+fn render_panel_layers(layers: List, n_panels: i32, panel: i32, rect: &[f64], dims: &[i32], threads: i32) -> Robj {
+    panel_layers(&layers, n_panels, panel, rect, dims, threads).unwrap_or_else(|| Robj::from(()))
+}
+
+fn panel_layers(specs: &List, n_panels: i32, panel: i32, rect: &[f64], dims: &[i32], threads: i32) -> Option<Robj> {
+    let &[left, top, pw, ph] = rect else { return None };
+    let &[w, h] = dims else { return None };
+    if w < 1 || h < 1 || n_panels < 1 || panel < 1 || panel > n_panels {
+        return None;
+    }
+    let (w, h) = (w as usize, h as usize);
+    let mut fonts = Fonts::new();
+    let mut drawn = Vec::new();
+    for (_, l) in specs.iter() {
+        let one = layers(&List::try_from(l).ok()?, n_panels as usize, &mut fonts)?;
+        if let Some(layer) = one.into_iter().nth(panel as usize - 1)? {
+            drawn.push(layer);
+        }
+    }
+    if !fonts.keys.is_empty() {
+        return None;
+    }
+    let p = Panel { clip: true, ontop: false, background: None, grid: Vec::new(), layers: drawn, border: None };
+    let faces: Vec<Font> = Vec::new();
+    let mut painter = Painter::new(&faces, w, h);
+    painter.threads = threads.max(0) as usize;
+    p.draw(&mut painter, &Rect { x0: left, y0: top, x1: left + pw, y1: top + ph })?;
+    let (out, ptr) = crate::render::native_raster(w, h);
+    let pixels = unsafe { std::slice::from_raw_parts_mut(ptr, w * h) };
+    let opts = raster::Options { threads: threads.max(0) as usize, ..Default::default() };
+    raster::render_into(&painter.list, w, h, &opts, pixels);
+    Some(out)
+}
+
 extendr_module! {
     mod page;
     fn render_page;
+    fn render_panel_layers;
 }

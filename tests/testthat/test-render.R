@@ -114,6 +114,9 @@ test_that("infinite positions are squished to the panel edge", {
   expect_render_close(p, max = 64, tier = "hybrid")
 })
 
+# A layer no tier of alot draws: geom_raster().
+grid_df <- expand.grid(x = 1:3, y = 1:3)
+
 test_that("unsupported layers and coords keep ggplot2's pointsGrob, with a reason", {
   base <- ggplot2::ggplot(d, ggplot2::aes(x, y))
   na <- d
@@ -122,7 +125,7 @@ test_that("unsupported layers and coords keep ggplot2's pointsGrob, with a reaso
     "unsupported shape" = base + ggplot2::geom_point(shape = 30),
     "character pch" = base + ggplot2::geom_point(shape = "a"),
     "clip is not \"on\"" = base + ggplot2::geom_point() + ggplot2::coord_cartesian(clip = "off"),
-    "coord is not an unreversed coord_cartesian()" = base + ggplot2::geom_point() + ggplot2::coord_flip(),
+    "coord is not an unreversed coord_cartesian()" = base + ggplot2::geom_point() + ggplot2::coord_polar(),
     "NA in stroke" = base + ggplot2::geom_point(stroke = NA),
     "position scale does not rescale linearly" =
       base + ggplot2::geom_point() + ggplot2::continuous_scale(
@@ -131,7 +134,7 @@ test_that("unsupported layers and coords keep ggplot2's pointsGrob, with a reaso
       ),
     "no rows" = ggplot2::ggplot(d[0, ], ggplot2::aes(x, y)) + ggplot2::geom_point(),
     "x or y is AsIs" = ggplot2::ggplot(d[1, ]) + ggplot2::geom_point(ggplot2::aes(x = I(0.5), y = I(0.5))),
-    "no Rust drawer for this geom" = base + ggplot2::geom_area()
+    "no Rust drawer for this geom" = ggplot2::ggplot(grid_df, ggplot2::aes(x, y)) + ggplot2::geom_raster()
   )
   for (reason in names(cases)) {
     p <- cases[[reason]]
@@ -152,10 +155,10 @@ test_that("rows with missing values are removed as ggplot2 does", {
 })
 
 test_that("alot_render_coverage() reports each layer", {
-  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_area() + ggplot2::geom_point()
+  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_raster(data = grid_df) + ggplot2::geom_point()
   cov <- alot_render_coverage(p)
   expect_equal(cov$tier, "hybrid")
-  expect_equal(cov$layers$geom, c("GeomArea", "GeomPoint"))
+  expect_equal(cov$layers$geom, c("GeomRaster", "GeomPoint"))
   expect_equal(cov$layers$engine, c("ggplot2", "rust"))
   expect_equal(cov$layers$reason, c("no Rust drawer for this geom", NA))
 })
@@ -182,7 +185,7 @@ test_that("alot_png() writes a PNG and closes its device", {
 })
 
 test_that("alot_png() draws unsupported plots with ggplot2", {
-  p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_area()
+  p <- ggplot2::ggplot(grid_df, ggplot2::aes(x, y)) + ggplot2::geom_raster()
   file <- withr::local_tempfile(fileext = ".png")
   before <- grDevices::dev.cur()
   rlang::local_options(rlib_message_verbosity = "verbose")
@@ -326,7 +329,7 @@ test_that("alot_png() restores the current device", {
   withr::defer(grDevices::graphics.off())
   alot_png(p, withr::local_tempfile(fileext = ".png"), width = 2, height = 2, dpi = 50)
   expect_equal(grDevices::dev.cur(), dev)
-  suppressMessages(alot_png(ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_area(),
+  suppressMessages(alot_png(ggplot2::ggplot(grid_df, ggplot2::aes(x, y)) + ggplot2::geom_raster(),
     withr::local_tempfile(fileext = ".png"), width = 2, height = 2, dpi = 50))
   expect_equal(grDevices::dev.cur(), dev)
 })
@@ -399,7 +402,7 @@ test_that("unsupported rect layers keep ggplot2's rectGrob, with a reason", {
   base <- ggplot2::ggplot(mtcars, ggplot2::aes(factor(cyl)))
   cases <- list(
     "linetype is not solid or blank" = base + ggplot2::geom_bar(colour = "black", linetype = "dashed"),
-    "coord is not an unreversed coord_cartesian()" = base + ggplot2::geom_bar() + ggplot2::coord_flip(),
+    "coord is not an unreversed coord_cartesian()" = base + ggplot2::geom_bar() + ggplot2::coord_polar(),
     "clip is not \"on\"" = base + ggplot2::geom_bar() + ggplot2::coord_cartesian(clip = "off"),
     "no Rust drawer for this geom" = ggplot2::ggplot(ggplot2::faithfuld, ggplot2::aes(waiting, eruptions, fill = density)) + ggplot2::geom_raster()
   )
@@ -473,9 +476,9 @@ test_that("unsupported path layers keep ggplot2's grobs, with a reason", {
   cases <- list(
     "arrows" = base + ggplot2::geom_path(arrow = grid::arrow()),
     "aesthetics vary along a line" = base + ggplot2::geom_path(ggplot2::aes(colour = hp)),
-    "coord is not an unreversed coord_cartesian()" = base + ggplot2::geom_line() + ggplot2::coord_flip(),
+    "coord is not an unreversed coord_cartesian()" = base + ggplot2::geom_line() + ggplot2::coord_polar(),
     "NA in x or y" = ggplot2::ggplot(na, ggplot2::aes(x, y)) + ggplot2::geom_polygon(),
-    "no Rust drawer for this geom" = base + ggplot2::geom_area()
+    "no Rust drawer for this geom" = ggplot2::ggplot(grid_df, ggplot2::aes(x, y)) + ggplot2::geom_raster()
   )
   for (reason in names(cases)) {
     p <- cases[[reason]]

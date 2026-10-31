@@ -16,7 +16,9 @@ A list with `tier`, the tier [alot_png()] would use (`"full"`,
   `geom`, the `engine` that draws it in the hybrid tier (`"rust"` or
   `"ggplot2"`) and, for `"ggplot2"`, the `reason`; and `full`, a data
   frame of the `component`, `name` and `reason` for everything that keeps
-  the plot out of the full tier (no rows: nothing does). `tier` can still
+  the plot out of the full tier (no rows: nothing does, and `tier` is
+  `"full"`; layers without rows and `geom_blank()` draw nothing, so they
+  don't). `tier` can still
   drop to `"hybrid"` if the full renderer meets something at draw time,
   such as a strip narrower than its text.
 }

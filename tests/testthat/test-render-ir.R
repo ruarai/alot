@@ -90,6 +90,7 @@ test_that("unsupported parts give reasons", {
 })
 
 test_that("alot_render_coverage() reports the full tier's reasons", {
+  withr::local_options(alot.full_tier = TRUE)
   cov <- alot_render_coverage(ir_plot())
   expect_identical(nrow(cov$full), 0L)
   cov <- alot_render_coverage(ir_plot() + ggplot2::coord_polar())

@@ -179,6 +179,15 @@ rs_layout <- function(spec, page) .Call(wrap__layout_boxes, spec, page)
 #' @noRd
 rs_render_page <- function(spec, threads) .Call(wrap__render_page, spec, threads)
 
+#' One panel of the full tier's layer specs (`full_layer_specs()` in
+#' R/render-full.R), for the hybrid tier's lazy grobs: the marks of panel
+#' `panel` (1-based, of `n_panels`) drawn as `Panel::draw()` draws a page's
+#' layers, clipped to the panel at `rect` (left, top, width, height in
+#' pixels) on a transparent raster of `dims` (width, height). `NULL`
+#' (decline) for a spec it doesn't read and for text, which needs fonts.
+#' @noRd
+rs_render_panel_layers <- function(layers, n_panels, panel, rect, dims, threads) .Call(wrap__render_panel_layers, layers, n_panels, panel, rect, dims, threads)
+
 #' Writes a nativeRaster (`dim` = height, width) to `path` as PNG with the
 #' metadata ragg's `agg_png()` writes for device background `bg` (R, G, B,
 #' A, 0-255): RGBA unless `bg` is opaque, `bKGD`, and `pHYs` if `dpi` is

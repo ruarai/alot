@@ -1,14 +1,17 @@
 # Rendering to PNG (PHASE2.md). alot_png() picks the first tier that
-# supports the plot:
+# supports the plot (R7.1):
 #
+# - full: the whole page drawn in Rust (render_full(), R/render-full.R);
 # - hybrid: ggplot2's gtable and grid drawing on ragg::agg_capture(), except
 #   that layers with a Rust drawer become lazy grobs that render their panel
 #   to a pixel-aligned raster in Rust. The PNG is encoded in Rust.
 # - ggplot2: ggplot_gtable() drawn on ragg::agg_png(), unchanged.
 #
 # hybrid_gtable() swaps each supported layer's draw_geom (GeomPoint, and
-# GeomRect and the geoms inheriting its draw_panel) for one that returns a
-# lazy "alot_hybrid_layer" grob per panel. The grob holds the layer's
+# GeomRect and the geoms inheriting its draw_panel, GeomPath, GeomStep,
+# GeomPolygon, and through the "marks" drawer the other geoms the full tier
+# draws, but text) for one that returns a lazy "alot_hybrid_layer" grob per
+# panel. The grob holds the layer's
 # columns; at draw time, on a raster (ragg) device, it renders the panel's
 # marks at device resolution. On any other device it draws ggplot2's own
 # grob.
@@ -17,11 +20,13 @@
 #'
 #' Builds `plot` with [alot_build()] (unless it is already built) and draws
 #' it with the first rendering tier that supports it (see
-#' [alot_render_coverage()]). In the hybrid tier, ggplot2 lays the plot out
-#' and layers with a Rust drawer are rasterised in Rust; the PNG is encoded
-#' in Rust. Otherwise the plot is drawn by ggplot2 on [ragg::agg_png()].
-#' If the hybrid tier hits an internal error, `alot_png()` warns and draws
-#' with ggplot2. The arguments follow [ggplot2::ggsave()]'s, and the file
+#' [alot_render_coverage()]). The full tier draws the whole page in Rust. In
+#' the hybrid tier, ggplot2 lays the plot out and layers with a Rust drawer
+#' are rasterised in Rust. In both the PNG is encoded in Rust. Otherwise the
+#' plot is drawn by ggplot2 on [ragg::agg_png()]. The first time in a
+#' session that a plot drops below the full tier, a message says why. If a
+#' tier hits an internal error, `alot_png()` warns and tries the next one
+#' (full, then hybrid, then ggplot2). The arguments follow [ggplot2::ggsave()]'s, and the file
 #' has the size, resolution and colour type `ggsave()` gives with ragg.
 #'
 #' @param plot A ggplot or a built plot.
@@ -71,9 +76,10 @@ write_png <- function(raster, filename, bg = "white", dpi = NA) {
 # error in alot's tier warns (class "alot_render_fallback") and drops to
 # ggplot2.
 render_raster <- function(built, size) {
-  # The full tier draws point and blank layers so far (R5.1);
-  # options(alot.full_tier = FALSE) skips it.
-  if (!isFALSE(getOption("alot.full_tier"))) {
+  # options(alot.full_tier = FALSE) skips the full tier.
+  full <- !isFALSE(getOption("alot.full_tier"))
+  why <- NULL
+  if (full) {
     out <- tryCatch(
       render_full(built, size),
       error = function(e) {
@@ -81,20 +87,25 @@ render_raster <- function(built, size) {
           c("alot's full renderer failed; trying another tier.", "x" = conditionMessage(e)),
           class = "alot_render_fallback"
         )
-        NULL
+        structure(list(), reason = "the full renderer failed")
       }
     )
     if (inherits(out, "nativeRaster")) {
       return(list(tier = "full", raster = out))
     }
+    why <- attr(out, "reason") %||% "the full tier declined the plot"
   }
   tier <- render_coverage(built)$tier
-  if (tier == "ggplot2") {
+  if (full) {
+    below_full_message(tier, why)
+  } else if (tier == "ggplot2") {
     cli::cli_inform(
       c("i" = "alot can't render any layer of this plot; drawing with ggplot2.",
         "i" = "See {.fn alot_render_coverage} for why."),
       .frequency = "once", .frequency_id = "alot_render_ggplot2"
     )
+  }
+  if (tier == "ggplot2") {
     return(list(tier = "ggplot2", raster = NULL))
   }
   tryCatch(
@@ -110,6 +121,17 @@ render_raster <- function(built, size) {
   )
 }
 
+# The message, once per session, that a plot drops below the full tier
+# (R7.1): the tier it is drawn with and the full tier's first reason.
+below_full_message <- function(tier, reason) {
+  cli::cli_inform(
+    c("i" = "alot draws this plot with its {tier} tier, not the full tier: {reason}.",
+      "i" = "See {.fn alot_render_coverage} for what each tier can draw."),
+    .frequency = "once", .frequency_id = "alot_render_below_full",
+    class = "alot_render_below_full"
+  )
+}
+
 #' Report how alot would render a plot
 #'
 #' @param plot A ggplot or a built plot.
@@ -119,7 +141,9 @@ render_raster <- function(built, size) {
 #'   `geom`, the `engine` that draws it in the hybrid tier (`"rust"` or
 #'   `"ggplot2"`) and, for `"ggplot2"`, the `reason`; and `full`, a data
 #'   frame of the `component`, `name` and `reason` for everything that keeps
-#'   the plot out of the full tier (no rows: nothing does). `tier` can still
+#'   the plot out of the full tier (no rows: nothing does, and `tier` is
+#'   `"full"`; layers without rows and `geom_blank()` draw nothing, so they
+#'   don't). `tier` can still
 #'   drop to `"hybrid"` if the full renderer meets something at draw time,
 #'   such as a strip narrower than its text.
 #' @export
@@ -127,12 +151,18 @@ alot_render_coverage <- function(plot) {
   built <- if (ggplot2::is_ggplot(plot)) alot_build(plot) else plot
   ir <- render_ir(built)
   out <- render_coverage(built)
-  full <- ir$support
+  # As full_decline() and page_spec() decide (R/render-full.R), so `tier`
+  # is the tier render_raster() draws with (R7.1).
+  full <- full_support(ir)
+  rownames(full) <- NULL
   reason <- full_page_reason(built, ir)
   if (nrow(full) == 0 && !is.null(reason)) {
     full <- data.frame(component = "page", name = "layout", reason = reason)
   }
-  if (nrow(full) == 0 && !isFALSE(getOption("alot.full_tier"))) {
+  if (isFALSE(getOption("alot.full_tier"))) {
+    full <- rbind(full, data.frame(component = "option", name = "alot.full_tier", reason = "options(alot.full_tier = FALSE)"))
+  }
+  if (nrow(full) == 0) {
     out$tier <- "full"
   }
   c(out, list(full = full))
@@ -151,7 +181,7 @@ render_coverage <- function(built) {
   layout <- built@layout
   reason <- vapply(seq_along(layers), function(i) {
     data <- suppressWarnings(hybrid_data(layers[[i]], built@data[[i]]))
-    hybrid_decline(layers[[i]], data, layout) %||% NA_character_
+    hybrid_choice(layers[[i]], data, layout)$reason %||% NA_character_
   }, character(1))
   geom <- vapply(layers, function(l) class(l$geom)[1], character(1))
   engine <- ifelse(is.na(reason), "rust", "ggplot2")
@@ -225,12 +255,64 @@ hybrid_layer <- function(layer) {
     polygons = draw_polygons_layer,
     NULL
   )
-  if (is.null(draw)) {
+  if (is.null(draw) && !hybrid_marks_kind(layer)) {
     return(layer)
   }
   ggplot2::ggproto(NULL, layer,
-    draw_geom = function(self, data, layout) draw(data, layout, layer)
+    draw_geom = function(self, data, layout) {
+      if (!is.null(draw) && hybrid_cartesian(layout$coord)) {
+        draw(data, layout, layer)
+      } else {
+        draw_marks_layer(data, layout, layer)
+      }
+    }
   )
+}
+
+# The hybrid tier's own drawers (points, rects, paths, polygons) take an
+# unreversed coord_cartesian(); other coords, and the geoms the full tier
+# draws that have no drawer of their own, go to the "marks" drawer
+# (draw_marks_layer()).
+hybrid_cartesian <- function(coord) identical(class(coord), class(ggplot2::coord_cartesian()))
+
+# Whether the "marks" drawer can draw a layer's geom: the full tier's
+# drawers except text and labels, which ggplot2 draws in the hybrid tier
+# (R6.1: ragg draws a page's few text grobs faster than a raster per grob).
+hybrid_marks_kind <- function(layer) {
+  kind <- full_kind(layer)
+  !is.null(kind) && !kind %in% c("text", "label")
+}
+
+# How the hybrid tier draws a layer, given its data from hybrid_data():
+# `drawer` ("points", "rects", "paths", "polygons" or "marks"), or the
+# `reason` ggplot2 draws it. hybrid_layer() picks the drawer the same way,
+# and each drawer makes the same check, so coverage and drawing agree.
+hybrid_choice <- function(layer, data, layout) {
+  kind <- hybrid_kind(layer)
+  if (!is.null(kind) && hybrid_cartesian(layout$coord)) {
+    reason <- hybrid_decline(layer, data, layout, kind)
+    return(if (is.null(reason)) list(drawer = kind) else list(reason = reason))
+  }
+  full <- full_kind(layer)
+  if (is.null(full)) {
+    return(list(reason = hybrid_decline(layer, data, layout, NULL)))
+  }
+  if (!hybrid_marks_kind(layer)) {
+    return(list(reason = "text is drawn by ggplot2 in the hybrid tier"))
+  }
+  reason <- marks_decline(layer, data, layout, full)
+  if (is.null(reason)) list(drawer = "marks") else list(reason = reason)
+}
+
+# Why the "marks" drawer can't draw a layer of full-tier kind `kind`, or
+# NULL: the full tier's own checks for the layer (hybrid_decline(full =
+# TRUE), and full_transform_check() for coord_transform()).
+marks_decline <- function(layer, data, layout, kind) {
+  reason <- hybrid_decline(layer, data, layout, kind, full = TRUE)
+  if (is.null(reason) && inherits(layout$coord, "CoordTransform")) {
+    reason <- full_transform_check(layout, list(list(kind = kind, data = data)))
+  }
+  reason
 }
 
 # The geom that draws a layer's panels: a layer's `key_glyph` makes its geom
@@ -272,8 +354,10 @@ hybrid_kind <- function(layer) {
 
 # The drawer the full tier has for a layer's geom: the hybrid tier's, and
 # GeomText's draw_panel (text is drawn by ggplot2 in the hybrid tier).
-# GeomRibbon's draw_group (GeomArea, GeomDensity) and GeomSmooth's are
-# drawn in the full tier only ("ribbons", "smooth"; R6.5a).
+# GeomRibbon's draw_group (GeomArea, GeomDensity) and GeomSmooth's
+# ("ribbons", "smooth"; R6.5a) and the kinds below have no hybrid drawer of
+# their own: the hybrid tier draws them with the full tier's specs
+# (draw_marks_layer(), R7.1).
 full_kind <- function(layer) {
   kind <- hybrid_kind(layer)
   if (!is.null(kind)) {
@@ -781,6 +865,54 @@ draw_polygons_layer <- function(data, layout, layer) {
   path_grobs("polygons", shared, data, layout, "geom_polygon")
 }
 
+# Mirrors Layer$draw_geom and Geom$draw_layer (ggplot2 R/layer.R,
+# R/geom-.R) for the geoms the full tier draws: one lazy grob per panel
+# drawing the panel's marks as the full tier builds them
+# (full_layer_specs(), R/render-full.R) and draws them in a panel
+# (rs_render_panel_layers()). The specs depend on the device's resolution,
+# so they are built at draw time, once per resolution for all panels.
+draw_marks_layer <- function(data, layout, layer) {
+  params <- layer$computed_geom_params
+  if (gg_empty(data)) {
+    return(layer$draw_geom(data, layout))
+  }
+  kind <- full_kind(layer)
+  data <- point_handle_na(layer, data)
+  if (identical(kind, "points")) data$shape <- gg_translate_shape_string(data$shape)
+  if (!is.null(marks_decline(layer, data, layout, kind))) {
+    return(layer$geom$draw_layer(data, params, layout, layout$coord))
+  }
+  if (identical(kind, "paths")) path_messages(layer, data)
+  n_panels <- length(layout$panel_params)
+  pair <- paste(layout$layout$SCALE_X, layout$layout$SCALE_Y)
+  shared <- list(
+    layer = layer, full_kind = kind, data = data, layout = layout, coord = layout$coord,
+    geom = layer$geom, params = params, n_panels = n_panels, scales = match(pair, unique(pair)),
+    panel = as.integer(data$PANEL), cache = new.env(parent = emptyenv())
+  )
+  counts <- tabulate(shared$panel, n_panels)
+  lapply(seq_len(n_panels), function(i) {
+    if (counts[i] == 0) {
+      return(ggplot2::zeroGrob())
+    }
+    hybrid_grob("marks", shared, i, layout$panel_params[[i]], paste0("geom_", kind))
+  })
+}
+
+# The full tier's specs of a "marks" grob's layer at resolution `res`, or
+# NULL where it declines them (an unparsed colour, say).
+marks_specs <- function(s, res) {
+  key <- format(res, digits = 15)
+  if (!exists(key, envir = s$cache, inherits = FALSE)) {
+    specs <- tryCatch(
+      full_layer_specs(s$layer, s$full_kind, s$data, s$layout, res, s$n_panels, s$scales),
+      alot_layout_decline = function(e) NULL
+    )
+    assign(key, specs, envir = s$cache)
+  }
+  get(key, envir = s$cache, inherits = FALSE)
+}
+
 # Packed RGBA for the Rust drawers, as col2rgb(scales::alpha(colour, alpha),
 # alpha = TRUE). Rust decodes colours as farver does (hex, names,
 # "transparent", NA); what it declines (farver's numeric palette indices,
@@ -850,7 +982,8 @@ drawDetails.alot_hybrid_layer <- function(x, recording) {
   tr <- grid::current.transform()
   x_range <- linear_range(x$panel_params$x)
   y_range <- linear_range(x$panel_params$y)
-  if (is.null(res) || tr[1, 2] != 0 || tr[2, 1] != 0 || is.null(x_range) || is.null(y_range)) {
+  linear <- identical(x$kind, "marks") || (!is.null(x_range) && !is.null(y_range))
+  if (is.null(res) || tr[1, 2] != 0 || tr[2, 1] != 0 || !linear) {
     return(grid::grid.draw(hybrid_fallback_grob(x)))
   }
 
@@ -888,7 +1021,11 @@ drawDetails.alot_hybrid_layer <- function(x, recording) {
       s$x, s$y, rows, s$path_rows[[x$panel]], s$ring_rows[[x$panel]],
       s$colour, s$fill, as.double(s$lwd), as.double(s$lty), s$style, s$mitre,
       x_range, y_range, rect, dims, res, render_threads()
-    )
+    ),
+    marks = {
+      specs <- marks_specs(s, res)
+      if (!is.null(specs)) rs_render_panel_layers(specs, s$n_panels, x$panel, rect, dims, render_threads())
+    }
   )
   if (is.null(img)) {
     return(grid::grid.draw(hybrid_fallback_grob(x)))
@@ -928,7 +1065,12 @@ hybrid_fallback_grob <- function(x) {
       data, x$panel_params, s$coord, rule = s$params$rule %||% "evenodd",
       lineend = s$params$lineend %||% "butt", linejoin = s$params$linejoin %||% "round",
       linemitre = s$params$linemitre %||% 10
-    )
+    ),
+    # Geom$draw_layer()'s call for the panel (ggplot2 R/geom-.R).
+    marks = {
+      params <- s$params[intersect(names(s$params), s$geom$parameters())]
+      rlang::inject(s$geom$draw_panel(data, x$panel_params, s$coord, !!!params))
+    }
   )
 }
 

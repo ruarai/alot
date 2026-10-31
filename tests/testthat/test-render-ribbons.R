@@ -96,10 +96,10 @@ test_that("ribbons the full tier doesn't draw decline to another tier", {
   expect_match(reason(rb + geom_ribbon() + coord_cartesian(clip = "off")), "clip")
   sm <- data.frame(x = 1:5, y = 1:5, ymin = c(0, NA, 2, 3, 4), ymax = 2:6)
   expect_match(reason(ggplot(sm, aes(x, y, ymin = ymin, ymax = ymax)) + geom_smooth(stat = "identity")), "NA in a ribbon")
-  # No hybrid drawer: ggplot2 draws them there.
+  # The hybrid tier's marks drawer (R7.1) declines as the full tier does.
   expect_identical(tier(rb + geom_ribbon(aes(fill = x))), "ggplot2")
   expect_identical(tier(rb + geom_ribbon(aes(fill = x)) + geom_point(aes(y = hi))), "hybrid")
   cov <- alot_render_coverage(rb + geom_ribbon())
   expect_identical(cov$tier, "full")
-  expect_identical(cov$layers$engine, "ggplot2")
+  expect_identical(cov$layers$engine, "rust")
 })

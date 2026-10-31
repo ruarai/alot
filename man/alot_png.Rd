@@ -43,11 +43,13 @@ alot_png(
 \description{
 Builds `plot` with [alot_build()] (unless it is already built) and draws
 it with the first rendering tier that supports it (see
-[alot_render_coverage()]). In the hybrid tier, ggplot2 lays the plot out
-and layers with a Rust drawer are rasterised in Rust; the PNG is encoded
-in Rust. Otherwise the plot is drawn by ggplot2 on [ragg::agg_png()].
-If the hybrid tier hits an internal error, `alot_png()` warns and draws
-with ggplot2. The arguments follow [ggplot2::ggsave()]'s, and the file
+[alot_render_coverage()]). The full tier draws the whole page in Rust. In
+the hybrid tier, ggplot2 lays the plot out and layers with a Rust drawer
+are rasterised in Rust. In both the PNG is encoded in Rust. Otherwise the
+plot is drawn by ggplot2 on [ragg::agg_png()]. The first time in a
+session that a plot drops below the full tier, a message says why. If a
+tier hits an internal error, `alot_png()` warns and tries the next one
+(full, then hybrid, then ggplot2). The arguments follow [ggplot2::ggsave()]'s, and the file
 has the size, resolution and colour type `ggsave()` gives with ragg.
 }
 \seealso{

@@ -119,8 +119,22 @@ full_panels <- function(built, ir, res) {
 # ranges are one pair for every panel, or a pair per panel where scales
 # are free.
 full_layers <- function(built, ir, res) {
-  pps <- built@layout$panel_params
-  scales <- ir$layout$scales
+  n_panels <- nrow(ir$layout$panels)
+  out <- list()
+  for (i in seq_along(ir$layers)) {
+    layer <- ir$layers[[i]]
+    if (is.null(layer$kind) || nrow(layer$data) == 0) next
+    out <- c(out, full_layer_specs(built@plot@layers[[i]], layer$kind, layer$data, built@layout, res, n_panels, ir$layout$scales))
+  }
+  out
+}
+
+# The specs of one layer drawn by the full tier's drawer `kind`, given its
+# data from hybrid_data(); `scales` gives each panel's pair of scales
+# (render_ir()'s `layout$scales`). Also drawn a panel at a time by the
+# hybrid tier's "marks" drawer (draw_marks_layer(), R/render.R).
+full_layer_specs <- function(layer, kind, data, layout, res, n_panels, scales) {
+  pps <- layout$panel_params
   first <- match(seq_len(max(scales)), scales)
   pair <- function(aes) {
     r <- lapply(pps[first], function(pp) as.double(linear_range(pp[[aes]])))
@@ -129,53 +143,41 @@ full_layers <- function(built, ir, res) {
   # coord_flip(): the drawers work in data space (as the geoms decompose
   # before Coord$transform()), so data x takes the vertical scale's range;
   # full_flip() then swaps the marks' axes.
-  flip <- inherits(built@layout$coord, "CoordFlip")
-  trans <- inherits(built@layout$coord, "CoordTransform")
+  flip <- inherits(layout$coord, "CoordFlip")
+  trans <- inherits(layout$coord, "CoordTransform")
   ranges <- if (flip) list(x_range = pair("y"), y_range = pair("x")) else list(x_range = pair("x"), y_range = pair("y"))
-  n_panels <- nrow(ir$layout$panels)
-  out <- list()
-  for (i in seq_along(ir$layers)) {
-    layer <- ir$layers[[i]]
-    if (is.null(layer$kind) || nrow(layer$data) == 0) next
-    spec <- switch(layer$kind,
-      points = if (trans) {
-        full_points(full_transform(built, layer$data), list(x_range = c(0, 1), y_range = c(0, 1)), n_panels, res)
-      } else {
-        full_points(layer$data, ranges, n_panels, res)
-      },
-      rects = full_rects(built@plot@layers[[i]], layer$data, ranges, n_panels, res),
-      paths = full_paths(built@plot@layers[[i]], layer$data, ranges, n_panels, res),
-      text = full_text(built@plot@layers[[i]], layer$data, built@layout$coord, pps, scales, n_panels, res),
-      ribbons = full_ribbons(built@plot@layers[[i]], layer$data, ranges, n_panels, res, FALSE),
-      smooth = full_ribbons(built@plot@layers[[i]], layer$data, ranges, n_panels, res, TRUE),
-      label = {
-        out[[length(out) + 1L]] <- full_labels(built@plot@layers[[i]], layer$data, built@layout$coord, pps, scales, n_panels, res, ranges)
-        next
-      },
-      polygons = {
-        out <- c(out, full_polygons(built@plot@layers[[i]], layer$data, ranges, n_panels, res))
-        next
-      },
-      {
-        draw <- if (layer$kind %in% names(segment_kinds())) full_segments else full_range
-        out <- c(out, draw(layer$kind, built@plot@layers[[i]], layer$data, ranges, n_panels, res))
-        next
-      }
-    )
-    kind <- if (layer$kind %in% c("ribbons", "smooth")) "paths" else layer$kind
-    if (!is.null(spec)) out[[length(out) + 1L]] <- c(list(kind = kind), spec)
-  }
+  # Each drawer gives one spec (with its `kind` added here), or a list of
+  # specs already of a kind.
+  one <- function(spec, as = kind) if (!is.null(spec)) list(c(list(kind = as), spec))
+  out <- switch(kind,
+    points = one(if (trans) {
+      full_points(full_transform(layout, data), list(x_range = c(0, 1), y_range = c(0, 1)), n_panels, res)
+    } else {
+      full_points(data, ranges, n_panels, res)
+    }),
+    rects = one(full_rects(layer, data, ranges, n_panels, res)),
+    paths = one(full_paths(layer, data, ranges, n_panels, res)),
+    text = one(full_text(layer, data, layout$coord, pps, scales, n_panels, res)),
+    ribbons = one(full_ribbons(layer, data, ranges, n_panels, res, FALSE), "paths"),
+    smooth = one(full_ribbons(layer, data, ranges, n_panels, res, TRUE), "paths"),
+    label = Filter(Negate(is.null), list(full_labels(layer, data, layout$coord, pps, scales, n_panels, res, ranges))),
+    polygons = full_polygons(layer, data, ranges, n_panels, res),
+    {
+      draw <- if (kind %in% names(segment_kinds())) full_segments else full_range
+      draw(kind, layer, data, ranges, n_panels, res)
+    }
+  )
   if (flip) lapply(out, full_flip) else out
 }
 
 # CoordTransform$transform() (ggplot2 R/coord-transform.R) of each row's
 # position through its panel's params: npc, Inf squished to the edges.
-full_transform <- function(built, data) {
-  pps <- built@layout$panel_params
+full_transform <- function(layout, data) {
+  pps <- layout$panel_params
   panel <- as.integer(data$PANEL)
   for (k in unique(panel)) {
     rows <- which(panel == k)
-    data[rows, c("x", "y")] <- built@layout$coord$transform(data[rows, c("x", "y")], pps[[k]])[c("x", "y")]
+    data[rows, c("x", "y")] <- layout$coord$transform(data[rows, c("x", "y")], pps[[k]])[c("x", "y")]
   }
   data
 }
@@ -183,13 +185,13 @@ full_transform <- function(built, data) {
 # coord_transform() declines where its transformations make a drawn
 # position infinite or NaN: ggplot2 warns (warn_new_infinites()) as it
 # squishes them, which the full tier doesn't mirror.
-full_transform_check <- function(built, ir) {
-  tr <- built@layout$coord$trans
-  ranges <- unlist(lapply(built@layout$panel_params, function(pp) c(pp$x.range, pp$y.range)))
+full_transform_check <- function(layout, layers) {
+  tr <- layout$coord$trans
+  ranges <- unlist(lapply(layout$panel_params, function(pp) c(pp$x.range, pp$y.range)))
   if (any(!is.finite(ranges))) {
     return("coord_transform() makes a panel range infinite")
   }
-  for (layer in ir$layers) {
+  for (layer in layers) {
     if (is.null(layer$kind) || nrow(layer$data) == 0) next
     for (aes in c("x", "y")) {
       v <- layer$data[[aes]]
@@ -505,9 +507,7 @@ full_decline <- function(built, ir) {
   if (!all(drawn)) {
     return("layers other than geom_point(), geom_line() and the other geoms the full tier draws")
   }
-  support <- ir$support
-  # Layers without rows draw nothing.
-  support <- support[!(support$component == "layer" & (support$name == "GeomBlank" | support$reason == "no rows")), ]
+  support <- full_support(ir)
   if (nrow(support) > 0) {
     return(support$reason[1])
   }
@@ -515,7 +515,7 @@ full_decline <- function(built, ir) {
     return("coord not drawn yet")
   }
   if (ir$coord$class == "CoordTransform") {
-    reason <- full_transform_check(built, ir)
+    reason <- full_transform_check(built@layout, ir$layers)
     if (!is.null(reason)) {
       return(reason)
     }
@@ -525,6 +525,14 @@ full_decline <- function(built, ir) {
     return("axis cap")
   }
   NULL
+}
+
+# What keeps the plot out of the full tier in `ir$support`: all of it but
+# geom_blank() and layers without rows, which draw nothing.
+full_support <- function(ir) {
+  support <- ir$support
+  drop <- support$component == "layer" & (support$name == "GeomBlank" | support$reason == "no rows")
+  support[!drop, , drop = FALSE]
 }
 
 # The spec of rs_render_page() for `built` on a page of `size`; declines

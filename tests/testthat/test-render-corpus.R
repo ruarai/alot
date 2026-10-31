@@ -3,7 +3,9 @@
 # once with ggplot2 and drawn by ggplot2 + ragg and by alot at
 # render_size (helper-render.R). Plots that alot draws in one of its tiers
 # must pass expect_render_close() in that tier; the rest are reported as
-# fallbacks, with alot_render_coverage()'s reasons.
+# fallbacks, with alot_render_coverage()'s reasons. Plots are drawn in the
+# tier alot_render_coverage() reports (the full tier on, as for users);
+# ALOT_RENDER_HYBRID=1 keeps the full tier off to check the hybrid tier.
 #
 # By default one plot in `ALOT_RENDER_SAMPLE` (8) runs, spread evenly through
 # the corpus; ALOT_RENDER_FULL=1 runs them all. ALOT_RENDER_CORPUS, a regex
@@ -53,8 +55,19 @@ render_max <- c("geom_point.Rd #10" = 64, "scale_identity.Rd #1" = 48)
 render_corpus_check <- function(id, p) {
   set.seed(1)
   b <- suppressWarnings(suppressMessages(ggplot2::ggplot_build(p)))
-  cov <- render_coverage(b)
+  # Each plot is drawn in the tier alot_png() picks, which must be the one
+  # alot_render_coverage() reports, with a reason for each plot not drawn
+  # in full (R7.1). ALOT_RENDER_HYBRID=1 keeps the full tier off, to check
+  # the hybrid tier on every plot it draws.
+  withr::local_options(alot.full_tier = !identical(Sys.getenv("ALOT_RENDER_HYBRID"), "1"))
+  cov <- suppressWarnings(alot_render_coverage(b))
   render_counts$tier <- c(render_counts$tier, cov$tier)
+  if (cov$tier != "full" && nrow(cov$full) == 0) {
+    return(fail(sprintf("%s: alot_render_coverage() gives no reason the plot isn't drawn in full.", id)))
+  }
+  if (cov$tier == "ggplot2" && anyNA(cov$layers$reason)) {
+    return(fail(sprintf("%s: alot_render_coverage() gives no reason a layer is drawn by ggplot2.", id)))
+  }
   # Every plot's render IR builds (R3.1); its support table gives the
   # reasons the full tier would decline.
   ir <- tryCatch(render_ir(b), error = function(e) e)

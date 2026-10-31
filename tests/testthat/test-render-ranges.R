@@ -96,5 +96,6 @@ test_that("ranges the full tier doesn't draw decline to another tier", {
   expect_match(reason(ggplot(gap, aes(x, y, ymin = lo, ymax = hi)) + geom_linerange()), "NA in positions")
   cov <- alot_render_coverage(rg + geom_errorbar())
   expect_identical(cov$tier, "full")
-  expect_identical(cov$layers$engine, "ggplot2")
+  # The hybrid tier draws them with its marks drawer (R7.1).
+  expect_identical(cov$layers$engine, "rust")
 })
