@@ -156,7 +156,13 @@ close_device <- function(dev, old = 1L) {
       if (grepl("locked device", conditionMessage(w))) invokeRestart("muffleWarning")
     }
   )
-  if (old > 1 && old %in% grDevices::dev.list()) grDevices::dev.set(old)
+  # dev.off() already activates another open device, often `old`. R's
+  # selectDevice() invokes activation callbacks even for the current device
+  # (R src/main/devices.c); reselecting it can make RStudio redraw the plot.
+  # Restore `old` only when it still exists and is not already current.
+  if (old > 1 && old %in% grDevices::dev.list() && grDevices::dev.cur() != old) {
+    grDevices::dev.set(old)
+  }
 }
 
 # Like ggplot2::ggplot_gtable(), but layers with a Rust drawer become grobs
