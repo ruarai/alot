@@ -1,0 +1,1924 @@
+"file","id","all_rust"
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #1",FALSE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #10",FALSE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #11",FALSE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #12",FALSE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #13",FALSE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #14",FALSE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #15",TRUE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #16",TRUE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #17",TRUE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #18",TRUE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #19",FALSE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #2",TRUE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #20",FALSE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #21",FALSE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #22",FALSE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #23",FALSE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #3",TRUE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #4",TRUE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #5",TRUE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #6",TRUE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #7",TRUE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #8",TRUE
+"man-aes_colour_fill_alpha.R","aes_colour_fill_alpha.Rd #9",TRUE
+"man-aes_eval.R","aes_eval.Rd #1",TRUE
+"man-aes_eval.R","aes_eval.Rd #2",TRUE
+"man-aes_eval.R","aes_eval.Rd #3",TRUE
+"man-aes_eval.R","aes_eval.Rd #4",TRUE
+"man-aes_eval.R","aes_eval.Rd #5",FALSE
+"man-aes_eval.R","aes_eval.Rd #6",TRUE
+"man-aes_eval.R","aes_eval.Rd #7",TRUE
+"man-aes_eval.R","aes_eval.Rd #8",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #1",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #10",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #11",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #12",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #13",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #14",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #15",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #16",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #17",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #18",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #2",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #3",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #4",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #5",FALSE
+"man-aes_group_order.R","aes_group_order.Rd #6",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #7",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #8",TRUE
+"man-aes_group_order.R","aes_group_order.Rd #9",FALSE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #1",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #10",FALSE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #11",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #12",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #13",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #14",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #15",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #16",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #17",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #18",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #19",FALSE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #2",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #20",FALSE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #21",FALSE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #3",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #4",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #5",FALSE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #6",FALSE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #7",FALSE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #8",TRUE
+"man-aes_linetype_size_shape.R","aes_linetype_size_shape.Rd #9",TRUE
+"man-aes_position.R","aes_position.Rd #1",TRUE
+"man-aes_position.R","aes_position.Rd #2",TRUE
+"man-aes_position.R","aes_position.Rd #3",TRUE
+"man-aes_position.R","aes_position.Rd #4",TRUE
+"man-aes_position.R","aes_position.Rd #5",TRUE
+"man-aes_position.R","aes_position.Rd #6",TRUE
+"man-aes_position.R","aes_position.Rd #7",TRUE
+"man-aes_position.R","aes_position.Rd #8",TRUE
+"man-aes.R","aes.Rd #1",TRUE
+"man-aes.R","aes.Rd #2",TRUE
+"man-aes.R","aes.Rd #3",TRUE
+"man-aes.R","aes.Rd #4",TRUE
+"man-aes.R","aes.Rd #5",TRUE
+"man-annotate.R","annotate.Rd #1",TRUE
+"man-annotate.R","annotate.Rd #2",TRUE
+"man-annotate.R","annotate.Rd #3",TRUE
+"man-annotate.R","annotate.Rd #4",TRUE
+"man-annotate.R","annotate.Rd #5",TRUE
+"man-annotate.R","annotate.Rd #6",TRUE
+"man-annotate.R","annotate.Rd #7",TRUE
+"man-annotate.R","annotate.Rd #8",TRUE
+"man-annotate.R","annotate.Rd #9",TRUE
+"man-annotation_custom.R","annotation_custom.Rd #1",TRUE
+"man-annotation_custom.R","annotation_custom.Rd #2",TRUE
+"man-annotation_custom.R","annotation_custom.Rd #3",TRUE
+"man-annotation_custom.R","annotation_custom.Rd #4",TRUE
+"man-annotation_logticks.R","annotation_logticks.Rd #1",TRUE
+"man-annotation_logticks.R","annotation_logticks.Rd #10",FALSE
+"man-annotation_logticks.R","annotation_logticks.Rd #11",FALSE
+"man-annotation_logticks.R","annotation_logticks.Rd #2",FALSE
+"man-annotation_logticks.R","annotation_logticks.Rd #3",FALSE
+"man-annotation_logticks.R","annotation_logticks.Rd #4",FALSE
+"man-annotation_logticks.R","annotation_logticks.Rd #5",FALSE
+"man-annotation_logticks.R","annotation_logticks.Rd #6",FALSE
+"man-annotation_logticks.R","annotation_logticks.Rd #7",TRUE
+"man-annotation_logticks.R","annotation_logticks.Rd #8",TRUE
+"man-annotation_logticks.R","annotation_logticks.Rd #9",FALSE
+"man-annotation_raster.R","annotation_raster.Rd #1",TRUE
+"man-annotation_raster.R","annotation_raster.Rd #2",TRUE
+"man-annotation_raster.R","annotation_raster.Rd #3",TRUE
+"man-annotation_raster.R","annotation_raster.Rd #4",TRUE
+"man-as_labeller.R","as_labeller.Rd #1",TRUE
+"man-as_labeller.R","as_labeller.Rd #2",TRUE
+"man-as_labeller.R","as_labeller.Rd #3",TRUE
+"man-as_labeller.R","as_labeller.Rd #4",TRUE
+"man-as_labeller.R","as_labeller.Rd #5",TRUE
+"man-coord_cartesian.R","coord_cartesian.Rd #1",TRUE
+"man-coord_cartesian.R","coord_cartesian.Rd #10",TRUE
+"man-coord_cartesian.R","coord_cartesian.Rd #11",TRUE
+"man-coord_cartesian.R","coord_cartesian.Rd #2",TRUE
+"man-coord_cartesian.R","coord_cartesian.Rd #3",TRUE
+"man-coord_cartesian.R","coord_cartesian.Rd #4",TRUE
+"man-coord_cartesian.R","coord_cartesian.Rd #5",TRUE
+"man-coord_cartesian.R","coord_cartesian.Rd #6",TRUE
+"man-coord_cartesian.R","coord_cartesian.Rd #7",TRUE
+"man-coord_cartesian.R","coord_cartesian.Rd #8",TRUE
+"man-coord_cartesian.R","coord_cartesian.Rd #9",TRUE
+"man-coord_fixed.R","coord_fixed.Rd #1",TRUE
+"man-coord_fixed.R","coord_fixed.Rd #2",TRUE
+"man-coord_fixed.R","coord_fixed.Rd #3",TRUE
+"man-coord_fixed.R","coord_fixed.Rd #4",TRUE
+"man-coord_fixed.R","coord_fixed.Rd #5",TRUE
+"man-coord_flip.R","coord_flip.Rd #1",TRUE
+"man-coord_flip.R","coord_flip.Rd #2",FALSE
+"man-coord_flip.R","coord_flip.Rd #3",TRUE
+"man-coord_flip.R","coord_flip.Rd #4",FALSE
+"man-coord_flip.R","coord_flip.Rd #5",TRUE
+"man-coord_flip.R","coord_flip.Rd #6",FALSE
+"man-coord_radial.R","coord_radial.Rd #1",TRUE
+"man-coord_radial.R","coord_radial.Rd #2",FALSE
+"man-coord_radial.R","coord_radial.Rd #3",TRUE
+"man-coord_radial.R","coord_radial.Rd #4",FALSE
+"man-coord_radial.R","coord_radial.Rd #5",FALSE
+"man-coord_radial.R","coord_radial.Rd #6",FALSE
+"man-coord_radial.R","coord_radial.Rd #7",FALSE
+"man-coord_radial.R","coord_radial.Rd #8",FALSE
+"man-coord_radial.R","coord_radial.Rd #9",FALSE
+"man-coord_transform.R","coord_transform.Rd #1",TRUE
+"man-coord_transform.R","coord_transform.Rd #10",FALSE
+"man-coord_transform.R","coord_transform.Rd #2",TRUE
+"man-coord_transform.R","coord_transform.Rd #3",FALSE
+"man-coord_transform.R","coord_transform.Rd #4",TRUE
+"man-coord_transform.R","coord_transform.Rd #5",FALSE
+"man-coord_transform.R","coord_transform.Rd #6",FALSE
+"man-coord_transform.R","coord_transform.Rd #7",TRUE
+"man-coord_transform.R","coord_transform.Rd #8",TRUE
+"man-coord_transform.R","coord_transform.Rd #9",FALSE
+"man-Coord.R","Coord.Rd #1",FALSE
+"man-draw_key.R","draw_key.Rd #1",FALSE
+"man-draw_key.R","draw_key.Rd #2",FALSE
+"man-draw_key.R","draw_key.Rd #3",FALSE
+"man-element.R","element.Rd #1",TRUE
+"man-element.R","element.Rd #2",TRUE
+"man-element.R","element.Rd #3",TRUE
+"man-element.R","element.Rd #4",TRUE
+"man-element.R","element.Rd #5",TRUE
+"man-element.R","element.Rd #6",TRUE
+"man-expand_limits.R","expand_limits.Rd #1",TRUE
+"man-expand_limits.R","expand_limits.Rd #2",TRUE
+"man-expand_limits.R","expand_limits.Rd #3",TRUE
+"man-expand_limits.R","expand_limits.Rd #4",TRUE
+"man-expand_limits.R","expand_limits.Rd #5",TRUE
+"man-expand_limits.R","expand_limits.Rd #6",TRUE
+"man-expansion.R","expansion.Rd #1",TRUE
+"man-expansion.R","expansion.Rd #2",TRUE
+"man-expansion.R","expansion.Rd #3",TRUE
+"man-facet_grid.R","facet_grid.Rd #1",TRUE
+"man-facet_grid.R","facet_grid.Rd #10",TRUE
+"man-facet_grid.R","facet_grid.Rd #11",FALSE
+"man-facet_grid.R","facet_grid.Rd #12",FALSE
+"man-facet_grid.R","facet_grid.Rd #13",FALSE
+"man-facet_grid.R","facet_grid.Rd #2",TRUE
+"man-facet_grid.R","facet_grid.Rd #3",TRUE
+"man-facet_grid.R","facet_grid.Rd #4",TRUE
+"man-facet_grid.R","facet_grid.Rd #5",TRUE
+"man-facet_grid.R","facet_grid.Rd #6",TRUE
+"man-facet_grid.R","facet_grid.Rd #7",TRUE
+"man-facet_grid.R","facet_grid.Rd #8",TRUE
+"man-facet_grid.R","facet_grid.Rd #9",TRUE
+"man-facet_null.R","facet_null.Rd #1",TRUE
+"man-facet_wrap.R","facet_wrap.Rd #1",TRUE
+"man-facet_wrap.R","facet_wrap.Rd #10",FALSE
+"man-facet_wrap.R","facet_wrap.Rd #11",TRUE
+"man-facet_wrap.R","facet_wrap.Rd #2",TRUE
+"man-facet_wrap.R","facet_wrap.Rd #3",TRUE
+"man-facet_wrap.R","facet_wrap.Rd #4",TRUE
+"man-facet_wrap.R","facet_wrap.Rd #5",TRUE
+"man-facet_wrap.R","facet_wrap.Rd #6",TRUE
+"man-facet_wrap.R","facet_wrap.Rd #7",TRUE
+"man-facet_wrap.R","facet_wrap.Rd #8",TRUE
+"man-facet_wrap.R","facet_wrap.Rd #9",TRUE
+"man-geom_abline.R","geom_abline.Rd #1",TRUE
+"man-geom_abline.R","geom_abline.Rd #10",TRUE
+"man-geom_abline.R","geom_abline.Rd #11",TRUE
+"man-geom_abline.R","geom_abline.Rd #2",TRUE
+"man-geom_abline.R","geom_abline.Rd #3",TRUE
+"man-geom_abline.R","geom_abline.Rd #4",TRUE
+"man-geom_abline.R","geom_abline.Rd #5",TRUE
+"man-geom_abline.R","geom_abline.Rd #6",TRUE
+"man-geom_abline.R","geom_abline.Rd #7",TRUE
+"man-geom_abline.R","geom_abline.Rd #8",TRUE
+"man-geom_abline.R","geom_abline.Rd #9",TRUE
+"man-geom_bar.R","geom_bar.Rd #1",FALSE
+"man-geom_bar.R","geom_bar.Rd #10",TRUE
+"man-geom_bar.R","geom_bar.Rd #11",FALSE
+"man-geom_bar.R","geom_bar.Rd #12",FALSE
+"man-geom_bar.R","geom_bar.Rd #2",TRUE
+"man-geom_bar.R","geom_bar.Rd #3",TRUE
+"man-geom_bar.R","geom_bar.Rd #4",TRUE
+"man-geom_bar.R","geom_bar.Rd #5",TRUE
+"man-geom_bar.R","geom_bar.Rd #6",TRUE
+"man-geom_bar.R","geom_bar.Rd #7",TRUE
+"man-geom_bar.R","geom_bar.Rd #8",TRUE
+"man-geom_bar.R","geom_bar.Rd #9",TRUE
+"man-geom_bin_2d.R","geom_bin_2d.Rd #1",TRUE
+"man-geom_bin_2d.R","geom_bin_2d.Rd #2",TRUE
+"man-geom_bin_2d.R","geom_bin_2d.Rd #3",TRUE
+"man-geom_bin_2d.R","geom_bin_2d.Rd #4",TRUE
+"man-geom_bin_2d.R","geom_bin_2d.Rd #5",TRUE
+"man-geom_blank.R","geom_blank.Rd #1",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #1",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #10",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #11",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #12",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #13",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #2",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #3",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #4",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #5",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #6",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #7",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #8",TRUE
+"man-geom_boxplot.R","geom_boxplot.Rd #9",TRUE
+"man-geom_contour.R","geom_contour.Rd #1",TRUE
+"man-geom_contour.R","geom_contour.Rd #10",TRUE
+"man-geom_contour.R","geom_contour.Rd #11",FALSE
+"man-geom_contour.R","geom_contour.Rd #2",TRUE
+"man-geom_contour.R","geom_contour.Rd #4",TRUE
+"man-geom_contour.R","geom_contour.Rd #5",TRUE
+"man-geom_contour.R","geom_contour.Rd #6",TRUE
+"man-geom_contour.R","geom_contour.Rd #7",TRUE
+"man-geom_contour.R","geom_contour.Rd #8",TRUE
+"man-geom_contour.R","geom_contour.Rd #9",TRUE
+"man-geom_count.R","geom_count.Rd #1",TRUE
+"man-geom_count.R","geom_count.Rd #2",FALSE
+"man-geom_count.R","geom_count.Rd #3",FALSE
+"man-geom_count.R","geom_count.Rd #4",TRUE
+"man-geom_count.R","geom_count.Rd #5",FALSE
+"man-geom_count.R","geom_count.Rd #6",FALSE
+"man-geom_count.R","geom_count.Rd #7",FALSE
+"man-geom_count.R","geom_count.Rd #8",FALSE
+"man-geom_density_2d.R","geom_density_2d.Rd #1",TRUE
+"man-geom_density_2d.R","geom_density_2d.Rd #5",TRUE
+"man-geom_density.R","geom_density.Rd #1",TRUE
+"man-geom_density.R","geom_density.Rd #10",TRUE
+"man-geom_density.R","geom_density.Rd #2",TRUE
+"man-geom_density.R","geom_density.Rd #3",TRUE
+"man-geom_density.R","geom_density.Rd #4",TRUE
+"man-geom_density.R","geom_density.Rd #5",TRUE
+"man-geom_density.R","geom_density.Rd #6",TRUE
+"man-geom_density.R","geom_density.Rd #7",TRUE
+"man-geom_density.R","geom_density.Rd #8",TRUE
+"man-geom_density.R","geom_density.Rd #9",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #1",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #10",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #11",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #12",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #13",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #14",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #15",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #16",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #17",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #2",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #3",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #4",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #5",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #6",FALSE
+"man-geom_dotplot.R","geom_dotplot.Rd #7",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #8",TRUE
+"man-geom_dotplot.R","geom_dotplot.Rd #9",TRUE
+"man-geom_function.R","geom_function.Rd #1",TRUE
+"man-geom_function.R","geom_function.Rd #10",TRUE
+"man-geom_function.R","geom_function.Rd #11",TRUE
+"man-geom_function.R","geom_function.Rd #12",TRUE
+"man-geom_function.R","geom_function.Rd #2",FALSE
+"man-geom_function.R","geom_function.Rd #3",TRUE
+"man-geom_function.R","geom_function.Rd #4",TRUE
+"man-geom_function.R","geom_function.Rd #5",TRUE
+"man-geom_function.R","geom_function.Rd #6",TRUE
+"man-geom_function.R","geom_function.Rd #7",TRUE
+"man-geom_function.R","geom_function.Rd #8",TRUE
+"man-geom_function.R","geom_function.Rd #9",TRUE
+"man-geom_hex.R","geom_hex.Rd #1",TRUE
+"man-geom_hex.R","geom_hex.Rd #2",FALSE
+"man-geom_hex.R","geom_hex.Rd #3",FALSE
+"man-geom_hex.R","geom_hex.Rd #4",FALSE
+"man-geom_hex.R","geom_hex.Rd #5",FALSE
+"man-geom_hex.R","geom_hex.Rd #6",FALSE
+"man-geom_histogram.R","geom_histogram.Rd #1",TRUE
+"man-geom_histogram.R","geom_histogram.Rd #10",TRUE
+"man-geom_histogram.R","geom_histogram.Rd #11",TRUE
+"man-geom_histogram.R","geom_histogram.Rd #2",TRUE
+"man-geom_histogram.R","geom_histogram.Rd #3",TRUE
+"man-geom_histogram.R","geom_histogram.Rd #4",TRUE
+"man-geom_histogram.R","geom_histogram.Rd #5",FALSE
+"man-geom_histogram.R","geom_histogram.Rd #6",TRUE
+"man-geom_histogram.R","geom_histogram.Rd #7",TRUE
+"man-geom_histogram.R","geom_histogram.Rd #8",TRUE
+"man-geom_histogram.R","geom_histogram.Rd #9",TRUE
+"man-geom_jitter.R","geom_jitter.Rd #1",TRUE
+"man-geom_jitter.R","geom_jitter.Rd #2",TRUE
+"man-geom_jitter.R","geom_jitter.Rd #3",TRUE
+"man-geom_jitter.R","geom_jitter.Rd #4",TRUE
+"man-geom_jitter.R","geom_jitter.Rd #5",TRUE
+"man-geom_jitter.R","geom_jitter.Rd #6",TRUE
+"man-geom_jitter.R","geom_jitter.Rd #7",TRUE
+"man-geom_jitter.R","geom_jitter.Rd #8",TRUE
+"man-geom_linerange.R","geom_linerange.Rd #1",TRUE
+"man-geom_linerange.R","geom_linerange.Rd #10",TRUE
+"man-geom_linerange.R","geom_linerange.Rd #11",TRUE
+"man-geom_linerange.R","geom_linerange.Rd #2",TRUE
+"man-geom_linerange.R","geom_linerange.Rd #3",TRUE
+"man-geom_linerange.R","geom_linerange.Rd #4",TRUE
+"man-geom_linerange.R","geom_linerange.Rd #5",TRUE
+"man-geom_linerange.R","geom_linerange.Rd #6",TRUE
+"man-geom_linerange.R","geom_linerange.Rd #7",TRUE
+"man-geom_linerange.R","geom_linerange.Rd #8",TRUE
+"man-geom_linerange.R","geom_linerange.Rd #9",TRUE
+"man-geom_map.R","geom_map.Rd #1",TRUE
+"man-geom_map.R","geom_map.Rd #2",FALSE
+"man-geom_map.R","geom_map.Rd #3",FALSE
+"man-geom_path.R","geom_path.Rd #1",FALSE
+"man-geom_path.R","geom_path.Rd #10",FALSE
+"man-geom_path.R","geom_path.Rd #11",FALSE
+"man-geom_path.R","geom_path.Rd #12",FALSE
+"man-geom_path.R","geom_path.Rd #13",TRUE
+"man-geom_path.R","geom_path.Rd #14",TRUE
+"man-geom_path.R","geom_path.Rd #15",TRUE
+"man-geom_path.R","geom_path.Rd #16",TRUE
+"man-geom_path.R","geom_path.Rd #17",TRUE
+"man-geom_path.R","geom_path.Rd #18",TRUE
+"man-geom_path.R","geom_path.Rd #19",TRUE
+"man-geom_path.R","geom_path.Rd #2",FALSE
+"man-geom_path.R","geom_path.Rd #20",TRUE
+"man-geom_path.R","geom_path.Rd #21",TRUE
+"man-geom_path.R","geom_path.Rd #3",FALSE
+"man-geom_path.R","geom_path.Rd #4",FALSE
+"man-geom_path.R","geom_path.Rd #5",FALSE
+"man-geom_path.R","geom_path.Rd #6",TRUE
+"man-geom_path.R","geom_path.Rd #7",TRUE
+"man-geom_path.R","geom_path.Rd #8",TRUE
+"man-geom_path.R","geom_path.Rd #9",FALSE
+"man-geom_point.R","geom_point.Rd #1",TRUE
+"man-geom_point.R","geom_point.Rd #10",TRUE
+"man-geom_point.R","geom_point.Rd #11",TRUE
+"man-geom_point.R","geom_point.Rd #12",TRUE
+"man-geom_point.R","geom_point.Rd #13",TRUE
+"man-geom_point.R","geom_point.Rd #14",FALSE
+"man-geom_point.R","geom_point.Rd #15",TRUE
+"man-geom_point.R","geom_point.Rd #16",TRUE
+"man-geom_point.R","geom_point.Rd #17",TRUE
+"man-geom_point.R","geom_point.Rd #2",TRUE
+"man-geom_point.R","geom_point.Rd #3",TRUE
+"man-geom_point.R","geom_point.Rd #4",TRUE
+"man-geom_point.R","geom_point.Rd #5",FALSE
+"man-geom_point.R","geom_point.Rd #6",TRUE
+"man-geom_point.R","geom_point.Rd #7",TRUE
+"man-geom_point.R","geom_point.Rd #8",TRUE
+"man-geom_point.R","geom_point.Rd #9",TRUE
+"man-geom_polygon.R","geom_polygon.Rd #1",TRUE
+"man-geom_polygon.R","geom_polygon.Rd #2",TRUE
+"man-geom_polygon.R","geom_polygon.Rd #3",FALSE
+"man-geom_polygon.R","geom_polygon.Rd #4",TRUE
+"man-geom_polygon.R","geom_polygon.Rd #5",TRUE
+"man-geom_qq.R","geom_qq.Rd #1",FALSE
+"man-geom_qq.R","geom_qq.Rd #2",TRUE
+"man-geom_qq.R","geom_qq.Rd #3",TRUE
+"man-geom_qq.R","geom_qq.Rd #4",TRUE
+"man-geom_qq.R","geom_qq.Rd #5",TRUE
+"man-geom_quantile.R","geom_quantile.Rd #1",TRUE
+"man-geom_quantile.R","geom_quantile.Rd #2",TRUE
+"man-geom_quantile.R","geom_quantile.Rd #3",TRUE
+"man-geom_quantile.R","geom_quantile.Rd #4",TRUE
+"man-geom_quantile.R","geom_quantile.Rd #5",TRUE
+"man-geom_quantile.R","geom_quantile.Rd #6",TRUE
+"man-geom_quantile.R","geom_quantile.Rd #7",TRUE
+"man-geom_ribbon.R","geom_ribbon.Rd #1",FALSE
+"man-geom_ribbon.R","geom_ribbon.Rd #2",TRUE
+"man-geom_ribbon.R","geom_ribbon.Rd #3",TRUE
+"man-geom_ribbon.R","geom_ribbon.Rd #4",TRUE
+"man-geom_ribbon.R","geom_ribbon.Rd #5",TRUE
+"man-geom_ribbon.R","geom_ribbon.Rd #6",TRUE
+"man-geom_ribbon.R","geom_ribbon.Rd #7",TRUE
+"man-geom_ribbon.R","geom_ribbon.Rd #8",TRUE
+"man-geom_ribbon.R","geom_ribbon.Rd #9",TRUE
+"man-geom_rug.R","geom_rug.Rd #1",TRUE
+"man-geom_rug.R","geom_rug.Rd #10",TRUE
+"man-geom_rug.R","geom_rug.Rd #2",TRUE
+"man-geom_rug.R","geom_rug.Rd #3",TRUE
+"man-geom_rug.R","geom_rug.Rd #4",TRUE
+"man-geom_rug.R","geom_rug.Rd #5",TRUE
+"man-geom_rug.R","geom_rug.Rd #6",TRUE
+"man-geom_rug.R","geom_rug.Rd #7",TRUE
+"man-geom_rug.R","geom_rug.Rd #8",TRUE
+"man-geom_rug.R","geom_rug.Rd #9",TRUE
+"man-geom_segment.R","geom_segment.Rd #1",TRUE
+"man-geom_segment.R","geom_segment.Rd #2",FALSE
+"man-geom_segment.R","geom_segment.Rd #3",TRUE
+"man-geom_segment.R","geom_segment.Rd #4",TRUE
+"man-geom_segment.R","geom_segment.Rd #5",TRUE
+"man-geom_segment.R","geom_segment.Rd #6",TRUE
+"man-geom_segment.R","geom_segment.Rd #7",TRUE
+"man-geom_smooth.R","geom_smooth.Rd #1",TRUE
+"man-geom_smooth.R","geom_smooth.Rd #2",TRUE
+"man-geom_smooth.R","geom_smooth.Rd #3",TRUE
+"man-geom_smooth.R","geom_smooth.Rd #4",TRUE
+"man-geom_smooth.R","geom_smooth.Rd #5",TRUE
+"man-geom_smooth.R","geom_smooth.Rd #6",TRUE
+"man-geom_smooth.R","geom_smooth.Rd #7",TRUE
+"man-geom_spoke.R","geom_spoke.Rd #1",TRUE
+"man-geom_spoke.R","geom_spoke.Rd #2",TRUE
+"man-geom_text.R","geom_text.Rd #1",TRUE
+"man-geom_text.R","geom_text.Rd #10",TRUE
+"man-geom_text.R","geom_text.Rd #11",TRUE
+"man-geom_text.R","geom_text.Rd #12",FALSE
+"man-geom_text.R","geom_text.Rd #13",FALSE
+"man-geom_text.R","geom_text.Rd #14",TRUE
+"man-geom_text.R","geom_text.Rd #15",TRUE
+"man-geom_text.R","geom_text.Rd #16",FALSE
+"man-geom_text.R","geom_text.Rd #17",FALSE
+"man-geom_text.R","geom_text.Rd #18",FALSE
+"man-geom_text.R","geom_text.Rd #19",FALSE
+"man-geom_text.R","geom_text.Rd #2",TRUE
+"man-geom_text.R","geom_text.Rd #20",TRUE
+"man-geom_text.R","geom_text.Rd #21",TRUE
+"man-geom_text.R","geom_text.Rd #3",TRUE
+"man-geom_text.R","geom_text.Rd #4",TRUE
+"man-geom_text.R","geom_text.Rd #5",TRUE
+"man-geom_text.R","geom_text.Rd #6",TRUE
+"man-geom_text.R","geom_text.Rd #7",TRUE
+"man-geom_text.R","geom_text.Rd #8",TRUE
+"man-geom_text.R","geom_text.Rd #9",TRUE
+"man-geom_tile.R","geom_tile.Rd #1",TRUE
+"man-geom_tile.R","geom_tile.Rd #10",TRUE
+"man-geom_tile.R","geom_tile.Rd #11",TRUE
+"man-geom_tile.R","geom_tile.Rd #12",TRUE
+"man-geom_tile.R","geom_tile.Rd #13",TRUE
+"man-geom_tile.R","geom_tile.Rd #2",TRUE
+"man-geom_tile.R","geom_tile.Rd #3",TRUE
+"man-geom_tile.R","geom_tile.Rd #4",TRUE
+"man-geom_tile.R","geom_tile.Rd #5",TRUE
+"man-geom_tile.R","geom_tile.Rd #6",TRUE
+"man-geom_tile.R","geom_tile.Rd #7",TRUE
+"man-geom_tile.R","geom_tile.Rd #8",TRUE
+"man-geom_tile.R","geom_tile.Rd #9",TRUE
+"man-geom_violin.R","geom_violin.Rd #1",TRUE
+"man-geom_violin.R","geom_violin.Rd #10",TRUE
+"man-geom_violin.R","geom_violin.Rd #11",TRUE
+"man-geom_violin.R","geom_violin.Rd #12",TRUE
+"man-geom_violin.R","geom_violin.Rd #13",TRUE
+"man-geom_violin.R","geom_violin.Rd #14",TRUE
+"man-geom_violin.R","geom_violin.Rd #2",TRUE
+"man-geom_violin.R","geom_violin.Rd #3",TRUE
+"man-geom_violin.R","geom_violin.Rd #4",TRUE
+"man-geom_violin.R","geom_violin.Rd #5",TRUE
+"man-geom_violin.R","geom_violin.Rd #6",TRUE
+"man-geom_violin.R","geom_violin.Rd #7",TRUE
+"man-geom_violin.R","geom_violin.Rd #8",TRUE
+"man-geom_violin.R","geom_violin.Rd #9",TRUE
+"man-Geom.R","Geom.Rd #1",TRUE
+"man-get_alt_text.R","get_alt_text.Rd #1",TRUE
+"man-get_alt_text.R","get_alt_text.Rd #2",TRUE
+"man-get_guide_data.R","get_guide_data.Rd #1",FALSE
+"man-get_guide_data.R","get_guide_data.Rd #2",FALSE
+"man-get_guide_data.R","get_guide_data.Rd #3",FALSE
+"man-get_strip_labels.R","get_strip_labels.Rd #1",TRUE
+"man-get_theme.R","get_theme.Rd #1",TRUE
+"man-get_theme.R","get_theme.Rd #2",TRUE
+"man-get_theme.R","get_theme.Rd #3",TRUE
+"man-get_theme.R","get_theme.Rd #4",TRUE
+"man-get_theme.R","get_theme.Rd #5",TRUE
+"man-get_theme.R","get_theme.Rd #6",TRUE
+"man-gg-add.R","gg-add.Rd #1",TRUE
+"man-gg-add.R","gg-add.Rd #2",TRUE
+"man-gg-add.R","gg-add.Rd #3",TRUE
+"man-gg-add.R","gg-add.Rd #4",TRUE
+"man-ggplot.R","ggplot.Rd #1",TRUE
+"man-ggplot.R","ggplot.Rd #2",TRUE
+"man-ggplot.R","ggplot.Rd #3",TRUE
+"man-ggtheme.R","ggtheme.Rd #1",TRUE
+"man-ggtheme.R","ggtheme.Rd #10",TRUE
+"man-ggtheme.R","ggtheme.Rd #11",TRUE
+"man-ggtheme.R","ggtheme.Rd #12",TRUE
+"man-ggtheme.R","ggtheme.Rd #13",TRUE
+"man-ggtheme.R","ggtheme.Rd #14",TRUE
+"man-ggtheme.R","ggtheme.Rd #15",TRUE
+"man-ggtheme.R","ggtheme.Rd #16",TRUE
+"man-ggtheme.R","ggtheme.Rd #17",TRUE
+"man-ggtheme.R","ggtheme.Rd #18",TRUE
+"man-ggtheme.R","ggtheme.Rd #2",TRUE
+"man-ggtheme.R","ggtheme.Rd #3",TRUE
+"man-ggtheme.R","ggtheme.Rd #4",TRUE
+"man-ggtheme.R","ggtheme.Rd #5",TRUE
+"man-ggtheme.R","ggtheme.Rd #6",TRUE
+"man-ggtheme.R","ggtheme.Rd #7",TRUE
+"man-ggtheme.R","ggtheme.Rd #8",TRUE
+"man-ggtheme.R","ggtheme.Rd #9",TRUE
+"man-guide_axis_logticks.R","guide_axis_logticks.Rd #1",TRUE
+"man-guide_axis_logticks.R","guide_axis_logticks.Rd #2",FALSE
+"man-guide_axis_logticks.R","guide_axis_logticks.Rd #3",FALSE
+"man-guide_axis_logticks.R","guide_axis_logticks.Rd #4",FALSE
+"man-guide_axis_logticks.R","guide_axis_logticks.Rd #5",FALSE
+"man-guide_axis_logticks.R","guide_axis_logticks.Rd #6",FALSE
+"man-guide_axis_logticks.R","guide_axis_logticks.Rd #7",FALSE
+"man-guide_axis_stack.R","guide_axis_stack.Rd #1",TRUE
+"man-guide_axis_stack.R","guide_axis_stack.Rd #2",FALSE
+"man-guide_axis_theta.R","guide_axis_theta.Rd #1",FALSE
+"man-guide_axis_theta.R","guide_axis_theta.Rd #2",FALSE
+"man-guide_axis.R","guide_axis.Rd #1",TRUE
+"man-guide_axis.R","guide_axis.Rd #2",FALSE
+"man-guide_axis.R","guide_axis.Rd #3",FALSE
+"man-guide_axis.R","guide_axis.Rd #4",FALSE
+"man-guide_bins.R","guide_bins.Rd #1",FALSE
+"man-guide_bins.R","guide_bins.Rd #2",FALSE
+"man-guide_bins.R","guide_bins.Rd #3",FALSE
+"man-guide_bins.R","guide_bins.Rd #4",FALSE
+"man-guide_bins.R","guide_bins.Rd #5",FALSE
+"man-guide_bins.R","guide_bins.Rd #6",FALSE
+"man-guide_colourbar.R","guide_colourbar.Rd #1",TRUE
+"man-guide_colourbar.R","guide_colourbar.Rd #10",TRUE
+"man-guide_colourbar.R","guide_colourbar.Rd #11",TRUE
+"man-guide_colourbar.R","guide_colourbar.Rd #12",TRUE
+"man-guide_colourbar.R","guide_colourbar.Rd #13",TRUE
+"man-guide_colourbar.R","guide_colourbar.Rd #14",FALSE
+"man-guide_colourbar.R","guide_colourbar.Rd #15",FALSE
+"man-guide_colourbar.R","guide_colourbar.Rd #16",FALSE
+"man-guide_colourbar.R","guide_colourbar.Rd #2",FALSE
+"man-guide_colourbar.R","guide_colourbar.Rd #3",TRUE
+"man-guide_colourbar.R","guide_colourbar.Rd #4",TRUE
+"man-guide_colourbar.R","guide_colourbar.Rd #5",TRUE
+"man-guide_colourbar.R","guide_colourbar.Rd #6",TRUE
+"man-guide_colourbar.R","guide_colourbar.Rd #7",TRUE
+"man-guide_colourbar.R","guide_colourbar.Rd #8",TRUE
+"man-guide_colourbar.R","guide_colourbar.Rd #9",TRUE
+"man-guide_coloursteps.R","guide_coloursteps.Rd #1",TRUE
+"man-guide_coloursteps.R","guide_coloursteps.Rd #2",FALSE
+"man-guide_coloursteps.R","guide_coloursteps.Rd #3",FALSE
+"man-guide_coloursteps.R","guide_coloursteps.Rd #4",FALSE
+"man-guide_coloursteps.R","guide_coloursteps.Rd #5",FALSE
+"man-guide_coloursteps.R","guide_coloursteps.Rd #6",FALSE
+"man-guide_custom.R","guide_custom.Rd #1",TRUE
+"man-guide_custom.R","guide_custom.Rd #2",TRUE
+"man-guide_custom.R","guide_custom.Rd #3",TRUE
+"man-guide_custom.R","guide_custom.Rd #4",TRUE
+"man-guide_legend.R","guide_legend.Rd #1",TRUE
+"man-guide_legend.R","guide_legend.Rd #10",TRUE
+"man-guide_legend.R","guide_legend.Rd #11",TRUE
+"man-guide_legend.R","guide_legend.Rd #12",TRUE
+"man-guide_legend.R","guide_legend.Rd #13",TRUE
+"man-guide_legend.R","guide_legend.Rd #14",TRUE
+"man-guide_legend.R","guide_legend.Rd #15",TRUE
+"man-guide_legend.R","guide_legend.Rd #2",FALSE
+"man-guide_legend.R","guide_legend.Rd #3",TRUE
+"man-guide_legend.R","guide_legend.Rd #4",TRUE
+"man-guide_legend.R","guide_legend.Rd #5",TRUE
+"man-guide_legend.R","guide_legend.Rd #6",TRUE
+"man-guide_legend.R","guide_legend.Rd #7",TRUE
+"man-guide_legend.R","guide_legend.Rd #8",TRUE
+"man-guide_legend.R","guide_legend.Rd #9",TRUE
+"man-Guide.R","Guide.Rd #1",TRUE
+"man-guides.R","guides.Rd #1",TRUE
+"man-guides.R","guides.Rd #10",TRUE
+"man-guides.R","guides.Rd #11",FALSE
+"man-guides.R","guides.Rd #2",TRUE
+"man-guides.R","guides.Rd #3",TRUE
+"man-guides.R","guides.Rd #4",TRUE
+"man-guides.R","guides.Rd #5",TRUE
+"man-guides.R","guides.Rd #6",TRUE
+"man-guides.R","guides.Rd #7",TRUE
+"man-guides.R","guides.Rd #8",TRUE
+"man-guides.R","guides.Rd #9",TRUE
+"man-label_bquote.R","label_bquote.Rd #1",TRUE
+"man-label_bquote.R","label_bquote.Rd #2",TRUE
+"man-label_bquote.R","label_bquote.Rd #3",TRUE
+"man-label_bquote.R","label_bquote.Rd #4",TRUE
+"man-labeller.R","labeller.Rd #1",TRUE
+"man-labeller.R","labeller.Rd #10",TRUE
+"man-labeller.R","labeller.Rd #2",TRUE
+"man-labeller.R","labeller.Rd #3",TRUE
+"man-labeller.R","labeller.Rd #4",TRUE
+"man-labeller.R","labeller.Rd #5",TRUE
+"man-labeller.R","labeller.Rd #6",TRUE
+"man-labeller.R","labeller.Rd #7",TRUE
+"man-labeller.R","labeller.Rd #8",TRUE
+"man-labeller.R","labeller.Rd #9",TRUE
+"man-labellers.R","labellers.Rd #1",TRUE
+"man-labellers.R","labellers.Rd #2",TRUE
+"man-labellers.R","labellers.Rd #3",TRUE
+"man-labellers.R","labellers.Rd #4",TRUE
+"man-labellers.R","labellers.Rd #5",TRUE
+"man-labellers.R","labellers.Rd #6",TRUE
+"man-labellers.R","labellers.Rd #7",TRUE
+"man-labs.R","labs.Rd #1",TRUE
+"man-labs.R","labs.Rd #2",TRUE
+"man-labs.R","labs.Rd #3",TRUE
+"man-labs.R","labs.Rd #4",TRUE
+"man-labs.R","labs.Rd #5",TRUE
+"man-labs.R","labs.Rd #6",TRUE
+"man-labs.R","labs.Rd #7",TRUE
+"man-labs.R","labs.Rd #8",TRUE
+"man-labs.R","labs.Rd #9",TRUE
+"man-layer.R","layer.Rd #1",TRUE
+"man-layer.R","layer.Rd #2",TRUE
+"man-layer.R","layer.Rd #3",TRUE
+"man-lims.R","lims.Rd #1",TRUE
+"man-lims.R","lims.Rd #2",TRUE
+"man-lims.R","lims.Rd #3",TRUE
+"man-lims.R","lims.Rd #4",TRUE
+"man-lims.R","lims.Rd #5",TRUE
+"man-lims.R","lims.Rd #6",FALSE
+"man-lims.R","lims.Rd #7",FALSE
+"man-lims.R","lims.Rd #8",FALSE
+"man-lims.R","lims.Rd #9",FALSE
+"man-make_constructor.R","make_constructor.Rd #1",TRUE
+"man-make_constructor.R","make_constructor.Rd #2",TRUE
+"man-make_constructor.R","make_constructor.Rd #3",TRUE
+"man-position_dodge.R","position_dodge.Rd #1",TRUE
+"man-position_dodge.R","position_dodge.Rd #10",TRUE
+"man-position_dodge.R","position_dodge.Rd #11",TRUE
+"man-position_dodge.R","position_dodge.Rd #12",TRUE
+"man-position_dodge.R","position_dodge.Rd #13",TRUE
+"man-position_dodge.R","position_dodge.Rd #14",TRUE
+"man-position_dodge.R","position_dodge.Rd #2",TRUE
+"man-position_dodge.R","position_dodge.Rd #3",TRUE
+"man-position_dodge.R","position_dodge.Rd #4",TRUE
+"man-position_dodge.R","position_dodge.Rd #5",TRUE
+"man-position_dodge.R","position_dodge.Rd #6",TRUE
+"man-position_dodge.R","position_dodge.Rd #7",TRUE
+"man-position_dodge.R","position_dodge.Rd #8",TRUE
+"man-position_dodge.R","position_dodge.Rd #9",TRUE
+"man-position_jitter.R","position_jitter.Rd #1",TRUE
+"man-position_jitter.R","position_jitter.Rd #2",TRUE
+"man-position_jitter.R","position_jitter.Rd #3",TRUE
+"man-position_jitter.R","position_jitter.Rd #4",TRUE
+"man-position_jitter.R","position_jitter.Rd #5",TRUE
+"man-position_jitterdodge.R","position_jitterdodge.Rd #1",TRUE
+"man-position_nudge.R","position_nudge.Rd #1",TRUE
+"man-position_nudge.R","position_nudge.Rd #2",TRUE
+"man-position_nudge.R","position_nudge.Rd #3",TRUE
+"man-position_nudge.R","position_nudge.Rd #4",TRUE
+"man-position_stack.R","position_stack.Rd #1",TRUE
+"man-position_stack.R","position_stack.Rd #10",FALSE
+"man-position_stack.R","position_stack.Rd #11",FALSE
+"man-position_stack.R","position_stack.Rd #12",FALSE
+"man-position_stack.R","position_stack.Rd #13",FALSE
+"man-position_stack.R","position_stack.Rd #14",FALSE
+"man-position_stack.R","position_stack.Rd #2",TRUE
+"man-position_stack.R","position_stack.Rd #3",TRUE
+"man-position_stack.R","position_stack.Rd #4",TRUE
+"man-position_stack.R","position_stack.Rd #5",TRUE
+"man-position_stack.R","position_stack.Rd #6",TRUE
+"man-position_stack.R","position_stack.Rd #7",TRUE
+"man-position_stack.R","position_stack.Rd #8",FALSE
+"man-position_stack.R","position_stack.Rd #9",TRUE
+"man-Position.R","Position.Rd #1",TRUE
+"man-print.ggplot.R","print.ggplot.Rd #1",TRUE
+"man-print.ggplot.R","print.ggplot.Rd #2",TRUE
+"man-print.ggplot.R","print.ggplot.Rd #3",TRUE
+"man-print.ggplot.R","print.ggplot.Rd #4",TRUE
+"man-print.ggplot.R","print.ggplot.Rd #5",TRUE
+"man-print.ggplot.R","print.ggplot.Rd #6",TRUE
+"man-qplot.R","qplot.Rd #1",TRUE
+"man-qplot.R","qplot.Rd #10",TRUE
+"man-qplot.R","qplot.Rd #11",TRUE
+"man-qplot.R","qplot.Rd #12",TRUE
+"man-qplot.R","qplot.Rd #13",TRUE
+"man-qplot.R","qplot.Rd #14",TRUE
+"man-qplot.R","qplot.Rd #15",TRUE
+"man-qplot.R","qplot.Rd #2",TRUE
+"man-qplot.R","qplot.Rd #3",FALSE
+"man-qplot.R","qplot.Rd #4",TRUE
+"man-qplot.R","qplot.Rd #5",TRUE
+"man-qplot.R","qplot.Rd #6",TRUE
+"man-qplot.R","qplot.Rd #7",TRUE
+"man-qplot.R","qplot.Rd #8",TRUE
+"man-qplot.R","qplot.Rd #9",TRUE
+"man-reexports.R","reexports.Rd #1",TRUE
+"man-reexports.R","reexports.Rd #2",TRUE
+"man-register_theme_elements.R","register_theme_elements.Rd #1",TRUE
+"man-scale_alpha.R","scale_alpha.Rd #1",FALSE
+"man-scale_alpha.R","scale_alpha.Rd #2",FALSE
+"man-scale_alpha.R","scale_alpha.Rd #3",FALSE
+"man-scale_alpha.R","scale_alpha.Rd #4",FALSE
+"man-scale_binned.R","scale_binned.Rd #1",FALSE
+"man-scale_brewer.R","scale_brewer.Rd #1",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #10",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #11",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #12",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #13",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #14",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #15",FALSE
+"man-scale_brewer.R","scale_brewer.Rd #2",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #3",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #4",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #5",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #6",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #7",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #8",TRUE
+"man-scale_brewer.R","scale_brewer.Rd #9",TRUE
+"man-scale_colour_continuous.R","scale_colour_continuous.Rd #1",TRUE
+"man-scale_colour_continuous.R","scale_colour_continuous.Rd #2",FALSE
+"man-scale_colour_continuous.R","scale_colour_continuous.Rd #3",FALSE
+"man-scale_colour_continuous.R","scale_colour_continuous.Rd #4",FALSE
+"man-scale_colour_continuous.R","scale_colour_continuous.Rd #5",FALSE
+"man-scale_colour_discrete.R","scale_colour_discrete.Rd #1",TRUE
+"man-scale_colour_discrete.R","scale_colour_discrete.Rd #2",TRUE
+"man-scale_colour_discrete.R","scale_colour_discrete.Rd #3",TRUE
+"man-scale_colour_discrete.R","scale_colour_discrete.Rd #4",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #1",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #10",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #11",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #12",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #13",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #14",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #15",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #16",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #17",FALSE
+"man-scale_continuous.R","scale_continuous.Rd #2",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #3",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #4",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #5",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #6",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #7",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #8",TRUE
+"man-scale_continuous.R","scale_continuous.Rd #9",TRUE
+"man-scale_date.R","scale_date.Rd #1",FALSE
+"man-scale_date.R","scale_date.Rd #2",FALSE
+"man-scale_date.R","scale_date.Rd #3",FALSE
+"man-scale_date.R","scale_date.Rd #4",FALSE
+"man-scale_date.R","scale_date.Rd #5",FALSE
+"man-scale_discrete.R","scale_discrete.Rd #1",TRUE
+"man-scale_discrete.R","scale_discrete.Rd #10",FALSE
+"man-scale_discrete.R","scale_discrete.Rd #11",FALSE
+"man-scale_discrete.R","scale_discrete.Rd #2",TRUE
+"man-scale_discrete.R","scale_discrete.Rd #3",TRUE
+"man-scale_discrete.R","scale_discrete.Rd #4",TRUE
+"man-scale_discrete.R","scale_discrete.Rd #5",TRUE
+"man-scale_discrete.R","scale_discrete.Rd #6",TRUE
+"man-scale_discrete.R","scale_discrete.Rd #7",TRUE
+"man-scale_discrete.R","scale_discrete.Rd #8",TRUE
+"man-scale_discrete.R","scale_discrete.Rd #9",FALSE
+"man-scale_gradient.R","scale_gradient.Rd #1",TRUE
+"man-scale_gradient.R","scale_gradient.Rd #2",TRUE
+"man-scale_gradient.R","scale_gradient.Rd #3",TRUE
+"man-scale_gradient.R","scale_gradient.Rd #4",FALSE
+"man-scale_gradient.R","scale_gradient.Rd #5",TRUE
+"man-scale_gradient.R","scale_gradient.Rd #6",TRUE
+"man-scale_gradient.R","scale_gradient.Rd #7",TRUE
+"man-scale_gradient.R","scale_gradient.Rd #8",TRUE
+"man-scale_grey.R","scale_grey.Rd #1",TRUE
+"man-scale_grey.R","scale_grey.Rd #2",TRUE
+"man-scale_grey.R","scale_grey.Rd #3",TRUE
+"man-scale_grey.R","scale_grey.Rd #4",TRUE
+"man-scale_grey.R","scale_grey.Rd #5",TRUE
+"man-scale_grey.R","scale_grey.Rd #6",TRUE
+"man-scale_hue.R","scale_hue.Rd #1",TRUE
+"man-scale_hue.R","scale_hue.Rd #10",TRUE
+"man-scale_hue.R","scale_hue.Rd #11",TRUE
+"man-scale_hue.R","scale_hue.Rd #12",TRUE
+"man-scale_hue.R","scale_hue.Rd #13",TRUE
+"man-scale_hue.R","scale_hue.Rd #14",TRUE
+"man-scale_hue.R","scale_hue.Rd #15",TRUE
+"man-scale_hue.R","scale_hue.Rd #16",TRUE
+"man-scale_hue.R","scale_hue.Rd #17",TRUE
+"man-scale_hue.R","scale_hue.Rd #18",TRUE
+"man-scale_hue.R","scale_hue.Rd #2",TRUE
+"man-scale_hue.R","scale_hue.Rd #3",TRUE
+"man-scale_hue.R","scale_hue.Rd #4",TRUE
+"man-scale_hue.R","scale_hue.Rd #5",TRUE
+"man-scale_hue.R","scale_hue.Rd #6",TRUE
+"man-scale_hue.R","scale_hue.Rd #7",TRUE
+"man-scale_hue.R","scale_hue.Rd #8",TRUE
+"man-scale_hue.R","scale_hue.Rd #9",TRUE
+"man-scale_identity.R","scale_identity.Rd #1",FALSE
+"man-scale_identity.R","scale_identity.Rd #2",TRUE
+"man-scale_identity.R","scale_identity.Rd #3",FALSE
+"man-scale_identity.R","scale_identity.Rd #4",FALSE
+"man-scale_identity.R","scale_identity.Rd #5",FALSE
+"man-scale_identity.R","scale_identity.Rd #6",FALSE
+"man-scale_identity.R","scale_identity.Rd #7",FALSE
+"man-scale_linetype.R","scale_linetype.Rd #1",FALSE
+"man-scale_linetype.R","scale_linetype.Rd #2",FALSE
+"man-scale_linetype.R","scale_linetype.Rd #3",FALSE
+"man-scale_linetype.R","scale_linetype.Rd #4",FALSE
+"man-scale_linewidth.R","scale_linewidth.Rd #1",FALSE
+"man-scale_linewidth.R","scale_linewidth.Rd #2",FALSE
+"man-scale_linewidth.R","scale_linewidth.Rd #3",FALSE
+"man-scale_linewidth.R","scale_linewidth.Rd #4",FALSE
+"man-scale_linewidth.R","scale_linewidth.Rd #5",FALSE
+"man-scale_manual.R","scale_manual.Rd #1",TRUE
+"man-scale_manual.R","scale_manual.Rd #2",TRUE
+"man-scale_manual.R","scale_manual.Rd #3",TRUE
+"man-scale_manual.R","scale_manual.Rd #4",TRUE
+"man-scale_manual.R","scale_manual.Rd #5",TRUE
+"man-scale_manual.R","scale_manual.Rd #6",TRUE
+"man-scale_manual.R","scale_manual.Rd #7",TRUE
+"man-scale_manual.R","scale_manual.Rd #8",TRUE
+"man-scale_shape.R","scale_shape.Rd #1",TRUE
+"man-scale_shape.R","scale_shape.Rd #2",TRUE
+"man-scale_shape.R","scale_shape.Rd #3",TRUE
+"man-scale_shape.R","scale_shape.Rd #4",TRUE
+"man-scale_shape.R","scale_shape.Rd #5",TRUE
+"man-scale_shape.R","scale_shape.Rd #6",FALSE
+"man-scale_size.R","scale_size.Rd #1",FALSE
+"man-scale_size.R","scale_size.Rd #2",FALSE
+"man-scale_size.R","scale_size.Rd #3",FALSE
+"man-scale_size.R","scale_size.Rd #4",FALSE
+"man-scale_size.R","scale_size.Rd #5",FALSE
+"man-scale_size.R","scale_size.Rd #6",FALSE
+"man-scale_size.R","scale_size.Rd #7",FALSE
+"man-scale_size.R","scale_size.Rd #8",FALSE
+"man-scale_steps.R","scale_steps.Rd #1",FALSE
+"man-scale_steps.R","scale_steps.Rd #2",FALSE
+"man-scale_steps.R","scale_steps.Rd #3",FALSE
+"man-scale_viridis.R","scale_viridis.Rd #1",TRUE
+"man-scale_viridis.R","scale_viridis.Rd #10",TRUE
+"man-scale_viridis.R","scale_viridis.Rd #11",TRUE
+"man-scale_viridis.R","scale_viridis.Rd #12",TRUE
+"man-scale_viridis.R","scale_viridis.Rd #13",FALSE
+"man-scale_viridis.R","scale_viridis.Rd #2",TRUE
+"man-scale_viridis.R","scale_viridis.Rd #3",TRUE
+"man-scale_viridis.R","scale_viridis.Rd #4",TRUE
+"man-scale_viridis.R","scale_viridis.Rd #5",TRUE
+"man-scale_viridis.R","scale_viridis.Rd #6",TRUE
+"man-scale_viridis.R","scale_viridis.Rd #7",TRUE
+"man-scale_viridis.R","scale_viridis.Rd #8",TRUE
+"man-scale_viridis.R","scale_viridis.Rd #9",TRUE
+"man-sec_axis.R","sec_axis.Rd #1",TRUE
+"man-sec_axis.R","sec_axis.Rd #2",FALSE
+"man-sec_axis.R","sec_axis.Rd #3",FALSE
+"man-sec_axis.R","sec_axis.Rd #4",FALSE
+"man-sec_axis.R","sec_axis.Rd #5",FALSE
+"man-sec_axis.R","sec_axis.Rd #6",FALSE
+"man-sec_axis.R","sec_axis.Rd #7",FALSE
+"man-stat_connect.R","stat_connect.Rd #1",FALSE
+"man-stat_connect.R","stat_connect.Rd #2",FALSE
+"man-stat_ecdf.R","stat_ecdf.Rd #1",TRUE
+"man-stat_ecdf.R","stat_ecdf.Rd #2",TRUE
+"man-stat_ecdf.R","stat_ecdf.Rd #3",TRUE
+"man-stat_ecdf.R","stat_ecdf.Rd #4",TRUE
+"man-stat_ellipse.R","stat_ellipse.Rd #4",TRUE
+"man-stat_identity.R","stat_identity.Rd #1",TRUE
+"man-stat_identity.R","stat_identity.Rd #2",TRUE
+"man-stat_manual.R","stat_manual.Rd #1",TRUE
+"man-stat_manual.R","stat_manual.Rd #2",TRUE
+"man-stat_manual.R","stat_manual.Rd #3",TRUE
+"man-stat_manual.R","stat_manual.Rd #4",TRUE
+"man-stat_manual.R","stat_manual.Rd #5",TRUE
+"man-stat_manual.R","stat_manual.Rd #6",TRUE
+"man-stat_manual.R","stat_manual.Rd #7",TRUE
+"man-stat_manual.R","stat_manual.Rd #8",TRUE
+"man-stat_summary_2d.R","stat_summary_2d.Rd #1",TRUE
+"man-stat_summary_2d.R","stat_summary_2d.Rd #2",TRUE
+"man-stat_summary_2d.R","stat_summary_2d.Rd #3",TRUE
+"man-stat_summary_2d.R","stat_summary_2d.Rd #4",TRUE
+"man-stat_summary_2d.R","stat_summary_2d.Rd #5",TRUE
+"man-stat_summary_2d.R","stat_summary_2d.Rd #6",TRUE
+"man-stat_summary.R","stat_summary.Rd #1",TRUE
+"man-stat_summary.R","stat_summary.Rd #10",TRUE
+"man-stat_summary.R","stat_summary.Rd #11",TRUE
+"man-stat_summary.R","stat_summary.Rd #12",TRUE
+"man-stat_summary.R","stat_summary.Rd #13",TRUE
+"man-stat_summary.R","stat_summary.Rd #14",TRUE
+"man-stat_summary.R","stat_summary.Rd #15",TRUE
+"man-stat_summary.R","stat_summary.Rd #16",TRUE
+"man-stat_summary.R","stat_summary.Rd #17",TRUE
+"man-stat_summary.R","stat_summary.Rd #18",TRUE
+"man-stat_summary.R","stat_summary.Rd #19",TRUE
+"man-stat_summary.R","stat_summary.Rd #2",TRUE
+"man-stat_summary.R","stat_summary.Rd #20",TRUE
+"man-stat_summary.R","stat_summary.Rd #3",TRUE
+"man-stat_summary.R","stat_summary.Rd #4",TRUE
+"man-stat_summary.R","stat_summary.Rd #5",TRUE
+"man-stat_summary.R","stat_summary.Rd #6",TRUE
+"man-stat_summary.R","stat_summary.Rd #7",TRUE
+"man-stat_summary.R","stat_summary.Rd #8",FALSE
+"man-stat_summary.R","stat_summary.Rd #9",TRUE
+"man-stat_unique.R","stat_unique.Rd #1",TRUE
+"man-stat_unique.R","stat_unique.Rd #2",TRUE
+"man-Stat.R","Stat.Rd #1",TRUE
+"man-subtheme.R","subtheme.Rd #1",TRUE
+"man-subtheme.R","subtheme.Rd #2",TRUE
+"man-subtheme.R","subtheme.Rd #3",TRUE
+"man-summarise_plot.R","summarise_plot.Rd #1",TRUE
+"man-theme.R","theme.Rd #1",TRUE
+"man-theme.R","theme.Rd #10",TRUE
+"man-theme.R","theme.Rd #11",TRUE
+"man-theme.R","theme.Rd #12",TRUE
+"man-theme.R","theme.Rd #13",TRUE
+"man-theme.R","theme.Rd #14",TRUE
+"man-theme.R","theme.Rd #15",TRUE
+"man-theme.R","theme.Rd #16",TRUE
+"man-theme.R","theme.Rd #17",TRUE
+"man-theme.R","theme.Rd #18",TRUE
+"man-theme.R","theme.Rd #19",TRUE
+"man-theme.R","theme.Rd #2",TRUE
+"man-theme.R","theme.Rd #20",TRUE
+"man-theme.R","theme.Rd #21",TRUE
+"man-theme.R","theme.Rd #22",TRUE
+"man-theme.R","theme.Rd #23",TRUE
+"man-theme.R","theme.Rd #24",TRUE
+"man-theme.R","theme.Rd #25",TRUE
+"man-theme.R","theme.Rd #26",TRUE
+"man-theme.R","theme.Rd #27",TRUE
+"man-theme.R","theme.Rd #28",TRUE
+"man-theme.R","theme.Rd #29",TRUE
+"man-theme.R","theme.Rd #3",TRUE
+"man-theme.R","theme.Rd #30",TRUE
+"man-theme.R","theme.Rd #31",TRUE
+"man-theme.R","theme.Rd #32",TRUE
+"man-theme.R","theme.Rd #33",TRUE
+"man-theme.R","theme.Rd #34",FALSE
+"man-theme.R","theme.Rd #4",TRUE
+"man-theme.R","theme.Rd #5",TRUE
+"man-theme.R","theme.Rd #6",TRUE
+"man-theme.R","theme.Rd #7",TRUE
+"man-theme.R","theme.Rd #8",TRUE
+"man-theme.R","theme.Rd #9",TRUE
+"man-update_defaults.R","update_defaults.Rd #1",TRUE
+"man-update_defaults.R","update_defaults.Rd #2",TRUE
+"man-update_ggplot.R","update_ggplot.Rd #1",TRUE
+"man-update_labels.R","update_labels.Rd #1",TRUE
+"man-update_labels.R","update_labels.Rd #2",TRUE
+"man-update_labels.R","update_labels.Rd #3",TRUE
+"man-update_labels.R","update_labels.Rd #4",TRUE
+"man-update_labels.R","update_labels.Rd #5",TRUE
+"man-vars.R","vars.Rd #1",TRUE
+"man-vars.R","vars.Rd #2",TRUE
+"man-vars.R","vars.Rd #3",TRUE
+"man-vars.R","vars.Rd #4",TRUE
+"man-vars.R","vars.Rd #5",TRUE
+"man-vars.R","vars.Rd #6",TRUE
+"test-add.R","test-add.R: mapping class is preserved when adding mapping objects #1",TRUE
+"test-aes-calculated.R","test-aes-calculated.R: A deprecated warning is issued when stat(var) or ..var.. is used #1",FALSE
+"test-aes-calculated.R","test-aes-calculated.R: A deprecated warning is issued when stat(var) or ..var.. is used #2",FALSE
+"test-aes-calculated.R","test-aes-calculated.R: A geom can have scaled defaults (#6135) #1",TRUE
+"test-aes-calculated.R","test-aes-calculated.R: calculated aesthetics throw warnings when lengths mismatch #1",TRUE
+"test-aes-calculated.R","test-aes-calculated.R: calculated aesthetics throw warnings when lengths mismatch #2",FALSE
+"test-aes-calculated.R","test-aes-calculated.R: calculated aesthetics throw warnings when lengths mismatch #3",TRUE
+"test-aes-grouping.R","test-aes-grouping.R: group aesthetic overrides defaults #1",TRUE
+"test-aes-grouping.R","test-aes-grouping.R: group aesthetic overrides defaults #2",TRUE
+"test-aes-grouping.R","test-aes-grouping.R: group param overrides defaults #1",TRUE
+"test-aes-grouping.R","test-aes-grouping.R: label is not used as a grouping var #1",TRUE
+"test-aes-grouping.R","test-aes-grouping.R: label is not used as a grouping var #2",TRUE
+"test-aes-grouping.R","test-aes-grouping.R: one group per combination of discrete vars #1",TRUE
+"test-aes-grouping.R","test-aes-grouping.R: one group per combination of discrete vars #2",TRUE
+"test-aes-grouping.R","test-aes-grouping.R: one group per combination of discrete vars #3",TRUE
+"test-aes-grouping.R","test-aes-grouping.R: one group per combination of discrete vars #4",TRUE
+"test-aes-setting.R","test-aes-setting.R: aesthetic parameters match length of data #1",TRUE
+"test-aes-setting.R","test-aes-setting.R: alpha affects only fill colour of solid geoms #1",TRUE
+"test-aes-setting.R","test-aes-setting.R: alpha affects only fill colour of solid geoms #2",TRUE
+"test-aes-setting.R","test-aes-setting.R: alpha affects only fill colour of solid geoms #3",TRUE
+"test-aes-setting.R","test-aes-setting.R: legend filters out aesthetics not of length 1 #1",TRUE
+"test-aes-setting.R","test-aes-setting.R: Length 1 aesthetics are recycled to 0 #1",FALSE
+"test-aes.R","test-aes.R: aes evaluated in environment where plot created #2",TRUE
+"test-aes.R","test-aes.R: aesthetics are drawn correctly #1",TRUE
+"test-aes.R","test-aes.R: aesthetics are drawn correctly #2",TRUE
+"test-aes.R","test-aes.R: aesthetics are drawn correctly #3",TRUE
+"test-aes.R","test-aes.R: aesthetics are drawn correctly #4",TRUE
+"test-aes.R","test-aes.R: alpha is drawn correctly #1",TRUE
+"test-aes.R","test-aes.R: alpha is drawn correctly #2",TRUE
+"test-aes.R","test-aes.R: labelling doesn't cause error if aesthetic is NULL #1",FALSE
+"test-aes.R","test-aes.R: quosures are squashed when creating default label for a mapping #1",FALSE
+"test-aes.R","test-aes.R: Warnings are issued when plots use discouraged extract usage within aes() #1",TRUE
+"test-annotate.R","test-annotate.R: annotation_custom() and annotation_raster() adhere to scale transforms #1",FALSE
+"test-annotate.R","test-annotate.R: annotation_custom() and annotation_raster() adhere to scale transforms #2",FALSE
+"test-annotate.R","test-annotate.R: annotation_raster() and annotation_custom() requires cartesian coordinates #1",FALSE
+"test-annotate.R","test-annotate.R: annotation_raster() and annotation_custom() requires cartesian coordinates #2",FALSE
+"test-annotate.R","test-annotate.R: dates in segment annotation work #1",FALSE
+"test-annotate.R","test-annotate.R: segment annotations transform with scales #1",FALSE
+"test-build.R","test-build.R: non-position aesthetics are mapped #1",TRUE
+"test-build.R","test-build.R: non-position aesthetics are mapped #2",TRUE
+"test-build.R","test-build.R: position aesthetics are coerced to correct type #1",TRUE
+"test-build.R","test-build.R: position aesthetics are coerced to correct type #2",FALSE
+"test-build.R","test-build.R: strings are not converted to factors #1",TRUE
+"test-build.R","test-build.R: there is one data frame for each layer #1",TRUE
+"test-build.R","test-build.R: there is one data frame for each layer #2",TRUE
+"test-build.R","test-build.R: there is one data frame for each layer #3",TRUE
+"test-coord-.R","test-coord-.R: clipping is on by default #1",FALSE
+"test-coord-.R","test-coord-.R: coord expand takes a vector #1",TRUE
+"test-coord-.R","test-coord-.R: coord expand takes a vector #2",TRUE
+"test-coord-.R","test-coord-.R: coord expand takes a vector #3",TRUE
+"test-coord-.R","test-coord-.R: guide names are not removed by `train_panel_guides()` #1",FALSE
+"test-coord-.R","test-coord-.R: guide names are not removed by `train_panel_guides()` #2",FALSE
+"test-coord-.R","test-coord-.R: message when replacing non-default coordinate system #1",TRUE
+"test-coord-cartesian.R","test-coord-cartesian.R: cartesian coords can be reversed #1",FALSE
+"test-coord-cartesian.R","test-coord-cartesian.R: cartesian coords draws correctly with clipping on or off #1",FALSE
+"test-coord-cartesian.R","test-coord-cartesian.R: cartesian coords draws correctly with clipping on or off #2",FALSE
+"test-coord-cartesian.R","test-coord-cartesian.R: cartesian coords draws correctly with clipping on or off #3",FALSE
+"test-coord-cartesian.R","test-coord-cartesian.R: cartesian coords draws correctly with limits #1",TRUE
+"test-coord-cartesian.R","test-coord-cartesian.R: cartesian coords draws correctly with limits #2",TRUE
+"test-coord-cartesian.R","test-coord-cartesian.R: cartesian coords draws correctly with limits #3",TRUE
+"test-coord-cartesian.R","test-coord-cartesian.R: clipping can be turned off and on #1",FALSE
+"test-coord-cartesian.R","test-coord-cartesian.R: clipping can be turned off and on #2",FALSE
+"test-coord-cartesian.R","test-coord-cartesian.R: clipping can be turned off and on #3",FALSE
+"test-coord-flip.R","test-coord-flip.R: secondary labels are correctly turned off #1",FALSE
+"test-coord-polar.R","test-coord-polar.R: clipping can be turned off and on #1",FALSE
+"test-coord-polar.R","test-coord-polar.R: clipping can be turned off and on #2",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_polar can have free scales in facets #1",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_polar can have free scales in facets #2",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_polar can have free scales in facets #3",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_polar can have free scales in facets #4",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_polar can have free scales in facets #5",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_polar throws informative warning about guides #1",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_radial can deal with empty breaks (#6271) #1",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_radial warns about axes #1",TRUE
+"test-coord-polar.R","test-coord-polar.R: coord_radial warns about axes #2",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_radial warns about axes #3",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_radial() draws correctly #1",TRUE
+"test-coord-polar.R","test-coord-polar.R: coord_radial() draws correctly #2",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_radial() draws correctly #3",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_radial() draws correctly #4",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_radial() draws correctly #5",FALSE
+"test-coord-polar.R","test-coord-polar.R: coord_radial()'s axis internal placement works #1",FALSE
+"test-coord-polar.R","test-coord-polar.R: Inf is squished to range #1",FALSE
+"test-coord-polar.R","test-coord-polar.R: polar coordinates draw correctly #1",FALSE
+"test-coord-polar.R","test-coord-polar.R: polar coordinates draw correctly #2",FALSE
+"test-coord-polar.R","test-coord-polar.R: polar coordinates draw correctly #3",FALSE
+"test-coord-polar.R","test-coord-polar.R: polar coordinates draw correctly #4",FALSE
+"test-coord-polar.R","test-coord-polar.R: polar coordinates draw correctly #5",FALSE
+"test-coord-polar.R","test-coord-polar.R: polar coordinates draw correctly #6",FALSE
+"test-coord-polar.R","test-coord-polar.R: radial coords can be reversed #1",TRUE
+"test-coord-polar.R","test-coord-polar.R: radial coords can be reversed #2",FALSE
+"test-coord-polar.R","test-coord-polar.R: radial coords can be reversed #3",FALSE
+"test-coord-polar.R","test-coord-polar.R: radial coords can be reversed #4",FALSE
+"test-coord-polar.R","test-coord-polar.R: when both x and y are AsIs, they are not transformed #1",TRUE
+"test-coord-polar.R","test-coord-polar.R: when both x and y are AsIs, they are not transformed #2",FALSE
+"test-coord-polar.R","test-coord-polar.R: when both x and y are AsIs, they are not transformed #3",FALSE
+"test-coord-polar.R","test-coord-polar.R: when both x and y are AsIs, they are not transformed #4",FALSE
+"test-coord-transform.R","test-coord-transform.R: basic coord_transform() plot displays both continuous and discrete axes #1",FALSE
+"test-coord-transform.R","test-coord-transform.R: coord_transform() can reverse discrete axes #1",TRUE
+"test-coord-transform.R","test-coord-transform.R: coord_transform() can reverse discrete axes #2",FALSE
+"test-coord-transform.R","test-coord-transform.R: coord_transform() expands axes identically to coord_cartesian() #1",TRUE
+"test-coord-transform.R","test-coord-transform.R: coord_transform() expands axes identically to coord_cartesian() #2",TRUE
+"test-coord-transform.R","test-coord-transform.R: coord_transform() expands axes identically to coord_cartesian() #3",FALSE
+"test-coord-transform.R","test-coord-transform.R: coord_transform() expands axes outside the domain of the axis trans #1",TRUE
+"test-coord-transform.R","test-coord-transform.R: coord_transform() expands axes outside the domain of the axis trans #2",TRUE
+"test-coord-transform.R","test-coord-transform.R: coord_transform() expands axes outside the domain of the axis trans #3",FALSE
+"test-coord-transform.R","test-coord-transform.R: coord_transform() works with the reverse transformation #1",TRUE
+"test-coord-transform.R","test-coord-transform.R: coord_transform() works with the reverse transformation #2",TRUE
+"test-coord-transform.R","test-coord-transform.R: coord_transform() works with the reverse transformation #3",FALSE
+"test-coord-transform.R","test-coord-transform.R: coord_transform(expand = FALSE) expands axes identically to coord_cartesian(expand = FALSE) #1",TRUE
+"test-coord-transform.R","test-coord-transform.R: coord_transform(expand = FALSE) expands axes identically to coord_cartesian(expand = FALSE) #2",TRUE
+"test-coord-transform.R","test-coord-transform.R: coord_transform(expand = FALSE) expands axes identically to coord_cartesian(expand = FALSE) #3",FALSE
+"test-coord-transform.R","test-coord-transform.R: coord_transform(y = 'log10') expands the x axis identically to scale_y_log10() #1",TRUE
+"test-coord-transform.R","test-coord-transform.R: coord_transform(y = 'log10') expands the x axis identically to scale_y_log10() #2",TRUE
+"test-coord-transform.R","test-coord-transform.R: coord_transform(y = 'log10') expands the x axis identically to scale_y_log10() #3",FALSE
+"test-coord-transform.R","test-coord-transform.R: no warnings are generated when original data has Inf values, but no new Inf values created from the transformation #1",FALSE
+"test-coord-transform.R","test-coord-transform.R: second axes display in coord_transform() #1",FALSE
+"test-coord-transform.R","test-coord-transform.R: transformed coords can be reversed #1",FALSE
+"test-coord-transform.R","test-coord-transform.R: warnings are generated when coord_transform() results in new infinite values #1",FALSE
+"test-coord-transform.R","test-coord-transform.R: warnings are generated when coord_transform() results in new infinite values #2",FALSE
+"test-draw-key.R","test-draw-key.R: alternative key glyphs work #1",FALSE
+"test-draw-key.R","test-draw-key.R: alternative key glyphs work #2",FALSE
+"test-draw-key.R","test-draw-key.R: horizontal key glyphs work #1",FALSE
+"test-draw-key.R","test-draw-key.R: horizontal key glyphs work #2",FALSE
+"test-draw-key.R","test-draw-key.R: horizontal key glyphs work #3",FALSE
+"test-draw-key.R","test-draw-key.R: keep_draw_key #1",TRUE
+"test-draw-key.R","test-draw-key.R: keys can communicate their size #1",TRUE
+"test-empty-data.R","test-empty-data.R: empty data overrides plot defaults #1",TRUE
+"test-empty-data.R","test-empty-data.R: empty data overrides plot defaults #2",TRUE
+"test-empty-data.R","test-empty-data.R: empty layers still generate one grob per panel #1",FALSE
+"test-empty-data.R","test-empty-data.R: layer inherits data from plot when data = NULL #1",TRUE
+"test-empty-data.R","test-empty-data.R: layers with empty data are silently omitted #1",FALSE
+"test-empty-data.R","test-empty-data.R: layers with empty data are silently omitted #2",FALSE
+"test-empty-data.R","test-empty-data.R: layers with empty data are silently omitted #3",TRUE
+"test-empty-data.R","test-empty-data.R: layers with empty data are silently omitted #4",FALSE
+"test-empty-data.R","test-empty-data.R: layers with empty data are silently omitted with facet_grid #2",FALSE
+"test-empty-data.R","test-empty-data.R: layers with empty data are silently omitted with facet_wrap #2",FALSE
+"test-empty-data.R","test-empty-data.R: missing layers generate one grob per panel #1",TRUE
+"test-empty-data.R","test-empty-data.R: missing layers generate one grob per panel #2",TRUE
+"test-empty-data.R","test-empty-data.R: plots with empty data and vectors for aesthetics work #1",TRUE
+"test-empty-data.R","test-empty-data.R: plots with empty data and vectors for aesthetics work #2",TRUE
+"test-empty-data.R","test-empty-data.R: plots with empty data and vectors for aesthetics work #3",TRUE
+"test-facet-.R","test-facet-.R: facet labels respect both justification and margin arguments #1",TRUE
+"test-facet-.R","test-facet-.R: facet labels respect both justification and margin arguments #2",TRUE
+"test-facet-.R","test-facet-.R: facet labels respect both justification and margin arguments #3",TRUE
+"test-facet-.R","test-facet-.R: facet_grid `axes` can draw inner axes. #1",TRUE
+"test-facet-.R","test-facet-.R: facet_grid `axes` can draw inner axes. #2",TRUE
+"test-facet-.R","test-facet-.R: facet_grid `axes` can draw inner axes. #3",TRUE
+"test-facet-.R","test-facet-.R: facet_wrap `axes` can draw inner axes. #1",TRUE
+"test-facet-.R","test-facet-.R: facet_wrap `axes` can draw inner axes. #2",TRUE
+"test-facet-.R","test-facet-.R: facet_wrap `axes` can draw inner axes. #3",TRUE
+"test-facet-.R","test-facet-.R: facet_wrap throws deprecation messages #1",TRUE
+"test-facet-.R","test-facet-.R: facet_wrap() accepts vars() #1",TRUE
+"test-facet-.R","test-facet-.R: facet_wrap() accepts vars() #2",TRUE
+"test-facet-.R","test-facet-.R: facet_wrap() accepts vars() #3",TRUE
+"test-facet-.R","test-facet-.R: facet_wrap()/facet_grid() compact the facet spec, and accept empty spec #1",TRUE
+"test-facet-.R","test-facet-.R: facet_wrap()/facet_grid() compact the facet spec, and accept empty spec #2",FALSE
+"test-facet-.R","test-facet-.R: facet_wrap()/facet_grid() compact the facet spec, and accept empty spec #3",FALSE
+"test-facet-.R","test-facet-.R: facet's 'axis_labels' argument correctly omits labels #1",FALSE
+"test-facet-.R","test-facet-.R: facet's 'axis_labels' argument correctly omits labels #2",FALSE
+"test-facet-.R","test-facet-.R: facet's 'axis_labels' argument correctly omits labels #3",FALSE
+"test-facet-.R","test-facet-.R: facets split up the data #1",TRUE
+"test-facet-.R","test-facet-.R: facets split up the data #2",TRUE
+"test-facet-.R","test-facet-.R: facets split up the data #3",TRUE
+"test-facet-.R","test-facet-.R: facets split up the data #4",TRUE
+"test-facet-.R","test-facet-.R: facets split up the data #5",TRUE
+"test-facet-.R","test-facet-.R: facets split up the data #6",FALSE
+"test-facet-.R","test-facet-.R: facets split up the data #7",FALSE
+"test-facet-.R","test-facet-.R: facets with free scales scale independently #1",TRUE
+"test-facet-.R","test-facet-.R: facets with free scales scale independently #2",TRUE
+"test-facet-.R","test-facet-.R: facets with free scales scale independently #3",TRUE
+"test-facet-.R","test-facet-.R: facets with free scales scale independently #4",TRUE
+"test-facet-.R","test-facet-.R: shrink parameter affects scaling #1",TRUE
+"test-facet-.R","test-facet-.R: shrink parameter affects scaling #2",TRUE
+"test-facet-.R","test-facet-.R: shrink parameter affects scaling #3",TRUE
+"test-facet-labels.R","test-facet-labels.R: as_labeller() deals with non-labellers #1",TRUE
+"test-facet-labels.R","test-facet-labels.R: as_labeller() deals with non-labellers #2",TRUE
+"test-facet-labels.R","test-facet-labels.R: as_labeller() deals with non-labellers #3",TRUE
+"test-facet-labels.R","test-facet-labels.R: labeller() dispatches labellers #1",TRUE
+"test-facet-labels.R","test-facet-labels.R: labeller() dispatches labellers #2",TRUE
+"test-facet-labels.R","test-facet-labels.R: labeller() dispatches labellers #3",TRUE
+"test-facet-labels.R","test-facet-labels.R: labeller() dispatches labellers #4",TRUE
+"test-facet-labels.R","test-facet-labels.R: labeller() dispatches labellers #5",TRUE
+"test-facet-labels.R","test-facet-labels.R: labeller() dispatches labellers #6",TRUE
+"test-facet-labels.R","test-facet-labels.R: labeller() dispatches labellers #7",TRUE
+"test-facet-labels.R","test-facet-labels.R: labeller() dispatches labellers #8",TRUE
+"test-facet-labels.R","test-facet-labels.R: outside-justified labels are justified across panels #1",FALSE
+"test-facet-labels.R","test-facet-labels.R: parsed labels are rendered correctly #1",TRUE
+"test-facet-layout.R","test-facet-layout.R: facet_grid can respect coord aspect with free scales/space #1",TRUE
+"test-facet-layout.R","test-facet-layout.R: facet_grid throws errors at bad layout specs #1",TRUE
+"test-facet-layout.R","test-facet-layout.R: facet_grid throws errors at bad layout specs #2",TRUE
+"test-facet-layout.R","test-facet-layout.R: facet_wrap and facet_grid throws errors when using reserved words #1",TRUE
+"test-facet-layout.R","test-facet-layout.R: facet_wrap throws errors at bad layout specs #2",TRUE
+"test-facet-layout.R","test-facet-layout.R: wrap: as.table = FALSE gets axes #1",TRUE
+"test-facet-layout.R","test-facet-layout.R: wrap: space = 'free_x/y' sets panel sizes #1",TRUE
+"test-facet-layout.R","test-facet-layout.R: wrap: space = 'free_x/y' sets panel sizes #2",TRUE
+"test-facet-layout.R","test-facet-layout.R: wrap: space = 'free_x/y' sets panel sizes #3",TRUE
+"test-facet-map.R","test-facet-map.R: grid: layer layout is respected #1",FALSE
+"test-facet-map.R","test-facet-map.R: wrap: layer layout is respected #1",FALSE
+"test-facet-strips.R","test-facet-strips.R: facet_grid() builds correct output #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_grid() builds correct output #2",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_grid() switches to 'x' #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_grid() switches to 'x' #2",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_grid() switches to 'y' #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_grid() switches to 'y' #2",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_grid() switches to both 'x' and 'y' #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_grid() switches to both 'x' and 'y' #2",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_grid() warns about bad switch input #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_wrap() builds correct output #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_wrap() builds correct output #2",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_wrap() switches to 'bottom' #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_wrap() switches to 'bottom' #2",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_wrap() switches to 'left' #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_wrap() switches to 'left' #2",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_wrap() switches to 'right' #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: facet_wrap() switches to 'right' #2",TRUE
+"test-facet-strips.R","test-facet-strips.R: padding is only added if axis is present #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: padding is only added if axis is present #2",TRUE
+"test-facet-strips.R","test-facet-strips.R: padding is only added if axis is present #3",TRUE
+"test-facet-strips.R","test-facet-strips.R: padding is only added if axis is present #4",TRUE
+"test-facet-strips.R","test-facet-strips.R: padding is only added if axis is present #5",TRUE
+"test-facet-strips.R","test-facet-strips.R: padding is only added if axis is present #6",TRUE
+"test-facet-strips.R","test-facet-strips.R: strip clipping can be set from the theme #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: strip labels can be accessed #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: strips can be removed #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: strips can be removed #2",TRUE
+"test-facet-strips.R","test-facet-strips.R: y strip labels are rotated when strips are switched #1",TRUE
+"test-facet-strips.R","test-facet-strips.R: y strip labels are rotated when strips are switched #2",TRUE
+"test-geom-bar.R","test-geom-bar.R: geom_bar removes bars with parts outside the plot limits #1",TRUE
+"test-geom-bar.R","test-geom-bar.R: geom_bar removes bars with parts outside the plot limits #2",TRUE
+"test-geom-bar.R","test-geom-bar.R: geom_bar works in both directions #1",TRUE
+"test-geom-bar.R","test-geom-bar.R: geom_bar works in both directions #2",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: boxes with variable widths do not overlap #1",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: boxplot draws correctly #1",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: boxplot draws correctly #2",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: boxplot draws correctly #3",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: boxplots with a group size >1 error #1",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: can use US spelling of colour #1",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: geom_boxplot range includes all outliers #1",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: geom_boxplot range includes all outliers #2",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: geom_boxplot works in both directions #1",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: geom_boxplot works in both directions #2",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: quantile.type = 7 matches default behavior (backward compatible) #1",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: quantile.type = 7 matches default behavior (backward compatible) #2",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: quantile.type changes hinges for small samples (unweighted) #1",TRUE
+"test-geom-boxplot.R","test-geom-boxplot.R: quantile.type changes hinges for small samples (unweighted) #2",TRUE
+"test-geom-col.R","test-geom-col.R: geom_col removes columns with parts outside the plot limits #1",TRUE
+"test-geom-col.R","test-geom-col.R: geom_col removes columns with parts outside the plot limits #2",TRUE
+"test-geom-col.R","test-geom-col.R: geom_col removes columns with parts outside the plot limits #3",TRUE
+"test-geom-col.R","test-geom-col.R: geom_col supports alignment of columns #1",TRUE
+"test-geom-col.R","test-geom-col.R: geom_col supports alignment of columns #2",TRUE
+"test-geom-col.R","test-geom-col.R: geom_col supports alignment of columns #3",TRUE
+"test-geom-col.R","test-geom-col.R: geom_col works in both directions #1",TRUE
+"test-geom-col.R","test-geom-col.R: geom_col works in both directions #2",TRUE
+"test-geom-curve.R","test-geom-curve.R: geom_curve flipping works #1",TRUE
+"test-geom-curve.R","test-geom-curve.R: geom_curve flipping works #2",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: binning works #1",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: binning works #2",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: dodging works #1",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #1",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #10",FALSE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #11",FALSE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #12",FALSE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #13",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #14",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #15",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #16",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #17",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #18",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #19",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #2",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #20",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #21",FALSE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #22",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #23",FALSE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #24",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #25",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #26",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #27",FALSE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #28",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #29",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #3",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #30",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #31",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #32",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #33",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #34",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #4",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #5",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #6",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #7",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #8",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: geom_dotplot draws correctly #9",FALSE
+"test-geom-dotplot.R","test-geom-dotplot.R: NA's result in warning from stat_bindot #1",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: stackratio != 1 works #1",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: weight aesthetic is checked #1",FALSE
+"test-geom-dotplot.R","test-geom-dotplot.R: weight aesthetic is checked #2",FALSE
+"test-geom-dotplot.R","test-geom-dotplot.R: when binning on y-axis, limits depend on the panel #1",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: when binning on y-axis, limits depend on the panel #2",TRUE
+"test-geom-dotplot.R","test-geom-dotplot.R: when binning on y-axis, limits depend on the panel #3",TRUE
+"test-geom-errorbar.R","test-geom-errorbar.R: geom_errorbarh throws deprecation messages #1",TRUE
+"test-geom-freqpoly.R","test-geom-freqpoly.R: can do frequency polygon with categorical x #1",TRUE
+"test-geom-hline-vline-abline.R","test-geom-hline-vline-abline.R: check h/v/abline transformed on basic projections #1",TRUE
+"test-geom-hline-vline-abline.R","test-geom-hline-vline-abline.R: check h/v/abline transformed on basic projections #2",TRUE
+"test-geom-hline-vline-abline.R","test-geom-hline-vline-abline.R: check h/v/abline transformed on basic projections #3",FALSE
+"test-geom-hline-vline-abline.R","test-geom-hline-vline-abline.R: check h/v/abline transformed on basic projections #4",FALSE
+"test-geom-hline-vline-abline.R","test-geom-hline-vline-abline.R: geom_abline is clipped to x/y ranges #1",TRUE
+"test-geom-label.R","test-geom-label.R: geom_label handles line parameters and colours #1",FALSE
+"test-geom-label.R","test-geom-label.R: geom_label() rotates labels #1",TRUE
+"test-geom-path.R","test-geom-path.R: geom_path draws correctly #1",TRUE
+"test-geom-path.R","test-geom-path.R: geom_path draws correctly #2",TRUE
+"test-geom-path.R","test-geom-path.R: geom_path draws correctly #3",TRUE
+"test-geom-path.R","test-geom-path.R: geom_path draws correctly #4",TRUE
+"test-geom-path.R","test-geom-path.R: geom_path() throws meaningful error on bad combination of varying aesthetics #1",TRUE
+"test-geom-path.R","test-geom-path.R: NA linetype is dropped with warning #1",TRUE
+"test-geom-polygon.R","test-geom-polygon.R: geom_polygon draws correctly #1",TRUE
+"test-geom-polygon.R","test-geom-polygon.R: geom_polygon is closed before munching #1",FALSE
+"test-geom-polygon.R","test-geom-polygon.R: geom_polygon is closed before munching #2",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #1",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #10",FALSE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #11",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #12",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #2",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #3",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #4",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #5",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #6",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #7",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #8",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster draws correctly #9",TRUE
+"test-geom-raster.R","test-geom-raster.R: geom_raster() checks input and coordinate system #1",FALSE
+"test-geom-raster.R","test-geom-raster.R: geom_raster() fails with pattern fills #1",TRUE
+"test-geom-ribbon.R","test-geom-ribbon.R: geom_ribbon works in both directions #1",TRUE
+"test-geom-ribbon.R","test-geom-ribbon.R: geom_ribbon works in both directions #2",TRUE
+"test-geom-ribbon.R","test-geom-ribbon.R: geom_ribbon() checks the aesthetics #3",FALSE
+"test-geom-ribbon.R","test-geom-ribbon.R: NAs are dropped from the data #1",TRUE
+"test-geom-ribbon.R","test-geom-ribbon.R: outline.type option works #1",TRUE
+"test-geom-ribbon.R","test-geom-ribbon.R: outline.type option works #2",TRUE
+"test-geom-ribbon.R","test-geom-ribbon.R: outline.type option works #3",TRUE
+"test-geom-ribbon.R","test-geom-ribbon.R: outline.type option works #4",TRUE
+"test-geom-ribbon.R","test-geom-ribbon.R: outline.type option works #5",TRUE
+"test-geom-ribbon.R","test-geom-ribbon.R: outline.type option works #6",TRUE
+"test-geom-rug.R","test-geom-rug.R: coord_flip flips the rugs #1",TRUE
+"test-geom-rug.R","test-geom-rug.R: coord_flip flips the rugs #2",FALSE
+"test-geom-rug.R","test-geom-rug.R: geom_rug() warns about missing values when na.rm = FALSE #1",TRUE
+"test-geom-rug.R","test-geom-rug.R: geom_rug() warns about missing values when na.rm = FALSE #2",FALSE
+"test-geom-rug.R","test-geom-rug.R: geom_rug() warns about missing values when na.rm = FALSE #3",FALSE
+"test-geom-rug.R","test-geom-rug.R: Rug length needs unit object #1",TRUE
+"test-geom-rug.R","test-geom-rug.R: Rug length needs unit object #2",TRUE
+"test-geom-rug.R","test-geom-rug.R: Rug length needs unit object #3",TRUE
+"test-geom-rug.R","test-geom-rug.R: Rug lengths are correct #1",TRUE
+"test-geom-rug.R","test-geom-rug.R: Rug lengths are correct #2",TRUE
+"test-geom-rule.R","test-geom-rule.R: setting aesthetics generates one row for each input row #1",TRUE
+"test-geom-rule.R","test-geom-rule.R: setting aesthetics generates one row for each input row #2",TRUE
+"test-geom-rule.R","test-geom-rule.R: setting aesthetics generates one row for each input row #3",TRUE
+"test-geom-rule.R","test-geom-rule.R: setting aesthetics generates one row for each input row #4",TRUE
+"test-geom-rule.R","test-geom-rule.R: setting aesthetics generates one row for each input row #5",TRUE
+"test-geom-rule.R","test-geom-rule.R: setting parameters makes one row df #1",TRUE
+"test-geom-rule.R","test-geom-rule.R: setting parameters makes one row df #2",TRUE
+"test-geom-rule.R","test-geom-rule.R: setting parameters makes one row df #3",TRUE
+"test-geom-rule.R","test-geom-rule.R: setting parameters makes one row df #4",TRUE
+"test-geom-rule.R","test-geom-rule.R: setting parameters makes one row df #5",TRUE
+"test-geom-rule.R","test-geom-rule.R: setting parameters makes one row df #6",TRUE
+"test-geom-smooth.R","test-geom-smooth.R: a fallback message is thrown when `method = 'gam'` and {mgcv} is absent #1",TRUE
+"test-geom-smooth.R","test-geom-smooth.R: data is ordered by x #1",TRUE
+"test-geom-smooth.R","test-geom-smooth.R: default smoothing methods for small and large data sets work #1",TRUE
+"test-geom-smooth.R","test-geom-smooth.R: default smoothing methods for small and large data sets work #2",TRUE
+"test-geom-smooth.R","test-geom-smooth.R: default smoothing methods for small and large data sets work #3",TRUE
+"test-geom-smooth.R","test-geom-smooth.R: geom_smooth works in both directions #1",TRUE
+"test-geom-smooth.R","test-geom-smooth.R: geom_smooth works in both directions #2",TRUE
+"test-geom-smooth.R","test-geom-smooth.R: geom_smooth() works when one group fails #1",TRUE
+"test-geom-smooth.R","test-geom-smooth.R: geom_smooth() works with alternative stats #1",TRUE
+"test-geom-smooth.R","test-geom-smooth.R: geom_smooth() works with alternative stats #2",TRUE
+"test-geom-text.R","test-geom-text.R: geom_text() accepts mm and pt size units #1",TRUE
+"test-geom-text.R","test-geom-text.R: geom_text() accepts mm and pt size units #2",TRUE
+"test-geom-text.R","test-geom-text.R: geom_text() accepts mm and pt size units #3",TRUE
+"test-geom-text.R","test-geom-text.R: geom_text() can display expressions #1",TRUE
+"test-geom-text.R","test-geom-text.R: geom_text() rejects exotic units #1",TRUE
+"test-geom-text.R","test-geom-text.R: geom_text() rejects exotic units #2",TRUE
+"test-geom-tile.R","test-geom-tile.R: accepts linejoin parameter #1",TRUE
+"test-geom-tile.R","test-geom-tile.R: accepts linejoin parameter #2",TRUE
+"test-geom-tile.R","test-geom-tile.R: accepts width and height aesthetics #1",TRUE
+"test-geom-tile.R","test-geom-tile.R: accepts width and height params #1",TRUE
+"test-geom-tile.R","test-geom-tile.R: accepts width and height params #2",TRUE
+"test-geom-tile.R","test-geom-tile.R: width and height are inferred per panel #1",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #1",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #10",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #11",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #12",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #13",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #14",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #2",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #3",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #4",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #5",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #6",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #7",FALSE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #8",FALSE
+"test-geom-violin.R","test-geom-violin.R: geom_violin draws correctly #9",FALSE
+"test-geom-violin.R","test-geom-violin.R: geom_violin works in both directions #1",TRUE
+"test-geom-violin.R","test-geom-violin.R: geom_violin works in both directions #2",TRUE
+"test-geom-violin.R","test-geom-violin.R: quantiles do not fail on zero-range data #1",TRUE
+"test-geom-violin.R","test-geom-violin.R: quantiles do not issue warning #1",TRUE
+"test-geom-violin.R","test-geom-violin.R: quantiles fails outside 0-1 bound #1",FALSE
+"test-geom-violin.R","test-geom-violin.R: quantiles fails outside 0-1 bound #2",FALSE
+"test-geom-violin.R","test-geom-violin.R: range is expanded #1",TRUE
+"test-ggsave.R","test-ggsave.R: ggsave can create directories #1",TRUE
+"test-ggsave.R","test-ggsave.R: ggsave creates file #1",TRUE
+"test-ggsave.R","test-ggsave.R: ggsave fails informatively for no-extension filenames #1",TRUE
+"test-ggsave.R","test-ggsave.R: ggsave restores previous graphics device #1",TRUE
+"test-ggsave.R","test-ggsave.R: ggsave warns about empty or multiple filenames #1",TRUE
+"test-guide-.R","test-guide-.R: adding guides doesn't change plot state #1",TRUE
+"test-guide-.R","test-guide-.R: adding guides doesn't change plot state #2",FALSE
+"test-guide-.R","test-guide-.R: adding guides doesn't change plot state #3",FALSE
+"test-guide-.R","test-guide-.R: plotting does not induce state changes in guides #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: a warning is generated when guides are drawn at a location that doesn't make sense #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: a warning is generated when more than one position guide is drawn at a location #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: a warning is not generated when a guide is specified with duplicate breaks #1",TRUE
+"test-guide-axis.R","test-guide-axis.R: a warning is not generated when properly changing the position of a guide_axis() #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: axis guides are drawn correctly in plots #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: axis guides are drawn correctly in plots #2",FALSE
+"test-guide-axis.R","test-guide-axis.R: axis guides are drawn correctly in plots #3",TRUE
+"test-guide-axis.R","test-guide-axis.R: axis guides can be capped #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: axis guides can be customized #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: Axis titles won't be blown away by coord_*() #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: Axis titles won't be blown away by coord_*() #2",FALSE
+"test-guide-axis.R","test-guide-axis.R: guide_axis_stack stacks axes #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: guide_axis_stack stacks axes #2",FALSE
+"test-guide-axis.R","test-guide-axis.R: guide_axis_theta can be used in cartesian coordinates #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: guide_axis_theta sets relative angle #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: guide_axis_theta with only one axis key #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: guide_axis() draws minor ticks correctly #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: guides can be specified in guides() #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: guides have the final say in x and y #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: logticks look as they should #1",FALSE
+"test-guide-axis.R","test-guide-axis.R: Using non-position guides for position scales results in an informative error #1",FALSE
+"test-guide-colorbar.R","test-guide-colorbar.R: colorbar can be styled #1",TRUE
+"test-guide-colorbar.R","test-guide-colorbar.R: colorbar can be styled #2",TRUE
+"test-guide-colorbar.R","test-guide-colorbar.R: colorbar can be styled #3",TRUE
+"test-guide-colorbar.R","test-guide-colorbar.R: Colorbar respects show.legend in layer #1",TRUE
+"test-guide-colorbar.R","test-guide-colorbar.R: Colorbar respects show.legend in layer #2",TRUE
+"test-guide-colorbar.R","test-guide-colorbar.R: guides can handle multiple aesthetics for one scale #1",TRUE
+"test-guide-legend.R","test-guide-legend.R: absent titles don't take up space #1",TRUE
+"test-guide-legend.R","test-guide-legend.R: guide_legend uses key.spacing correctly #1",TRUE
+"test-guide-legend.R","test-guide-legend.R: legend directions are set correctly #1",TRUE
+"test-guide-legend.R","test-guide-legend.R: legend directions are set correctly #2",TRUE
+"test-guide-legend.R","test-guide-legend.R: legend directions are set correctly #3",TRUE
+"test-guide-legend.R","test-guide-legend.R: legend.byrow works in `guide_legend()` #1",TRUE
+"test-guide-legend.R","test-guide-legend.R: legend.key.justification works as intended #1",FALSE
+"test-guide-legend.R","test-guide-legend.R: legends can be forced to display unrelated geoms #1",FALSE
+"test-guide-legend.R","test-guide-legend.R: show.legend handles named vectors #1",TRUE
+"test-guide-legend.R","test-guide-legend.R: show.legend handles named vectors #2",TRUE
+"test-guide-legend.R","test-guide-legend.R: show.legend handles named vectors #3",TRUE
+"test-guide-legend.R","test-guide-legend.R: show.legend handles named vectors #4",TRUE
+"test-guide-legend.R","test-guide-legend.R: size = NA doesn't throw rendering errors #1",TRUE
+"test-guide-legend.R","test-guide-legend.R: size and linewidth affect key size #1",FALSE
+"test-guide-legend.R","test-guide-legend.R: unresolved, modified expressions throw a warning (#6264) #1",TRUE
+"test-guides.R","test-guides.R: a warning is generated when guides(<scale> = FALSE) is specified #1",TRUE
+"test-guides.R","test-guides.R: bin guide can be reversed #1",TRUE
+"test-guides.R","test-guides.R: bin guide can be styled correctly #1",FALSE
+"test-guides.R","test-guides.R: bin guide can be styled correctly #2",FALSE
+"test-guides.R","test-guides.R: bin guide can be styled correctly #3",FALSE
+"test-guides.R","test-guides.R: bin guide can be styled correctly #4",FALSE
+"test-guides.R","test-guides.R: bin guide can be styled correctly #5",FALSE
+"test-guides.R","test-guides.R: binning scales understand the different combinations of limits, breaks, labels, and show.limits #1",TRUE
+"test-guides.R","test-guides.R: binning scales understand the different combinations of limits, breaks, labels, and show.limits #10",FALSE
+"test-guides.R","test-guides.R: binning scales understand the different combinations of limits, breaks, labels, and show.limits #11",FALSE
+"test-guides.R","test-guides.R: binning scales understand the different combinations of limits, breaks, labels, and show.limits #2",FALSE
+"test-guides.R","test-guides.R: binning scales understand the different combinations of limits, breaks, labels, and show.limits #3",FALSE
+"test-guides.R","test-guides.R: binning scales understand the different combinations of limits, breaks, labels, and show.limits #4",FALSE
+"test-guides.R","test-guides.R: binning scales understand the different combinations of limits, breaks, labels, and show.limits #5",FALSE
+"test-guides.R","test-guides.R: binning scales understand the different combinations of limits, breaks, labels, and show.limits #6",FALSE
+"test-guides.R","test-guides.R: binning scales understand the different combinations of limits, breaks, labels, and show.limits #7",FALSE
+"test-guides.R","test-guides.R: binning scales understand the different combinations of limits, breaks, labels, and show.limits #8",FALSE
+"test-guides.R","test-guides.R: binning scales understand the different combinations of limits, breaks, labels, and show.limits #9",FALSE
+"test-guides.R","test-guides.R: coloursteps guide can be styled correctly #1",FALSE
+"test-guides.R","test-guides.R: coloursteps guide can be styled correctly #2",FALSE
+"test-guides.R","test-guides.R: coloursteps guide can be styled correctly #3",FALSE
+"test-guides.R","test-guides.R: coloursteps guide can be styled correctly #4",FALSE
+"test-guides.R","test-guides.R: empty guides are dropped #1",TRUE
+"test-guides.R","test-guides.R: get_guide_data retrieves keys appropriately #1",FALSE
+"test-guides.R","test-guides.R: get_guide_data retrieves keys from exotic coords #1",TRUE
+"test-guides.R","test-guides.R: get_guide_data retrieves keys from exotic coords #2",TRUE
+"test-guides.R","test-guides.R: get_guide_data retrieves keys from exotic coords #3",FALSE
+"test-guides.R","test-guides.R: guide specifications are properly checked #1",TRUE
+"test-guides.R","test-guides.R: guide specifications are properly checked #2",TRUE
+"test-guides.R","test-guides.R: guide specifications are properly checked #3",TRUE
+"test-guides.R","test-guides.R: guide specifications are properly checked #4",TRUE
+"test-guides.R","test-guides.R: guide specifications are properly checked #5",TRUE
+"test-guides.R","test-guides.R: guide specifications are properly checked #6",TRUE
+"test-guides.R","test-guides.R: guide_custom can be drawn and styled #1",FALSE
+"test-guides.R","test-guides.R: guide_custom can be drawn and styled #2",FALSE
+"test-guides.R","test-guides.R: guide_custom can be drawn and styled #3",FALSE
+"test-guides.R","test-guides.R: guide_none() can be used in non-position scales #1",TRUE
+"test-guides.R","test-guides.R: guide_none() can be used in non-position scales #2",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #1",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #10",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #11",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #12",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #13",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #14",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #15",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #16",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #17",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #18",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #19",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #2",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #20",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #3",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #4",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #5",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #6",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #7",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #8",TRUE
+"test-guides.R","test-guides.R: guides are positioned correctly #9",TRUE
+"test-guides.R","test-guides.R: guides title and text are positioned correctly #1",TRUE
+"test-guides.R","test-guides.R: guides title and text are positioned correctly #2",TRUE
+"test-guides.R","test-guides.R: guides title and text are positioned correctly #3",TRUE
+"test-guides.R","test-guides.R: guides title and text are positioned correctly #4",TRUE
+"test-guides.R","test-guides.R: guides title and text are positioned correctly #5",FALSE
+"test-guides.R","test-guides.R: guides title and text are positioned correctly #6",FALSE
+"test-guides.R","test-guides.R: guides title and text are positioned correctly #7",TRUE
+"test-guides.R","test-guides.R: guides title and text are positioned correctly #8",FALSE
+"test-labellers.R","test-labellers.R: labeller function catches overlap in names #1",TRUE
+"test-labels.R","test-labels.R: alt text is returned #1",TRUE
+"test-labels.R","test-labels.R: alt text is returned #2",TRUE
+"test-labels.R","test-labels.R: get_alt_text checks dots #1",FALSE
+"test-labels.R","test-labels.R: label dictionaries work #1",FALSE
+"test-labels.R","test-labels.R: labels can be derived using functions #1",TRUE
+"test-labels.R","test-labels.R: Labels can be extracted from attributes #1",TRUE
+"test-labels.R","test-labels.R: Labels from annotations are ignored (#6316) #1",TRUE
+"test-labels.R","test-labels.R: Labels from static aesthetics are ignored (#6003) #1",TRUE
+"test-labels.R","test-labels.R: Labels from static aesthetics are ignored (#6003) #2",TRUE
+"test-labels.R","test-labels.R: moving guide positions lets titles follow #1",TRUE
+"test-labels.R","test-labels.R: plot.tag.position rejects invalid input #1",TRUE
+"test-labels.R","test-labels.R: plot.tag.position rejects invalid input #3",TRUE
+"test-labels.R","test-labels.R: plot.tag.position rejects invalid input #4",TRUE
+"test-labels.R","test-labels.R: plot.tag.position rejects invalid input #5",TRUE
+"test-labels.R","test-labels.R: position axis label hierarchy works as intended #1",TRUE
+"test-labels.R","test-labels.R: tags are drawn correctly #1",TRUE
+"test-labels.R","test-labels.R: tags are drawn correctly #2",TRUE
+"test-labels.R","test-labels.R: tags are drawn correctly #3",TRUE
+"test-labels.R","test-labels.R: tags are drawn correctly #4",TRUE
+"test-labels.R","test-labels.R: tags are drawn correctly #5",TRUE
+"test-labels.R","test-labels.R: tags are drawn correctly #6",TRUE
+"test-labels.R","test-labels.R: warnings are thrown for unknown labels #1",TRUE
+"test-layer.R","test-layer.R: AsIs data passes unmodified #1",TRUE
+"test-layer.R","test-layer.R: AsIs data passes unmodified #2",TRUE
+"test-layer.R","test-layer.R: AsIs data passes unmodified #3",TRUE
+"test-layer.R","test-layer.R: AsIs data passes unmodified #4",TRUE
+"test-layer.R","test-layer.R: attributes on layer data are preserved #1",TRUE
+"test-layer.R","test-layer.R: column vectors are allowed (#2609) #1",TRUE
+"test-layer.R","test-layer.R: data.frames and matrix aesthetics survive the build stage #1",FALSE
+"test-layer.R","test-layer.R: empty aesthetics create warning #1",TRUE
+"test-layer.R","test-layer.R: if an aes is mapped to a function that returns NULL, it is removed #1",FALSE
+"test-layer.R","test-layer.R: inherit.aes works #1",TRUE
+"test-layer.R","test-layer.R: inherit.aes works #2",TRUE
+"test-layer.R","test-layer.R: layer names can be resolved #1",FALSE
+"test-layer.R","test-layer.R: layer names can be resolved #2",FALSE
+"test-layer.R","test-layer.R: layer reports the error with correct index etc #2",TRUE
+"test-layer.R","test-layer.R: layer warns for constant aesthetics #1",TRUE
+"test-layer.R","test-layer.R: layer warns for constant aesthetics #2",TRUE
+"test-layer.R","test-layer.R: layers are stateless except for the computed params #1",TRUE
+"test-layer.R","test-layer.R: retransform works on computed aesthetics in `map_statistic` #1",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: coord summary - basic #1",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: coord summary - basic #2",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: coord summary - basic #3",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: coord summary - coord_flip #1",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: coord summary - coord_flip #2",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: coord summary - coord_flip #3",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: coord summary - coord_flip #4",FALSE
+"test-plot-summary-api.R","test-plot-summary-api.R: coord summary - log transformations #1",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: coord summary - log transformations #2",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: coord summary - log transformations #3",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: coord summary - log transformations #4",FALSE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - basic plot #1",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - basic plot #2",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - basic plot #3",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - facet_grid #1",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - facet_grid #2",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - facet_grid #3",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - facet_wrap #1",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - facet_wrap #2",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - facet_wrap #3",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - free scales #1",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - free scales #2",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - free scales #3",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - free scales #4",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - log scales #1",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - log scales #2",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - log scales #3",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - log scales #4",FALSE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - reversed scales #1",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - reversed scales #2",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - reversed scales #3",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: layout summary - reversed scales #4",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: summarise_layers #1",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: summarise_layers #2",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: summarise_layers #3",TRUE
+"test-plot-summary-api.R","test-plot-summary-api.R: summarise_layers #4",TRUE
+"test-position_dodge.R","test-position_dodge.R: can control whether to preserve total or individual width #1",TRUE
+"test-position_dodge.R","test-position_dodge.R: can control whether to preserve total or individual width #2",TRUE
+"test-position_dodge.R","test-position_dodge.R: position_dodge() can dodge points vertically #1",TRUE
+"test-position_dodge.R","test-position_dodge.R: position_dodge() can dodge points vertically #2",TRUE
+"test-position_dodge.R","test-position_dodge.R: position_dodge() can reverse the dodge order #1",TRUE
+"test-position_dodge.R","test-position_dodge.R: position_dodge() can reverse the dodge order #2",TRUE
+"test-position_dodge.R","test-position_dodge.R: position_dodge() can reverse the dodge order #3",TRUE
+"test-position_dodge.R","test-position_dodge.R: position_dodge() can use the order aesthetic #1",TRUE
+"test-position-dodge2.R","test-position-dodge2.R: boxes in facetted plots keep the correct width #1",TRUE
+"test-position-dodge2.R","test-position-dodge2.R: cols at the same x position are dodged #1",TRUE
+"test-position-dodge2.R","test-position-dodge2.R: padding argument controls space between elements #1",TRUE
+"test-position-dodge2.R","test-position-dodge2.R: padding argument controls space between elements #2",TRUE
+"test-position-dodge2.R","test-position-dodge2.R: rectangles are dodged #1",TRUE
+"test-position-dodge2.R","test-position-dodge2.R: width of groups is computed per facet #1",TRUE
+"test-position-jitter.R","test-position-jitter.R: automatic jitter width considers panels #1",TRUE
+"test-position-jitter.R","test-position-jitter.R: automatic jitter width considers panels #2",TRUE
+"test-position-jitter.R","test-position-jitter.R: automatic jitter width considers panels #3",TRUE
+"test-position-jitterdodge.R","test-position-jitterdodge.R: position_jitterdodge preserves widths #1",TRUE
+"test-position-nudge.R","test-position-nudge.R: nudging works in both dimensions simultaneously #1",TRUE
+"test-position-nudge.R","test-position-nudge.R: nudging works in both dimensions simultaneously #2",TRUE
+"test-position-nudge.R","test-position-nudge.R: nudging works in individual dimensions #1",FALSE
+"test-position-nudge.R","test-position-nudge.R: nudging works in individual dimensions #2",FALSE
+"test-position-nudge.R","test-position-nudge.R: nudging works in individual dimensions #3",FALSE
+"test-position-nudge.R","test-position-nudge.R: nudging works in individual dimensions #4",FALSE
+"test-position-stack.R","test-position-stack.R: can request reverse stacking #1",TRUE
+"test-position-stack.R","test-position-stack.R: data keeps its order after stacking #1",TRUE
+"test-position-stack.R","test-position-stack.R: data with no extent is stacked correctly #1",TRUE
+"test-position-stack.R","test-position-stack.R: data with no extent is stacked correctly #2",TRUE
+"test-position-stack.R","test-position-stack.R: data with no extent is stacked correctly #3",TRUE
+"test-position-stack.R","test-position-stack.R: data with no extent is stacked correctly #4",TRUE
+"test-position-stack.R","test-position-stack.R: negative and positive values are handled separately #1",TRUE
+"test-position-stack.R","test-position-stack.R: negative and positive values are handled separately #2",TRUE
+"test-position-stack.R","test-position-stack.R: position_fill() handles one group per position case #1",TRUE
+"test-position-stack.R","test-position-stack.R: position_stack() can stack correctly when ymax is NA #1",TRUE
+"test-position-stack.R","test-position-stack.R: Stacking produces the expected output #1",TRUE
+"test-scale_date.R","test-scale_date.R: date scale draws correctly #1",FALSE
+"test-scale_date.R","test-scale_date.R: date scale draws correctly #2",FALSE
+"test-scale_date.R","test-scale_date.R: date scale draws correctly #3",FALSE
+"test-scale_date.R","test-scale_date.R: date scale draws correctly #4",FALSE
+"test-scale_date.R","test-scale_date.R: date scale draws correctly #5",FALSE
+"test-scale_date.R","test-scale_date.R: date scale draws correctly #6",FALSE
+"test-scale_date.R","test-scale_date.R: date scale draws correctly #7",FALSE
+"test-scale_date.R","test-scale_date.R: date scale draws correctly #8",FALSE
+"test-scale-brewer.R","test-scale-brewer.R: mid-point in diverging brewer color scale #1",TRUE
+"test-scale-brewer.R","test-scale-brewer.R: mid-point in diverging brewer color scale #2",TRUE
+"test-scale-date.R","test-scale-date.R: date(time) scales throw warnings when input is incorrect #1",TRUE
+"test-scale-date.R","test-scale-date.R: date(time) scales throw warnings when input is incorrect #2",FALSE
+"test-scale-date.R","test-scale-date.R: date(time) scales throw warnings when input is incorrect #3",FALSE
+"test-scale-date.R","test-scale-date.R: datetime alpha scales work #1",FALSE
+"test-scale-date.R","test-scale-date.R: datetime colour scales work #1",FALSE
+"test-scale-date.R","test-scale-date.R: datetime size scales work #1",FALSE
+"test-scale-date.R","test-scale-date.R: first timezone wins #1",FALSE
+"test-scale-date.R","test-scale-date.R: inherits timezone from data #1",FALSE
+"test-scale-date.R","test-scale-date.R: inherits timezone from data #2",FALSE
+"test-scale-date.R","test-scale-date.R: not cached across calls #1",FALSE
+"test-scale-date.R","test-scale-date.R: not cached across calls #2",FALSE
+"test-scale-discrete.R","test-scale-discrete.R: discrete ranges also encompass continuous values #1",FALSE
+"test-scale-discrete.R","test-scale-discrete.R: discrete scale defaults can be set globally #1",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: discrete scale defaults can be set globally #2",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: discrete scale defaults can be set globally #3",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: discrete scale defaults can be set globally #4",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: discrete scale defaults can be set globally #5",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: discrete scale shrinks to range when setting limits #1",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: invalid palettes trigger errors #1",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for non-position scales #1",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for non-position scales #2",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for non-position scales #3",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for non-position scales #4",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for non-position scales #5",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for non-position scales #6",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for position scales #1",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for position scales #2",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for position scales #3",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for position scales #4",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for position scales #5",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: NAs are translated/preserved for position scales #6",TRUE
+"test-scale-discrete.R","test-scale-discrete.R: palettes work for discrete scales #1",TRUE
+"test-scale-gradient.R","test-scale-gradient.R: points outside the limits are plotted as NA #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: fewer values (#3451) #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: generic scale can be used in place of aesthetic-specific scales #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: generic scale can be used in place of aesthetic-specific scales #2",TRUE
+"test-scale-manual.R","test-scale-manual.R: generic scale can be used in place of aesthetic-specific scales #3",TRUE
+"test-scale-manual.R","test-scale-manual.R: insufficient values raise an error #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: insufficient values raise an error #2",TRUE
+"test-scale-manual.R","test-scale-manual.R: insufficient values raise an error #4",TRUE
+"test-scale-manual.R","test-scale-manual.R: limits and breaks (#4619) #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: limits works (#3262) #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: missing values are replaced with na.value #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: missing values are replaced with na.value #2",TRUE
+"test-scale-manual.R","test-scale-manual.R: named values do not match with breaks in manual scales #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: named values work regardless of order #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: NAs from palette are not translated (#5929) #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: numeric linetype palettes are mapped correctly (#6096) #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: unnamed values match breaks in manual scales #1",TRUE
+"test-scale-manual.R","test-scale-manual.R: values are matched when scale contains more unique values than are in the data #1",TRUE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: continuous limits accepts functions #1",TRUE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: functional limits work for continuous scales #1",TRUE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: minor breaks draw correctly #1",TRUE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: minor breaks draw correctly #2",FALSE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: minor breaks draw correctly #3",FALSE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: minor breaks draw correctly #4",FALSE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: minor breaks draw correctly #5",TRUE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: minor breaks draw correctly #6",FALSE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: scale breaks can be removed #1",FALSE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: scale breaks can be removed #2",FALSE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: scale breaks can be removed #3",FALSE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: scale breaks can be removed #4",FALSE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: scale breaks can be removed #5",TRUE
+"test-scales-breaks-labels.R","test-scales-breaks-labels.R: scale breaks can be removed #6",TRUE
+"test-scales.R","test-scales.R: aesthetics can be set independently of scale name #1",TRUE
+"test-scales.R","test-scales.R: all-Inf layers are not used for determining the type of scale #1",TRUE
+"test-scales.R","test-scales.R: all-Inf layers are not used for determining the type of scale #2",FALSE
+"test-scales.R","test-scales.R: building a plot does not affect its scales #1",TRUE
+"test-scales.R","test-scales.R: discrete scales can map to 2D structures #1",TRUE
+"test-scales.R","test-scales.R: discrete scales can map to 2D structures #2",FALSE
+"test-scales.R","test-scales.R: discrete scales can map to 2D structures #3",FALSE
+"test-scales.R","test-scales.R: discrete scales can map to 2D structures #4",FALSE
+"test-scales.R","test-scales.R: identity scale preserves input values #1",FALSE
+"test-scales.R","test-scales.R: identity scale preserves input values #2",FALSE
+"test-scales.R","test-scales.R: multiple aesthetics can be set with one function call #1",TRUE
+"test-scales.R","test-scales.R: multiple aesthetics can be set with one function call #2",TRUE
+"test-scales.R","test-scales.R: oob affects position values #1",TRUE
+"test-scales.R","test-scales.R: oob affects position values #2",TRUE
+"test-scales.R","test-scales.R: oob affects position values #3",TRUE
+"test-scales.R","test-scales.R: oob affects position values #4",TRUE
+"test-scales.R","test-scales.R: oob affects position values #5",TRUE
+"test-scales.R","test-scales.R: oob affects position values #6",TRUE
+"test-scales.R","test-scales.R: position scales are updated by all position aesthetics #1",TRUE
+"test-scales.R","test-scales.R: position scales generate after stats #1",TRUE
+"test-scales.R","test-scales.R: scale_apply preserves class and attributes #1",FALSE
+"test-scales.R","test-scales.R: scales are looked for in appropriate place #1",TRUE
+"test-scales.R","test-scales.R: scales are looked for in appropriate place #2",TRUE
+"test-scales.R","test-scales.R: scales are looked for in appropriate place #3",TRUE
+"test-scales.R","test-scales.R: scales are looked for in appropriate place #4",TRUE
+"test-scales.R","test-scales.R: scales warn when transforms introduces non-finite values #1",TRUE
+"test-scales.R","test-scales.R: shape scale throws appropriate warnings for factors #1",TRUE
+"test-scales.R","test-scales.R: shape scale throws appropriate warnings for factors #2",TRUE
+"test-scales.R","test-scales.R: shape scale throws appropriate warnings for factors #3",TRUE
+"test-scales.R","test-scales.R: size and alpha scales throw appropriate warnings for factors #1",TRUE
+"test-scales.R","test-scales.R: size and alpha scales throw appropriate warnings for factors #2",TRUE
+"test-scales.R","test-scales.R: size and alpha scales throw appropriate warnings for factors #3",TRUE
+"test-scales.R","test-scales.R: size and alpha scales throw appropriate warnings for factors #4",TRUE
+"test-scales.R","test-scales.R: size and alpha scales throw appropriate warnings for factors #5",TRUE
+"test-scales.R","test-scales.R: size and alpha scales throw appropriate warnings for factors #6",TRUE
+"test-scales.R","test-scales.R: staged aesthetics are backtransformed properly (#4155) #1",FALSE
+"test-scales.R","test-scales.R: ViewScales can make fixed copies #1",TRUE
+"test-scales.R","test-scales.R: ViewScales can make fixed copies #2",FALSE
+"test-sec-axis.R","test-sec-axis.R: custom breaks work #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: discrete scales can have secondary axes #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: dup_axis() works #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: n.breaks is respected by secondary axes (#4483) #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec axis works with skewed transform #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec axis works with tidy eval #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis checks the user input #2",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis works with date/time/datetime scales #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis works with date/time/datetime scales #2",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis works with date/time/datetime scales #3",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis works with date/time/datetime scales #4",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis() breaks work for log-transformed scales #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis() breaks work for log-transformed scales #2",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis() breaks work for log-transformed scales #3",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis() handles secondary power transformations #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis() handles secondary power transformations #2",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis() respects custom transformations #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis() works for power transformations (monotonicity test doesn't fail) #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis() works for power transformations (monotonicity test doesn't fail) #2",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis() works for power transformations (monotonicity test doesn't fail) #3",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis() works for power transformations (monotonicity test doesn't fail) #4",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec_axis() works with subtraction #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: sec.axis allows independent trans btwn primary and secondary axes #1",FALSE
+"test-sec-axis.R","test-sec-axis.R: sex axis works with division (#1804) #1",FALSE
+"test-stat-align.R","test-stat-align.R: alignment adjusts per panel #1",TRUE
+"test-stat-align.R","test-stat-align.R: alignment adjusts per panel #2",TRUE
+"test-stat-align.R","test-stat-align.R: alignment adjusts per panel #3",TRUE
+"test-stat-align.R","test-stat-align.R: alignment with cliffs works #1",TRUE
+"test-stat-align.R","test-stat-align.R: alignment with negative and positive values works #1",TRUE
+"test-stat-align.R","test-stat-align.R: out-of-bounds padding is removed (#6667) #1",TRUE
+"test-stat-align.R","test-stat-align.R: out-of-bounds padding is removed (#6667) #2",TRUE
+"test-stat-align.R","test-stat-align.R: standard alignment works #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: binwidth computes widths for function input #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: breaks are transformed by the scale #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: breaks are transformed by the scale #2",TRUE
+"test-stat-bin.R","test-stat-bin.R: breaks computes bin boundaries for function input #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: can use breaks argument #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: fuzzy breaks are used when cutting #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: geom_freqpoly defaults to pad = TRUE #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: geom_histogram defaults to pad = FALSE #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: geom_histogram() can be drawn over a 0-width range (#3043) #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: stat_bin works in both directions #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: stat_bin works in both directions #2",TRUE
+"test-stat-bin.R","test-stat-bin.R: stat_bin() provides width (#3522) #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: stat_bin(drop) options work as intended #1",FALSE
+"test-stat-bin.R","test-stat-bin.R: stat_bin(drop) options work as intended #2",TRUE
+"test-stat-bin.R","test-stat-bin.R: stat_bin(drop) options work as intended #3",TRUE
+"test-stat-bin.R","test-stat-bin.R: stat_bin(drop) options work as intended #4",TRUE
+"test-stat-bin.R","test-stat-bin.R: stat_count preserves x order for continuous and discrete #1",TRUE
+"test-stat-bin.R","test-stat-bin.R: stat_count preserves x order for continuous and discrete #2",TRUE
+"test-stat-bin.R","test-stat-bin.R: stat_count preserves x order for continuous and discrete #3",TRUE
+"test-stat-bin.R","test-stat-bin.R: weights are added #1",TRUE
+"test-stat-bin2d.R","test-stat-bin2d.R: binwidth is respected #1",TRUE
+"test-stat-bin2d.R","test-stat-bin2d.R: binwidth is respected #2",FALSE
+"test-stat-bin2d.R","test-stat-bin2d.R: binwidth is respected #3",FALSE
+"test-stat-bin2d.R","test-stat-bin2d.R: breaks are transformed by the scale #1",TRUE
+"test-stat-bin2d.R","test-stat-bin2d.R: breaks are transformed by the scale #2",TRUE
+"test-stat-bin2d.R","test-stat-bin2d.R: breaks override binwidth #1",TRUE
+"test-stat-boxplot.R","test-stat-boxplot.R: stat_boxplot can suppress warning about missing rows #1",TRUE
+"test-stat-boxplot.R","test-stat-boxplot.R: stat_boxplot drops missing rows with a warning #1",TRUE
+"test-stat-boxplot.R","test-stat-boxplot.R: stat_boxplot drops missing rows with a warning #2",TRUE
+"test-stat-connect.R","test-stat-connect.R: stat_connect closes off ends #1",TRUE
+"test-stat-connect.R","test-stat-connect.R: stat_connect works with 1-row connections #1",TRUE
+"test-stat-connect.R","test-stat-connect.R: stat_connect works with ribbons in both orientations #1",TRUE
+"test-stat-connect.R","test-stat-connect.R: stat_connect works with ribbons in both orientations #2",TRUE
+"test-stat-contour.R","test-stat-contour.R: a warning is issued when there is more than one z per x+y #1",FALSE
+"test-stat-contour.R","test-stat-contour.R: basic stat_contour_filled() plot builds #1",TRUE
+"test-stat-contour.R","test-stat-contour.R: basic stat_contour() plot builds #1",TRUE
+"test-stat-contour.R","test-stat-contour.R: contouring irregularly spaced data works #1",TRUE
+"test-stat-contour.R","test-stat-contour.R: contouring sparse data results in a warning #1",FALSE
+"test-stat-contour.R","test-stat-contour.R: geom_contour_filled() and stat_contour_filled() result in identical layer data #1",TRUE
+"test-stat-contour.R","test-stat-contour.R: geom_contour_filled() and stat_contour_filled() result in identical layer data #2",TRUE
+"test-stat-contour.R","test-stat-contour.R: geom_contour_filled() and stat_contour_filled() result in identical layer data #3",TRUE
+"test-stat-contour.R","test-stat-contour.R: geom_contour() and stat_contour() result in identical layer data #1",TRUE
+"test-stat-contour.R","test-stat-contour.R: geom_contour() and stat_contour() result in identical layer data #2",TRUE
+"test-stat-contour.R","test-stat-contour.R: geom_contour() and stat_contour() result in identical layer data #3",TRUE
+"test-stat-contour.R","test-stat-contour.R: stat_contour() can infer rotations #1",TRUE
+"test-stat-contour.R","test-stat-contour.R: stat_contour() can infer rotations #2",TRUE
+"test-stat-count.R","test-stat-count.R: stat_count() respects uniqueness of `x` #1",TRUE
+"test-stat-density.R","test-stat-density.R: stat_density actually computes density #1",TRUE
+"test-stat-density.R","test-stat-density.R: stat_density can make weighted density estimation #1",TRUE
+"test-stat-density.R","test-stat-density.R: stat_density handles data outside of `bounds` #1",TRUE
+"test-stat-density.R","test-stat-density.R: stat_density handles data outside of `bounds` #2",TRUE
+"test-stat-density.R","test-stat-density.R: stat_density works in both directions #1",TRUE
+"test-stat-density.R","test-stat-density.R: stat_density works in both directions #2",TRUE
+"test-stat-ecdf.R","test-stat-ecdf.R: stat_ecdf responds to axis transformations #1",TRUE
+"test-stat-ecdf.R","test-stat-ecdf.R: stat_ecdf responds to axis transformations #2",TRUE
+"test-stat-ecdf.R","test-stat-ecdf.R: stat_ecdf works in both directions #1",TRUE
+"test-stat-ecdf.R","test-stat-ecdf.R: stat_ecdf works in both directions #2",TRUE
+"test-stat-function.R","test-stat-function.R: Line style can be changed via provided data #1",FALSE
+"test-stat-function.R","test-stat-function.R: Line style can be changed via provided data #2",FALSE
+"test-stat-function.R","test-stat-function.R: Line style can be changed via provided data #3",FALSE
+"test-stat-function.R","test-stat-function.R: uses scale limits, not data limits #1",TRUE
+"test-stat-function.R","test-stat-function.R: uses scale limits, not data limits #2",TRUE
+"test-stat-function.R","test-stat-function.R: uses scale limits, not data limits #3",TRUE
+"test-stat-function.R","test-stat-function.R: Warn when drawing multiple copies of the same function #1",TRUE
+"test-stat-function.R","test-stat-function.R: works in plots without any data #1",TRUE
+"test-stat-function.R","test-stat-function.R: works in plots without any data #2",TRUE
+"test-stat-function.R","test-stat-function.R: works in plots without any data #3",TRUE
+"test-stat-function.R","test-stat-function.R: works in plots without any data #4",TRUE
+"test-stat-function.R","test-stat-function.R: works with discrete x #1",TRUE
+"test-stat-function.R","test-stat-function.R: works with formula syntax #1",TRUE
+"test-stat-function.R","test-stat-function.R: works with transformed scales #1",TRUE
+"test-stat-function.R","test-stat-function.R: works with transformed scales #2",TRUE
+"test-stat-function.R","test-stat-function.R: works with transformed scales #3",TRUE
+"test-stat-function.R","test-stat-function.R: works with transformed scales #4",TRUE
+"test-stat-function.R","test-stat-function.R: works with transformed scales #5",TRUE
+"test-stat-function.R","test-stat-function.R: works with transformed scales #6",TRUE
+"test-stat-function.R","test-stat-function.R: works with transformed scales #7",TRUE
+"test-stat-function.R","test-stat-function.R: works with transformed scales #8",TRUE
+"test-stat-manual.R","test-stat-manual.R: stat_manual can take a function #1",TRUE
+"test-stat-qq.R","test-stat-qq.R: error is thrown with wrong quantile input #1",FALSE
+"test-stat-qq.R","test-stat-qq.R: error is thrown with wrong quantile input #2",FALSE
+"test-stat-qq.R","test-stat-qq.R: error is thrown with wrong quantile input #3",FALSE
+"test-stat-sum.R","test-stat-sum.R: handles grouping correctly #1",TRUE
+"test-stat-sum.R","test-stat-sum.R: handles grouping correctly #2",FALSE
+"test-stat-sum.R","test-stat-sum.R: handles grouping correctly #3",FALSE
+"test-stat-sum.R","test-stat-sum.R: handles grouping correctly #4",FALSE
+"test-stat-sum.R","test-stat-sum.R: handles grouping correctly #5",FALSE
+"test-stat-sum.R","test-stat-sum.R: handles grouping correctly #6",FALSE
+"test-stat-sum.R","test-stat-sum.R: handles grouping correctly #7",FALSE
+"test-stat-sum.R","test-stat-sum.R: handles grouping correctly #8",FALSE
+"test-stat-sum.R","test-stat-sum.R: summaries are drawn correctly #1",TRUE
+"test-stat-sum.R","test-stat-sum.R: summaries are drawn correctly #2",TRUE
+"test-stat-sum.R","test-stat-sum.R: summaries are drawn correctly #3",TRUE
+"test-stat-summary.R","test-stat-summary.R: stat_summary_(2d|hex) work with lambda expressions #1",TRUE
+"test-stat-summary.R","test-stat-summary.R: stat_summary_(2d|hex) work with lambda expressions #2",TRUE
+"test-stat-summary.R","test-stat-summary.R: stat_summary_bin takes user's `width` argument (#4647) #1",TRUE
+"test-stat-summary.R","test-stat-summary.R: stat_summary(_bin) work with lambda expressions #1",TRUE
+"test-stat-summary.R","test-stat-summary.R: stat_summary(_bin) work with lambda expressions #2",TRUE
+"test-stat-summary.R","test-stat-summary.R: stat_summary(_bin) work with lambda expressions #3",TRUE
+"test-stat-ydensity.R","test-stat-ydensity.R: `drop = FALSE` preserves groups with 1 observations #1",TRUE
+"test-stat-ydensity.R","test-stat-ydensity.R: `drop = FALSE` preserves groups with 1 observations #2",TRUE
+"test-stat-ydensity.R","test-stat-ydensity.R: `drop = FALSE` preserves groups with 1 observations #3",TRUE
+"test-stat-ydensity.R","test-stat-ydensity.R: mapped_discrete class is preserved #1",TRUE
+"test-stat-ydensity.R","test-stat-ydensity.R: quantiles are based on actual data (#4120) #1",TRUE
+"test-stats.R","test-stats.R: erroneously dropped aesthetics are found and issue a warning #1",FALSE
+"test-stats.R","test-stats.R: erroneously dropped aesthetics are found and issue a warning #2",FALSE
+"test-stats.R","test-stats.R: erroneously dropped aesthetics are found and issue a warning #3",FALSE
+"test-stats.R","test-stats.R: plot succeeds even if some computation fails #1",TRUE
+"test-stats.R","test-stats.R: plot succeeds even if some computation fails #2",TRUE
+"test-stats.R","test-stats.R: stats can modify persistent attributes #1",TRUE
+"test-theme.R","test-theme.R: adding theme object to ggplot object with + operator works #1",TRUE
+"test-theme.R","test-theme.R: adding theme object to ggplot object with + operator works #2",TRUE
+"test-theme.R","test-theme.R: adding theme object to ggplot object with + operator works #3",TRUE
+"test-theme.R","test-theme.R: adding theme object to ggplot object with + operator works #4",TRUE
+"test-theme.R","test-theme.R: adding theme object to ggplot object with + operator works #5",TRUE
+"test-theme.R","test-theme.R: adding theme object to ggplot object with + operator works #6",TRUE
+"test-theme.R","test-theme.R: adding theme object to ggplot object with + operator works #7",TRUE
+"test-theme.R","test-theme.R: adding theme object to ggplot object with + operator works #8",TRUE
+"test-theme.R","test-theme.R: adding theme object to ggplot object with + operator works #9",TRUE
+"test-theme.R","test-theme.R: aspect ratio is honored #1",TRUE
+"test-theme.R","test-theme.R: aspect ratio is honored #2",TRUE
+"test-theme.R","test-theme.R: aspect ratio is honored #3",TRUE
+"test-theme.R","test-theme.R: aspect ratio is honored #4",TRUE
+"test-theme.R","test-theme.R: aspect ratio is honored #5",TRUE
+"test-theme.R","test-theme.R: aspect ratio is honored #6",TRUE
+"test-theme.R","test-theme.R: aspect ratio is honored #7",TRUE
+"test-theme.R","test-theme.R: axes can be styled independently #1",FALSE
+"test-theme.R","test-theme.R: axes ticks can have independent lengths #1",FALSE
+"test-theme.R","test-theme.R: complete and non-complete themes interact correctly with ggplot objects #1",TRUE
+"test-theme.R","test-theme.R: complete and non-complete themes interact correctly with ggplot objects #2",TRUE
+"test-theme.R","test-theme.R: complete and non-complete themes interact correctly with ggplot objects #3",TRUE
+"test-theme.R","test-theme.R: complete and non-complete themes interact correctly with ggplot objects #4",TRUE
+"test-theme.R","test-theme.R: complete and non-complete themes interact correctly with ggplot objects #5",TRUE
+"test-theme.R","test-theme.R: complete plot themes shouldn't inherit from default #1",TRUE
+"test-theme.R","test-theme.R: current theme can be updated with new elements #1",FALSE
+"test-theme.R","test-theme.R: current theme can be updated with new elements #2",FALSE
+"test-theme.R","test-theme.R: element tree can be modified #1",FALSE
+"test-theme.R","test-theme.R: element tree can be modified #2",FALSE
+"test-theme.R","test-theme.R: geom elements are inherited correctly #1",TRUE
+"test-theme.R","test-theme.R: legend margins are correct when using relative key sizes #1",TRUE
+"test-theme.R","test-theme.R: legend margins are correct when using relative key sizes #2",TRUE
+"test-theme.R","test-theme.R: legend margins are correct when using relative key sizes #3",TRUE
+"test-theme.R","test-theme.R: legends are placed correctly when using stretchy spacing #1",TRUE
+"test-theme.R","test-theme.R: legends are placed correctly when using stretchy spacing #2",TRUE
+"test-theme.R","test-theme.R: legends are placed correctly when using stretchy spacing #3",TRUE
+"test-theme.R","test-theme.R: Legends can on all sides of the plot with custom justification #1",FALSE
+"test-theme.R","test-theme.R: panel.widths and panel.heights works with free-space panels #1",TRUE
+"test-theme.R","test-theme.R: panel.widths and panel.heights works with free-space panels #2",TRUE
+"test-theme.R","test-theme.R: panel.withs and panel.heights preserve aspect ratios with single panels #1",TRUE
+"test-theme.R","test-theme.R: panel.withs and panel.heights preserve aspect ratios with single panels #2",TRUE
+"test-theme.R","test-theme.R: plot titles and caption can be aligned to entire plot #1",TRUE
+"test-theme.R","test-theme.R: plot titles and caption can be aligned to entire plot #2",TRUE
+"test-theme.R","test-theme.R: rotated axis tick labels work #1",TRUE
+"test-theme.R","test-theme.R: setting 'spacing' and 'margins' affect the whole plot #1",TRUE
+"test-theme.R","test-theme.R: setting 'spacing' and 'margins' affect the whole plot #2",TRUE
+"test-theme.R","test-theme.R: setting 'spacing' and 'margins' affect the whole plot #3",TRUE
+"test-theme.R","test-theme.R: strips can be styled independently #1",TRUE
+"test-theme.R","test-theme.R: Strips can render custom elements #1",TRUE
+"test-theme.R","test-theme.R: Theme elements are checked during build #1",TRUE
+"test-theme.R","test-theme.R: Theme elements are checked during build #2",TRUE
+"test-theme.R","test-theme.R: Theme elements are checked during build #3",TRUE
+"test-theme.R","test-theme.R: theme ink and paper settings work #1",TRUE
+"test-theme.R","test-theme.R: theme ink and paper settings work #2",TRUE
+"test-theme.R","test-theme.R: theme validation happens at build stage #2",FALSE
+"test-theme.R","test-theme.R: theme(validate=FALSE) means do not check_element #1",TRUE
+"test-theme.R","test-theme.R: theme(validate=FALSE) means do not check_element #2",TRUE
+"test-theme.R","test-theme.R: theme(validate=FALSE) means do not check_element #3",TRUE
+"test-theme.R","test-theme.R: theme(validate=FALSE) means do not check_element #4",TRUE
+"test-theme.R","test-theme.R: theme(validate=FALSE) means do not check_element #5",TRUE
+"test-theme.R","test-theme.R: theme(validate=FALSE) means do not check_element #6",TRUE
+"test-theme.R","test-theme.R: themes don't change without acknowledgement #1",TRUE
+"test-theme.R","test-theme.R: themes don't change without acknowledgement #2",TRUE
+"test-theme.R","test-theme.R: themes don't change without acknowledgement #3",TRUE
+"test-theme.R","test-theme.R: themes don't change without acknowledgement #4",TRUE
+"test-theme.R","test-theme.R: themes don't change without acknowledgement #5",TRUE
+"test-theme.R","test-theme.R: themes don't change without acknowledgement #6",TRUE
+"test-theme.R","test-theme.R: themes don't change without acknowledgement #7",TRUE
+"test-theme.R","test-theme.R: themes don't change without acknowledgement #8",TRUE
+"test-theme.R","test-theme.R: themes don't change without acknowledgement #9",TRUE
+"test-theme.R","test-theme.R: themes look decent at larger base sizes #1",TRUE
+"test-theme.R","test-theme.R: themes look decent at larger base sizes #2",TRUE
+"test-theme.R","test-theme.R: themes look decent at larger base sizes #3",TRUE
+"test-theme.R","test-theme.R: themes look decent at larger base sizes #4",TRUE
+"test-theme.R","test-theme.R: themes look decent at larger base sizes #5",TRUE
+"test-theme.R","test-theme.R: themes look decent at larger base sizes #6",TRUE
+"test-theme.R","test-theme.R: themes look decent at larger base sizes #7",TRUE
+"test-theme.R","test-theme.R: themes look decent at larger base sizes #8",TRUE
+"test-theme.R","test-theme.R: themes look decent at larger base sizes #9",TRUE
+"test-utilities.R","test-utilities.R: summary method gives a nice summary #1",TRUE
+"test-viridis.R","test-viridis.R: viridis scale changes point color #1",TRUE
+"test-viridis.R","test-viridis.R: viridis scale changes point color #2",TRUE
+"test-viridis.R","test-viridis.R: viridis scale is used by default for ordered factors #1",TRUE

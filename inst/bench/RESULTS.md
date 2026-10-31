@@ -1278,3 +1278,162 @@ build is not timed), release build, 1600 × 1000 at 150 dpi, median of 3:
 `coord_flip()` adds only a swap of the marks' columns; `coord_transform()`
 places points with `CoordTransform$transform()` in R (vectorised, as ggplot2
 does). coord_fixed(), aspect ratios and secondary axes add no per-row work.
+
+
+## Full benchmark run (2026-10-31)
+
+All suites after R7.1, on a release build: AMD EPYC 9474F, 16 threads; R
+4.6.1; Ubuntu 22.04.5 LTS; ggplot2 4.0.3; ragg 1.5.2. The README figures
+(`tools/readme-figures.R`) are drawn from these numbers, copied to
+`tools/readme-data/bench-*.csv`. Times in ms.
+
+### Render end to end
+
+`inst/bench/render-e2e.R`: from a ggplot to a PNG file, `ggsave()` on
+`ragg::agg_png()` vs `alot_png()`, which draws all 18 cases in the full
+tier. Sequential, interleaved, medians of 3 (7 for `readme_10`), after a
+warm-up rep. Cases are defined in `inst/bench/render-cases.R`; all at 1600
+× 1000 px and 150 dpi except `readme_page` (7 × 7 in, 300 dpi).
+
+| case | ggplot2 (ggsave + ragg) | alot (alot_png) | speedup |
+| --- | ---: | ---: | --- |
+| readme | 3,673 | 315 | 11.7x |
+| readme_page | 5,458 | 383 | 14.3x |
+| readme_10 | 250 | 79 | 3.2x |
+| point_1e6 | 7,408 | 259 | 28.6x |
+| size_1e4 | 478 | 72 | 6.6x |
+| tile_1000 | 2,832 | 1,027 | 2.8x |
+| line_1e6 | 1,738 | 492 | 3.5x |
+| facets_400 | 11,801 | 789 | 15.0x |
+| grid_free_1e6 | 5,194 | 391 | 13.3x |
+| legends_inside_1e6 | 6,628 | 333 | 19.9x |
+| area_1e6 | 108,594 | 77,835 | 1.4x |
+| errorbar_1e5 | 8,874 | 317 | 28.0x |
+| boxplot_1e6 | 715 | 413 | 1.7x |
+| segment_1e5 | 535 | 235 | 2.3x |
+| label_2e3 | 4,607 | 348 | 13.2x |
+| polygon_1e4 | 237 | 87 | 2.7x |
+| flip_1e5 | 842 | 83 | 10.1x |
+| transform_1e5 | 846 | 104 | 8.1x |
+
+`area_1e6` is dominated by the build: `stat_align` over 1e6 rows takes
+about 80 s on both paths (see the render suite below), and drawing is 13×
+faster.
+
+### Render suite (hybrid tier)
+
+`inst/bench/render-suite.R`, which times each stage with the full tier off:
+build (`ggplot_build()` vs `alot_build()`), then render (gtable + draw +
+encode) with ggplot2 + ragg vs the hybrid tier (ggplot2's gtable, marks
+drawn in Rust). Medians of 3 (7 for `readme_10`). Per-stage tables are in
+the suite's output.
+
+| case | build ggplot2 | build alot | render ggplot2 | render hybrid | render speedup | total speedup |
+| --- | ---: | ---: | ---: | ---: | --- | --- |
+| readme | 419 | 164 | 3,271 | 426 | 7.7x | 6.4x |
+| readme_page | 656 | 185 | 5,064 | 526 | 9.6x | 7.9x |
+| readme_10 | 33 | 33 | 277 | 227 | 1.2x | 1.2x |
+| point_1e6 | 428 | 114 | 6,933 | 190 | 36.5x | 24.3x |
+| size_1e4 | 28 | 27 | 492 | 114 | 4.3x | 3.7x |
+| tile_1000 | 1,614 | 777 | 1,624 | 570 | 2.8x | 2.4x |
+| line_1e6 | 289 | 128 | 1,568 | 430 | 3.6x | 3.3x |
+| facets_400 | 29 | 23 | 12,832 | 13,204 | 1.0x | 1.0x |
+| grid_free_1e6 | 746 | 180 | 4,494 | 453 | 9.9x | 8.3x |
+| legends_inside_1e6 | 390 | 215 | 6,604 | 258 | 25.6x | 14.8x |
+| area_1e6 | 80,640 | 85,383 | 38,272 | 2,909 | 13.2x | 1.3x |
+| errorbar_1e5 | 92 | 73 | 9,664 | 345 | 28.0x | 23.3x |
+| boxplot_1e6 | 500 | 351 | 264 | 134 | 2.0x | 1.6x |
+| segment_1e5 | 66 | 41 | 520 | 271 | 1.9x | 1.9x |
+| label_2e3 | 26 | 26 | 4,571 | 4,477 | 1.0x | 1.0x |
+| polygon_1e4 | 33 | 28 | 240 | 115 | 2.1x | 1.9x |
+| flip_1e5 | 50 | 35 | 828 | 103 | 8.0x | 6.4x |
+| transform_1e5 | 52 | 39 | 834 | 127 | 6.6x | 5.2x |
+
+`facets_400` and `label_2e3` gain nothing here because ggplot2 builds their
+gtable and draws their strips and labels; the full tier (above) takes them
+to 15× and 13×.
+
+### Row scaling
+
+`inst/bench/row-scaling.R`, 6 parallel workers (so read gains under about
+1.5× as noise; see "How to read these numbers").
+
+| case | rows | ggplot2_ms | alot_ms | speedup |
+| --- | --- | ---: | ---: | --- |
+| point_discrete | 1e4 | 27 | 23 | 1.17x |
+| point_discrete | 1e6 | 554 | 182 | 3.04x |
+| point_discrete | 1e7 | 7,779 | 2,756 | 2.82x |
+| point_continuous | 1e4 | 26 | 24 | 1.08x |
+| point_continuous | 1e6 | 598 | 262 | 2.28x |
+| point_continuous | 1e7 | 10,394 | 3,396 | 3.06x |
+| facet_wrap_point | 1e4 | 25 | 21 | 1.19x |
+| facet_wrap_point | 1e6 | 441 | 134 | 3.29x |
+| facet_wrap_point | 1e7 | 8,363 | 1,957 | 4.27x |
+| histogram_fill | 1e4 | 37 | 35 | 1.06x |
+| histogram_fill | 1e6 | 277 | 212 | 1.31x |
+| histogram_fill | 1e7 | 4,832 | 2,882 | 1.68x |
+| bar_dodge | 1e4 | 61 | 59 | 1.03x |
+| bar_dodge | 1e6 | 372 | 281 | 1.32x |
+| bar_dodge | 1e7 | 7,563 | 4,165 | 1.82x |
+| density_groups | 1e4 | 35 | 33 | 1.06x |
+| density_groups | 1e6 | 302 | 228 | 1.32x |
+| density_groups | 1e7 | 4,703 | 3,193 | 1.47x |
+| boxplot | 1e4 | 37 | 30 | 1.23x |
+| boxplot | 1e6 | 506 | 290 | 1.74x |
+| boxplot | 1e7 | 7,716 | 2,578 | 2.99x |
+| smooth_lm | 1e4 | 29 | 27 | 1.07x |
+| smooth_lm | 1e6 | 415 | 342 | 1.21x |
+| smooth_lm | 1e7 | 9,255 | 6,057 | 1.53x |
+
+### Facet scaling (200 rows per panel)
+
+`inst/bench/facet-scaling.R`, 6 parallel workers.
+
+| case | panels | ggplot2_ms | alot_ms | speedup |
+| --- | --- | ---: | ---: | --- |
+| wrap_fixed_point | 25 | 24 | 18 | 1.33x |
+| wrap_fixed_point | 100 | 30 | 20 | 1.50x |
+| wrap_fixed_point | 400 | 67 | 28 | 2.39x |
+| wrap_fixed_point | 1600 | 458 | 62 | 7.39x |
+| wrap_free_point | 25 | 207 | 100 | 2.07x |
+| wrap_free_point | 100 | 766 | 359 | 2.13x |
+| wrap_free_point | 400 | 3,682 | 1,646 | 2.24x |
+| wrap_free_point | 1600 | 15,299 | 6,219 | 2.46x |
+| grid_free_point | 25 | 164 | 46 | 3.57x |
+| grid_free_point | 100 | 684 | 128 | 5.34x |
+| grid_free_point | 400 | 2,811 | 415 | 6.77x |
+| grid_free_point | 1600 | 10,640 | 1,273 | 8.36x |
+| wrap_histogram | 25 | 234 | 232 | 1.01x |
+| wrap_histogram | 100 | 999 | 886 | 1.13x |
+| wrap_histogram | 400 | 3,810 | 3,683 | 1.03x |
+| wrap_histogram | 1600 | 22,243 | 21,508 | 1.03x |
+
+### Per-step time at 1e6 rows
+
+`inst/bench/step-profile.R`, kernels off vs on; the two steps with the most
+ggplot2 time, with their speedups. Full tables are in the suite's output.
+
+| case | ggplot2_ms | alot_ms | speedup | largest steps (ggplot2 time), speedup |
+| --- | ---: | ---: | --- | --- |
+| point_discrete | 424.3 | 175.2 | 2.42x | `map_position_2` 11.67x, `map_position_1` 2.25x |
+| point_continuous | 683.2 | 270.2 | 2.53x | `npscales_map` 2.12x, `map_position_2` 11.39x |
+| facet_wrap_point | 378.5 | 153.9 | 2.46x | `map_position_2` 6.00x, `map_position_1` 2.72x |
+| histogram_fill | 310.3 | 169.7 | 1.83x | `compute_statistic` 1.87x, `map_position_1` 4.89x |
+| bar_dodge | 370.4 | 301.9 | 1.23x | `compute_statistic` 0.95x, `compute_aesthetics` 0.96x |
+| density_groups | 267.2 | 263.3 | 1.01x | `compute_statistic` 0.80x, `train_position_1` 1.78x |
+| boxplot | 412.0 | 303.0 | 1.36x | `compute_statistic` 1.08x, `train_position_1` 2.50x |
+| smooth_lm | 324.5 | 289.7 | 1.12x | `compute_statistic` 0.81x, `map_position_1` 2.40x |
+
+
+### Per-step time at 400 panels
+
+| case | ggplot2_ms | alot_ms | speedup | largest steps (ggplot2 time), speedup |
+| --- | ---: | ---: | --- | --- |
+| wrap_fixed_point | 50.7 | 25.8 | 1.97x | `map_position_2` 6.24x, `map_position_1` 4.65x |
+| wrap_free_point | 3418.0 | 1536.3 | 2.22x | `setup_panel_params` 2.53x, `setup_panel_guides` 2.72x |
+| grid_free_point | 2299.8 | 366.4 | 6.28x | `setup_panel_params` 8.78x, `setup_panel_guides` 5.39x |
+| wrap_histogram | 3671.7 | 3957.1 | 0.93x | `compute_statistic` 0.94x, `compute_position` 0.90x |
+
+Where the position scales, facets and panel guides dominate, the build is
+2–6× faster; plots dominated by stats (`density_groups`, `smooth_lm`,
+`wrap_histogram`) stay near 1× until the stat and position kernels land.

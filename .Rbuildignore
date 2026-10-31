@@ -14,3 +14,5 @@
 ^\.Rproj\.user$
 ^tools/extract-corpus\.R$
 ^tools/render-corpus\.R$
+^tools/readme-data$
+^tools/readme-figures\.R$

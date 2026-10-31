@@ -41,18 +41,47 @@ p <- ggplot(d, aes(income, spend, colour = age, shape = segment)) +
 
 size <- list(width = 1600, height = 1000, units = "px", dpi = 150)
 
-# ggplot2 drawing on ragg: 3.87 s
+# ggplot2 drawing on ragg: 3.67 s
 system.time(do.call(ggsave, c(list("ggplot2.png", p, device = ragg::agg_png), size)))
-# alot: 0.65 s
+# alot: 0.32 s
 system.time(do.call(alot::alot_png, c(list(p, "alot.png"), size)))
 ```
 
-That is about 6× faster from ggplot to PNG file. `alot_png()` builds the
-plot with `alot_build()` (about 2× faster than `ggplot_build()` here), lays
-it out with ggplot2, draws the points in Rust, and encodes the PNG in
-Rust. Times are medians of 5 interleaved runs on a release build (AMD EPYC
-9474F, 16 threads, R 4.6.1, ggplot2 4.0.3, ragg 1.5.2). See
-[inst/bench/RESULTS.md](inst/bench/RESULTS.md) for per-stage numbers.
+That is about 11× faster from ggplot to PNG file. `alot_png()` builds the
+plot with `alot_build()` (about 2.5× faster than `ggplot_build()` here),
+then lays out and draws the whole page in Rust (its full tier) and encodes
+the PNG in Rust. Times are medians of interleaved runs on a release build
+(AMD EPYC 9474F, 16 threads, R 4.6.1, ggplot2 4.0.3, ragg 1.5.2).
+
+![Dumbbell chart of time from ggplot to PNG for 18 plots, ggsave() with ragg vs alot_png(), on a log scale: alot is 1.4 to 29 times faster, 12 times for the plot above.](man/figures/readme-render-speed.png)
+
+Across 18 benchmark plots, `alot_png()` is 1.4–29× faster end to end. The
+slowest case spends almost all its time in a stat that both paths share.
+Building alone gains less, and more with more rows:
+
+![Dumbbell chart of build time for eight plot types at 1 and 10 million rows, ggplot_build() vs alot_build(), on a log scale: alot is 1.2 to 3.3 times faster at 1 million rows and 1.5 to 4.3 times at 10 million.](man/figures/readme-build-speed.png)
+
+The data behind each figure is in `tools/readme-data/`, and
+`tools/readme-figures.R` redraws them (with `alot_png()`). See
+[inst/bench/RESULTS.md](inst/bench/RESULTS.md) for per-stage and per-step
+numbers.
+
+## Coverage
+
+alot falls back to ggplot2 for anything it doesn't handle exactly, so
+coverage is about speed, not correctness. Over the corpus of about 1,900
+plots from ggplot2's own examples and tests (`tests/testthat/corpus/`),
+93% of build components run in Rust; stats and position adjustments are
+the gap:
+
+![Bar chart of the share of build components that ran in Rust per pipeline step over 1,923 corpus plots: 98% for position scale training and mapping, 80 to 100% for facets, panel parameters, guides and non-position scales, 34% for scale transforms, and 0% for stats and position adjustments.](man/figures/readme-coverage-build.png)
+
+For rendering, `alot_render_coverage(p)` reports the tier a plot is drawn
+in. Of the 1,663 corpus plots in the rendering scope, 92% are drawn
+entirely in Rust; the rest fall back to the hybrid tier (ggplot2 lays the
+page out, Rust draws the marks) or to ggplot2 itself:
+
+![Bar chart of the reasons the 128 remaining plots are not drawn in full: mostly geoms without a Rust drawer (geom_raster, geom_curve), plotmath labels, aesthetics varying along a line, non-character labels and arrows.](man/figures/readme-coverage-render.png)
 
 ## Tests
 

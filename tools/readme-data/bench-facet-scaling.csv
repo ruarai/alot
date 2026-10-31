@@ -1,0 +1,17 @@
+"case","panels","ggplot2_ms","alot_ms"
+"wrap_fixed_point",25,24,18
+"wrap_fixed_point",100,30,20
+"wrap_fixed_point",400,67,28
+"wrap_fixed_point",1600,458,62
+"wrap_free_point",25,207,100
+"wrap_free_point",100,766,359
+"wrap_free_point",400,3682,1646
+"wrap_free_point",1600,15299,6219
+"grid_free_point",25,164,46
+"grid_free_point",100,684,128
+"grid_free_point",400,2811,415
+"grid_free_point",1600,10640,1273
+"wrap_histogram",25,234,232
+"wrap_histogram",100,999,886
+"wrap_histogram",400,3810,3683
+"wrap_histogram",1600,22243,21508
