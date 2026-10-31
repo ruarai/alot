@@ -632,6 +632,42 @@ instead (2 ms); it equals `match()` for any factor, with NA codes kept.
 - Columns are converted once per variable already (`as.integer(scale_id)` is
   free for the integer match result), so no further conversion was found.
 
+### T6.1 Re-profile after the kernels (2026-10-31)
+
+Kernels on, release build, `ALOT_BENCH_CORES=1`, median of 3 `step_times()`
+runs per case. Row cases at 1e6 rows, facet cases at 400 panels. The five
+steps T6.1 names, in ms and as a share of that case's build time:
+
+| step | row cases (ms; share) | facet cases (ms; share) |
+|---|---|---|
+| `compute_geom_2` | point_discrete 14.2 (5%), point_continuous 14.2 (6%), facet_wrap_point 9.0 (9%); the other five 1.6–2.1 (≤1%) | 2.0–2.6 (≤0.7%; 10% of wrap_fixed_point) |
+| `compute_geom_1` | 0.2–1.0 (≤0.6%) | 0.2 (wrap_histogram 18.5, 0.5%) |
+| `finish_statistics` | 0.1 (<0.1%) | 0.1 (<0.1%) |
+| `layout$finish_data` | 0.1 (<0.1%) | 0.1 (<0.1%) |
+| `.ignore_data`/`.expose_data` (4 calls) | ≤0.1 each (<0.1%) | ≤0.1 each (<0.1%) |
+
+Ranked by share of build time: `compute_geom_2` (5–9% on the point cases),
+`compute_geom_1` (≤0.6%), then `finish_statistics`, `finish_data` and
+`.ignore_data`/`.expose_data` (<0.1% each).
+
+- **T6.3 opened** for `compute_geom_2` on `geom_point`: its 14 ms at 1e6 rows
+  is dominated by writing constant default-aesthetic columns, which a
+  parallel Rust fill could plausibly do 1.25× faster. The task profiles
+  first and drops the kernel if the time turns out to be elsewhere.
+- **Stays in R:** `compute_geom_1`, `finish_statistics`, `finish_data`,
+  `.ignore_data`/`.expose_data`. Each is at most 1 ms at 1e6 rows or 400
+  panels, so even an infinite speedup would not move the build.
+  `compute_geom_2` on the stat-based geoms (1.6–2.1 ms) stays too.
+- **Where the time is now** (not part of this task's list): `compute_statistic`
+  is 47–70% of the histogram, bar, density, boxplot and smooth cases at 1.0×
+  (smooth 1.87×), and `compute_position` is 44% of `wrap_histogram` at 400
+  panels; these wait on the deferred stat and position kernels (T3.x, T4.1).
+  `compute_aesthetics` is 5–20% at 1.0× (62 ms on bar_dodge); it evaluates
+  the user's aesthetics expressions, so it stays in R. `npscales_map` is
+  still 105 ms (55%) on `point_continuous` after T2.3. In the facet cases,
+  `setup_panel_params` and `setup_panel_guides` are 87% of `wrap_free_point`
+  (T5.3, T5.4).
+
 ## Phase 2 prototype: README plot to PNG (2026-10-30)
 
 Experimental (branch `proto/phase2-points`). `inst/bench/render-readme.R`

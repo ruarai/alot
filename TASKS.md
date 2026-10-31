@@ -17,8 +17,7 @@ deferred (in their heading or their section's) or "ignore for later" are not
 in it. Each task still follows its own entry and its phase's shared
 criteria.
 
-1. **Phase 1:** T0.7 → T5.4 → T5.5 → T6.2 → T6.1, then any tasks T6.1
-   opens, in the order it lists them.
+1. **Phase 1:** T0.7 → T5.4 → T5.5 → T6.2 → T6.1 → T6.3 (opened by T6.1).
 2. **Phase 2:** in "Suggested order (Phase 2)": R0.1, R0.2 → R0.3, R0.4 →
    R1.1 → R1.2–R1.5 → R2.1, R3.1 → R3.2, R2.2, R4.1 → R4.2 → R5.1 → R5.2 →
    R5.3 → R6.1–R6.6 → R7.1 → R7.2 → R7.3.
@@ -418,7 +417,7 @@ All stat kernels use the grouped driver (T0.4) and register under
 
 ## 1.6 Remaining per-row steps
 
-### T6.1 Re-profile and pick targets
+### T6.1 Re-profile and pick targets — done
 - **Depends:** T6.2 and the non-deferred 1.1–1.5 kernels
 - **Do:** Profile the bench suites with kernels in place. List
   `compute_geom_1`, `compute_geom_2`, `finish_statistics`,
@@ -446,6 +445,23 @@ All stat kernels use the grouped driver (T0.4) and register under
 - **Done when:** the profile split is recorded in `RESULTS.md`, and any
   change keeps the shared criteria and makes these steps faster on the
   example plot.
+
+
+### T6.3 Default-aesthetic columns in `compute_geom_2`
+- **Depends:** T6.1
+- **Touches:** `R/kernels-geom.R` (new), `alot-core/src/geom/…` (new)
+- **Do:** `Geom$use_defaults` (ggplot2 R/geom-.R), called by
+  `compute_geom_2`, adds each missing default aesthetic as a constant
+  column (for `geom_point`: `shape`/`colour`/`size`/`fill`/`alpha`/`stroke`
+  as not mapped). At 1e6 rows that is 14 ms on the point cases, 5–9% of the
+  build, mostly memory writes of constant columns. Profile first: if the
+  time is the column fills, fill them in parallel in Rust; if it is
+  `after_scale`/`modifies_aes` evaluation or validation, it stays in R.
+  Handle only `GeomPoint` with plain default aesthetics and no
+  `after_scale()` modifiers or `params` overrides; decline anything else.
+- **Done when:** the Phase 1 completion criteria hold, and the step is at
+  least 1.25× faster at 1e6 rows on `point_discrete`. If not, drop it and
+  record why in `RESULTS.md`, as for any kernel.
 
 ---
 
