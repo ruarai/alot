@@ -80,9 +80,9 @@ test_that("point plots the full tier doesn't draw decline to another tier", {
     b <- suppressWarnings(suppressMessages(ggplot_build(p)))
     suppressMessages(render_raster(b, render_size)$tier)
   }
-  # Legends and facets drop to the hybrid tier; so do
+  # Facets and inside legends drop to the hybrid tier; so do
   # other layers, other layers, clip off, other coords and shapes.
-  expect_identical(tier(base + geom_point(aes(colour = factor(cyl)))), "hybrid")
+  expect_identical(tier(base + geom_point(aes(colour = factor(cyl))) + theme(legend.position = "inside")), "hybrid")
   expect_identical(tier(base + geom_point() + facet_wrap(vars(cyl))), "hybrid")
   expect_identical(tier(base + geom_point() + geom_smooth(method = "lm", formula = y ~ x)), "hybrid")
   expect_identical(tier(base + geom_point() + coord_cartesian(clip = "off")), "ggplot2")

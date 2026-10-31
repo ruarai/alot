@@ -133,11 +133,12 @@ test_that("plots the full tier doesn't draw decline to another tier", {
   # Other layers aren't drawn yet.
   expect_identical(tier(ggplot(mtcars, aes(wt, mpg)) + geom_line()), "hybrid")
   expect_identical(tier(base + geom_blank() + geom_line()), "hybrid")
-  # Facets, coords, legends, axis caps and scaling aren't drawn yet.
+  # Facets, coords, axis caps and scaling aren't drawn yet.
   expect_identical(tier(base + facet_wrap(vars(cyl))), "ggplot2")
   expect_identical(tier(base + coord_flip()), "ggplot2")
   expect_identical(tier(base + coord_trans(x = "sqrt")), "ggplot2")
-  expect_identical(tier(ggplot(mtcars, aes(wt, mpg)) + geom_blank(aes(colour = factor(cyl)), show.legend = TRUE)), "ggplot2")
+  # A blank layer's legend has point keys (GeomBlank$draw_key), which the full tier draws.
+  expect_identical(tier(ggplot(mtcars, aes(wt, mpg)) + geom_blank(aes(colour = factor(cyl)), show.legend = TRUE)), "full")
   expect_identical(tier(base + guides(x = guide_axis(cap = "both"))), "ggplot2")
   expect_identical(tier(base, scaling = 2), "ggplot2")
   # Plotmath labels and glyphs the font lacks.

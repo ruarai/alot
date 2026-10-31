@@ -91,5 +91,5 @@ test_that("plots alot doesn't lay out decline with a reason", {
   expect_match(reason(base + theme(panel.widths = unit(5, "cm"))), "fixed panel sizes")
   expect_match(reason(base + theme(plot.margin = unit(c(1, 1, 1, 1), "lines"))), "unit lines")
   expect_match(reason(base + labs(title = quote(alpha^2))), "plain text")
-  expect_match(reason(base + aes(colour = factor(cyl))), "legend layout")
+  expect_match(reason(base + aes(colour = qsec) + guides(colour = guide_coloursteps())), "GuideColoursteps")
 })

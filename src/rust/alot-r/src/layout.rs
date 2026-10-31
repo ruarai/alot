@@ -72,6 +72,12 @@ fn legend(spec: &List, name: &str) -> Option<Option<LegendBox>> {
     match field(spec, name) {
         None => Some(None),
         Some(r) => {
+            // The sizes of a box grid laid out, or the box to lay out.
+            if let Ok(l) = List::try_from(r.clone()) {
+                let group = crate::page::legend_group(&l, &mut crate::page::Fonts::new())?;
+                let (width, height) = group.size();
+                return Some(Some(LegendBox { width, height }));
+            }
             let v = r.as_real_slice()?;
             Some(Some(LegendBox { width: *v.first()?, height: *v.get(1)? }))
         }

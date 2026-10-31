@@ -189,7 +189,7 @@ expect_layout_close <- function(object, expected, tol = 0.5) {
 # The sizes in pixels of the legend boxes in ggplot2's gtable for `built`,
 # as list(position = c(width, height)) for the positions that have one, and
 # the boxes of the top-level table, from one gtable. The Rust layout takes
-# the legends' sizes until their layout is mirrored.
+# these where it doesn't mirror the plot's legends (R5.3).
 grid_layout <- function(built, size = render_size) {
   do.call(ragg::agg_capture, size)
   on.exit(grDevices::dev.off())
@@ -216,7 +216,11 @@ grid_layout <- function(built, size = render_size) {
 expect_layout_matches <- function(built, size = render_size, tol = 0.5, label = NULL) {
   ir <- render_ir(built)
   info <- grid_layout(built, size)
-  mine <- layout_boxes_rust(built, size$width, size$height, size$res, ir, info$legends)
+  # alot's own legend boxes where it lays them out, grid's otherwise.
+  mine <- layout_boxes_rust(built, size$width, size$height, size$res, ir)
+  if (length(mine) == 0) {
+    mine <- layout_boxes_rust(built, size$width, size$height, size$res, ir, info$legends)
+  }
   if (length(mine) == 0) {
     return(attr(mine, "reason"))
   }

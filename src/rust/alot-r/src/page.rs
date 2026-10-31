@@ -4,6 +4,7 @@
 use alot_core::render::agg::{Cap, Join};
 use alot_core::render::axis::{Axis, Side, Ticks};
 use alot_core::render::layout::TitleGrob;
+use alot_core::render::legend::{Bar, BarTicks, Body, Guide, Keys, LegendGroup};
 use alot_core::render::page::{draw_page, LineStyle, PageSpec, RectEl, TextStyle};
 use alot_core::render::panel::{GridLines, Panel, PointLayer};
 use alot_core::render::raster;
@@ -47,8 +48,8 @@ fn opt<T>(l: &List, name: &str, mut f: impl FnMut(&List) -> Option<T>) -> Option
 }
 
 /// Font table entries are interned by (path, face index).
-struct Fonts {
-    keys: Vec<(String, u32)>,
+pub(crate) struct Fonts {
+    pub(crate) keys: Vec<(String, u32)>,
 }
 
 impl Fonts {
@@ -155,6 +156,102 @@ fn panel(l: &List) -> Option<Panel> {
     Some(Panel { clip: flag(l, "clip")?, background: opt(l, "background", rect_el)?, grid, points, border: opt(l, "border", rect_el)? })
 }
 
+impl Fonts {
+    pub(crate) fn new() -> Self {
+        Fonts { keys: Vec::new() }
+    }
+}
+
+fn side(l: &List, name: &str) -> Option<Side> {
+    match field(l, name)?.as_str()? {
+        "top" => Some(Side::Top),
+        "right" => Some(Side::Right),
+        "bottom" => Some(Side::Bottom),
+        "left" => Some(Side::Left),
+        _ => None,
+    }
+}
+
+fn pair(l: &List, name: &str) -> Option<(f64, f64)> {
+    let v = nums(l, name)?;
+    Some((*v.first()?, *v.get(1)?))
+}
+
+/// A guide: see `legend_guide()` and `legend_bar()` in R/render-legend.R.
+fn guide(l: &List, fonts: &mut Fonts) -> Option<Guide> {
+    let body = match field(l, "kind")?.as_str()? {
+        "legend" => {
+            let dim = nums(l, "dim")?;
+            let (key_w, key_h) = (nums(l, "key_w")?, nums(l, "key_h")?);
+            let mut marks = Vec::new();
+            for (_, m) in list_of(l, "marks")?.iter() {
+                let mut layers = Vec::new();
+                if !m.is_null() {
+                    for (_, layer) in List::try_from(m).ok()?.iter() {
+                        layers.push(point_layer(&List::try_from(layer).ok()?)?);
+                    }
+                }
+                marks.push(layers);
+            }
+            let mut labels = Vec::new();
+            for (_, t) in list_of(l, "labels")?.iter() {
+                labels.push(title(&List::try_from(t).ok()?, fonts)?);
+            }
+            if key_w.len() != key_h.len() || marks.len() != key_w.len() || !(labels.is_empty() || labels.len() == key_w.len()) {
+                return None;
+            }
+            Body::Keys(Keys {
+                nrow: *dim.first()? as usize,
+                ncol: *dim.get(1)? as usize,
+                byrow: flag(l, "byrow")?,
+                key_w,
+                key_h,
+                default: pair(l, "default")?,
+                bg: opt(l, "key_bg", rect_el)?,
+                marks,
+                labels,
+                spacing: pair(l, "spacing")?,
+            })
+        }
+        "bar" => Body::Bar(Bar {
+            size: pair(l, "bar_size")?,
+            horizontal: flag(l, "horizontal")?,
+            image: colours(l, "image")?,
+            frame: opt(l, "frame", rect_el)?,
+            ticks: opt(l, "ticks", |t| {
+                let len = nums(t, "len")?;
+                Some(BarTicks { pos: nums(t, "pos")?, len: [*len.first()?, *len.get(1)?], style: line_style(&list_of(t, "style")?)? })
+            })?,
+            labels: opt(l, "bar_labels", |t| title(t, fonts))?,
+        }),
+        _ => return None,
+    };
+    Some(Guide {
+        body,
+        title: opt(l, "title", |t| title(t, fonts))?,
+        title_position: side(l, "title_position")?,
+        title_just: pair(l, "title_just")?,
+        text_position: side(l, "text_position")?,
+        padding: nums(l, "padding")?.try_into().ok()?,
+        background: opt(l, "background", rect_el)?,
+    })
+}
+
+/// A position's legend box: see `legend_box()` in R/render-legend.R.
+pub(crate) fn legend_group(l: &List, fonts: &mut Fonts) -> Option<LegendGroup> {
+    let mut guides = Vec::new();
+    for (_, g) in list_of(l, "guides")?.iter() {
+        guides.push(guide(&List::try_from(g).ok()?, fonts)?);
+    }
+    Some(LegendGroup {
+        horizontal: flag(l, "horizontal")?,
+        spacing: num(l, "spacing")?,
+        box_just: pair(l, "box_just")?,
+        global_just: pair(l, "global_just")?,
+        guides,
+    })
+}
+
 /// Draws a single-panel plot's page (see `page_spec()` in
 /// R/render-full.R for the spec) to a nativeRaster, or returns NULL
 /// (decline) where something isn't drawn as ragg does.
@@ -181,6 +278,15 @@ fn render(spec: &List, threads: i32) -> Option<Robj> {
     if let Some(tag) = opt(&layout, "tag", |t| title(&list_of(t, "item")?, &mut fonts))? {
         titles.push(("tag".to_string(), tag));
     }
+    let mut legends = Vec::new();
+    for (cell, name) in [
+        ("legend_right", "guide-box-right"), ("legend_left", "guide-box-left"),
+        ("legend_bottom", "guide-box-bottom"), ("legend_top", "guide-box-top"),
+    ] {
+        if let Some(l) = field(&layout, cell).and_then(|r| List::try_from(r).ok()) {
+            legends.push((name.to_string(), legend_group(&l, &mut fonts)?));
+        }
+    }
     let mut axes = Vec::new();
     for (cell, name) in [("axis_t", "axis-t"), ("axis_l", "axis-l"), ("axis_r", "axis-r"), ("axis_b", "axis-b")] {
         if let Some(a) = opt(&layout, cell, |l| axis(l, &mut fonts))? {
@@ -196,6 +302,7 @@ fn render(spec: &List, threads: i32) -> Option<Robj> {
         panel: panel(&list_of(spec, "panel")?)?,
         axes,
         titles,
+        legends,
         threads: threads.max(0) as usize,
     };
     let data: Vec<std::sync::Arc<Vec<u8>>> = fonts.keys.iter().map(|k| font_data(&k.0)).collect::<Option<_>>()?;

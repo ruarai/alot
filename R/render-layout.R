@@ -202,9 +202,9 @@ layout_axis <- function(ir, built, position, res) {
 # The spec of the Rust layout (see rs_layout()) for the plot `built`, on a
 # device of `res` pixels per inch, or NULL with the reason as the
 # "reason" attribute where alot doesn't lay the plot out. `legends` gives
-# the sizes of the plot's legend boxes until their layout is mirrored: a
-# list of c(width, height) in pixels named by position (right, left,
-# bottom, top); NULL if the plot's legends are not sized.
+# the plot's legend boxes by position (right, left, bottom, top), each
+# c(width, height) in pixels or a box of legend_boxes(); NULL for those of
+# legend_boxes().
 layout_spec <- function(built, ir, res, legends = NULL) {
   tryCatch(
     layout_spec_(built, ir, res, legends),
@@ -226,7 +226,7 @@ layout_spec_ <- function(built, ir, res, legends) {
     layout_decline("fixed panel sizes")
   }
   if (is.null(legends) && length(ir$legends) > 0) {
-    layout_decline("legend layout is not mirrored yet")
+    legends <- legend_boxes(built, res)
   }
 
   aspect <- plot@theme$aspect.ratio %||% layout$coord$aspect(layout$panel_params[[1]])

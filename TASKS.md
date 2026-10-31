@@ -785,7 +785,8 @@ anything else.
   `alot_png()` tries the full tier first (`options(alot.full_tier = FALSE)`
   skips it; the test helper sets that so the hybrid tests keep their tier).
   ggplot2's missing-value warning is raised once, after drawing.
- Fixed-scale `facet_wrap` and strips
+
+### R5.2 Fixed-scale `facet_wrap` and strips
 - **Depends:** R5.1
 - **Touches:** `alot-core/src/render/facet.rs`
 - **Do:** Mirror `FacetWrap$draw_panels` for fixed scales: panel table,
@@ -794,7 +795,7 @@ anything else.
 - **Done when:** fixed-scale `facet_wrap` point plots pass layout and image
   checks.
 
-### R5.3 Colourbar and point legend
+### R5.3 Colourbar and point legend — partly done (README plot waits for R5.2)
 - **Depends:** R5.1, R4.1
 - **Touches:** `alot-core/src/render/{legend,keys}.rs`
 - **Do:** Mirror guide assembly for the right-hand legend box with two
@@ -803,6 +804,28 @@ anything else.
   stacking.
 - **Done when:** the README plot renders in the full tier, passes layout and
   image checks, and meets both PHASE2.md targets.
+- **Result:** the legends are done; the README plot is not, as it needs
+  R5.2's facets. `R/render-legend.R` resolves each guide with ggplot2's own
+  `setup_params()` and `setup_elements()` (so guide `theme`, `legend.*`
+  theme elements and `rel()` sizes resolve as ggplot2 does) and measures its
+  text; `alot-core/src/render/legend.rs` does `measure_grobs()`,
+  `arrange_layout()`, `assemble_drawing()`, `Guide$add_title()` and
+  `package_box()` on `layout::Table`, and draws background, title, keys and
+  labels in gtable's order. `guide_legend()` with `draw_key_point()` keys
+  (`nrow`, `ncol`, `byrow`, `reverse`, `override.aes`, title and text
+  positions, merged legends) and raster `guide_colourbar()` (both
+  directions; `page.rs` `bar_image()` is ragg's bilinear raster span, within
+  1/255 of ragg) at the right, left, top and bottom, one box per position
+  with `legend.box`, `legend.box.just`, `legend.justification`, spacing and
+  `legend.location`. The layout takes the legend boxes' sizes from the same
+  code, so `layout_boxes_rust()` needs no sizes from grid for these plots
+  (`expect_layout_matches()` checks them). Declined (drop to the hybrid
+  tier): `inside` legends, other guides (coloursteps, bins), keys other than
+  `draw_key_point()`, colourbars that are not rasters or have `angle`, a
+  non-zero `legend.box.margin`, a drawn `legend.box.background`,
+  `legend.key.justification`, stretched (`null`) sizes, and labels that are
+  not plain text (including NA). Legends still use the single-panel table, so
+  faceted plots decline until R5.2.
 
 ## R6 Breadth (milestones 2.3–2.6)
 

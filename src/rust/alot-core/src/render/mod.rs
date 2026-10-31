@@ -7,6 +7,7 @@ pub mod agg;
 pub mod axis;
 pub mod display;
 pub mod layout;
+pub mod legend;
 pub mod page;
 pub mod panel;
 pub mod paths;

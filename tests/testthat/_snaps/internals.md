@@ -3500,3 +3500,789 @@
           absoluteGrob(gList(line), width = grobWidth(line), height = grobHeight(line))
       }
 
+# upstream guide assembly matches what the legend drawers mirror
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          data$shape <- translate_shape_string(data$shape %||% 19)
+          pointsGrob(0.5, 0.5, pch = data$shape, gp = gg_par(col = alpha(data$colour %||% 
+              "black", data$alpha), fill = fill_alpha(data$fill %||% 
+              "black", data$alpha), pointsize = data$size %||% 1.5, 
+              stroke = data$stroke %||% 0.5))
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (is.null(keys)) {
+              ans <- list(widths = NULL, heights = NULL)
+              return(ans)
+          }
+          padding_zeroes <- rep(0, prod(dim) - n)
+          widths <- c(get_key_size(keys, "width", n), padding_zeroes)
+          heights <- c(get_key_size(keys, "height", n), padding_zeroes)
+          widths <- matrix(widths, nrow = dim[1], ncol = dim[2], byrow = byrow)
+          heights <- matrix(heights, nrow = dim[1], ncol = dim[2], 
+              byrow = byrow)
+          list(widths = pmax(default_width, apply(widths, 2, max)), 
+              heights = pmax(default_height, apply(heights, 1, max)))
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          size <- lapply(keys, attr, which = which)
+          size[lengths(size) != 1] <- 0
+          size <- matrix(unlist(size), ncol = n)
+          apply(size, 2, max)
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (!is.null(attr(key, "width")) && !is.null(attr(key, "height"))) {
+              return(key)
+          }
+          if (!is.null(size) || !is.null(linewidth)) {
+              size <- size %||% 0
+              linewidth <- linewidth %||% 0
+              size <- if (is.na(size)[1]) 
+                  0
+              else size[1]
+              linewidth <- if (is.na(linewidth)[1]) 
+                  0
+              else linewidth[1]
+              size <- (size + linewidth)/10
+          }
+          else {
+              size <- NULL
+          }
+          attr(key, "width") <- attr(key, "width", TRUE) %||% size %||% 
+              default[1]
+          attr(key, "height") <- attr(key, "height", TRUE) %||% size %||% 
+              default[2]
+          key
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          margin <- margin %||% margin()
+          margin <- switch(position, top = replace(margin, 3, margin[3] + 
+              gap), bottom = replace(margin, 1, margin[1] + gap), left = replace(margin, 
+              2, margin[2] + gap), right = replace(margin, 4, margin[4] + 
+              gap))
+          class(margin) <- c("ggplot2::margin", class(margin), "S7_object")
+          margin
+      }
+
+---
+
+    Code
+      print(body(gg_fn(f)))
+    Output
+      {
+          if (!is_discrete(key$.value)) {
+              return(TRUE)
+          }
+          if (is_named(show)) {
+              aes <- intersect(aes, names(show))
+              show <- show[aes]
+          }
+          else {
+              show <- show[rep(1L, length(aes))]
+          }
+          if (isTRUE(any(show)) || length(show) == 0) {
+              return(TRUE)
+          }
+          if (isTRUE(!any(show))) {
+              return(FALSE)
+          }
+          aes <- aes[is.na(show)]
+          match <- which(names(data) %in% aes)
+          if (length(match) == 0) {
+              return(TRUE)
+          }
+          keep <- rep(FALSE, nrow(key))
+          for (column in match) {
+              keep <- keep | key$.value %in% data[[column]]
+          }
+          is_na <- which(is.na(key$.value) & !keep)
+          if (length(is_na) > 0) {
+              na_keep <- FALSE
+              for (column in match) {
+                  na_keep <- na_keep || !all(data[[column]] %in% key$.value)
+              }
+              keep[is_na] <- na_keep
+          }
+          keep
+      }
+
+---
+
+    Code
+      print(body(environment(guides[[m]])$f))
+    Output
+      {
+          if (length(self$guides) < 1) {
+              return(zeroGrob())
+          }
+          default_position <- theme$legend.position %||% "right"
+          if (length(default_position) == 2) {
+              default_position <- "inside"
+          }
+          if (!default_position %in% c(.trbl, "inside")) {
+              return(zeroGrob())
+          }
+          positions <- vapply(params, function(p) p$position[1] %||% 
+              default_position, character(1), USE.NAMES = FALSE)
+          grobs <- self$draw(theme, positions, theme$legend.direction)
+          keep <- !vapply(grobs, is_zero, logical(1), USE.NAMES = FALSE)
+          grobs <- grobs[keep]
+          if (length(grobs) < 1) {
+              return(zeroGrob())
+          }
+          default_inside_just <- calc_element("legend.justification.inside", 
+              theme)
+          default_inside_position <- calc_element("legend.position.inside", 
+              theme)
+          groups <- data_frame0(positions = positions, justs = list(NULL), 
+              coords = list(NULL))
+          for (i in which(positions == "inside")) {
+              just <- params[[i]]$theme[["legend.justification.inside"]]
+              just <- valid.just(just %||% default_inside_just)
+              coord <- params[[i]]$theme[["legend.position.inside"]]
+              coord <- coord %||% default_inside_position %||% just
+              groups$justs[[i]] <- just
+              groups$coords[[i]] <- coord
+          }
+          groups <- vec_group_loc(vec_slice(groups, keep))
+          grobs <- vec_chop(grobs, indices = groups$loc)
+          names(grobs) <- groups$key$positions
+          theme$legend.spacing <- theme$legend.spacing %||% unit(0.5, 
+              "lines")
+          theme$legend.spacing.y <- calc_element("legend.spacing.y", 
+              theme)
+          theme$legend.spacing.x <- calc_element("legend.spacing.x", 
+              theme)
+          for (i in vec_seq_along(groups)) {
+              adjust <- NULL
+              position <- groups$key$positions[i]
+              if (position == "inside") {
+                  adjust <- theme(legend.position.inside = groups$key$coords[[i]], 
+                      legend.justification.inside = groups$key$justs[[i]])
+              }
+              adjust <- add_theme(theme, adjust, "internal theme settings")
+              grobs[[i]] <- self$package_box(grobs[[i]], position, 
+                  adjust)
+          }
+          is_inside <- names(grobs) == "inside"
+          if (sum(is_inside) > 1) {
+              inside <- gtable(unit(1, "npc"), unit(1, "npc"))
+              inside <- gtable_add_grob(inside, grobs[is_inside], t = 1, 
+                  l = 1, clip = "off", name = paste0("guide-box-inside-", 
+                      seq_len(sum(is_inside))))
+              grobs <- grobs[!is_inside]
+              grobs$inside <- inside
+          }
+          grobs[setdiff(c(.trbl, "inside"), names(grobs))] <- list(zeroGrob())
+          grobs
+      }
+
+---
+
+    Code
+      print(body(environment(guides[[m]])$f))
+    Output
+      {
+          directions <- rep(direction %||% "vertical", length(positions))
+          if (is.null(direction)) {
+              directions[positions %in% c("top", "bottom")] <- "horizontal"
+          }
+          grobs <- vector("list", length(guides))
+          for (i in seq_along(grobs)) {
+              grobs[[i]] <- guides[[i]]$draw(theme = theme, position = positions[i], 
+                  direction = directions[i], params = params[[i]])
+          }
+          grobs
+      }
+
+---
+
+    Code
+      print(body(environment(guides[[m]])$f))
+    Output
+      {
+          if (is_zero(grobs) || length(grobs) == 0) {
+              return(zeroGrob())
+          }
+          direction <- switch(position, top = , bottom = "horizontal", 
+              "vertical")
+          theme$legend.box <- theme$legend.box %||% direction
+          theme$legend.box.just <- theme$legend.box.just %||% switch(direction, 
+              vertical = c("left", "top"), horizontal = c("center", 
+                  "top"))
+          widths <- lapply(grobs, `[[`, "widths")
+          heights <- lapply(grobs, `[[`, "heights")
+          stretch_x <- any(unlist(lapply(widths, unitType)) == "null")
+          stretch_y <- any(unlist(lapply(heights, unitType)) == "null")
+          global_just <- paste0("legend.justification.", position)
+          global_just <- valid.just(calc_element(global_just, theme))
+          if (position == "inside") {
+              inside_position <- theme$legend.position.inside %||% 
+                  global_just
+              global_xjust <- inside_position[1]
+              global_yjust <- inside_position[2]
+              global_margin <- margin()
+          }
+          else {
+              global_xjust <- global_just[1]
+              global_yjust <- global_just[2]
+              global_margin <- margin(t = 1 - global_yjust, b = global_yjust, 
+                  r = 1 - global_xjust, l = global_xjust, unit = "null")
+          }
+          box_just <- valid.just(theme$legend.box.just)
+          box_xjust <- box_just[1]
+          box_yjust <- box_just[2]
+          margin <- calc_element("legend.box.margin", theme) %||% margin()
+          if (identical(theme$legend.box, "horizontal")) {
+              for (i in seq_along(grobs)) {
+                  grobs[[i]] <- editGrob(grobs[[i]], vp = viewport(x = box_xjust, 
+                      y = box_yjust, just = box_just, height = heightDetails(grobs[[i]])))
+              }
+              spacing <- theme$legend.spacing.x
+              stretch_spacing <- any(unitType(spacing) == "null")
+              if (!stretch_spacing) {
+                  spacing <- convertWidth(spacing, "cm")
+              }
+              total_height <- max(inject(unit.c(!!!lapply(heights, 
+                  sum))))
+              if (stretch_x || stretch_spacing) {
+                  widths <- redistribute_null_units(widths, spacing, 
+                      margin, "width")
+                  vp_width <- unit(1, "npc")
+              }
+              else {
+                  widths <- inject(unit.c(!!!lapply(widths, sum)))
+                  vp_width <- sum(widths, spacing * (length(grobs) - 
+                      1L))
+              }
+              vp <- viewport(x = global_xjust, y = global_yjust, just = global_just, 
+                  height = total_height, width = vp_width)
+              guides <- gtable_row(name = "guides", grobs = grobs, 
+                  widths = widths, height = total_height, vp = vp)
+              guides <- gtable_add_col_space(guides, spacing)
+          }
+          else {
+              for (i in seq_along(grobs)) {
+                  grobs[[i]] <- editGrob(grobs[[i]], vp = viewport(x = box_xjust, 
+                      y = box_yjust, just = box_just, width = widthDetails(grobs[[i]])))
+              }
+              spacing <- theme$legend.spacing.y
+              stretch_spacing <- any(unitType(spacing) == "null")
+              if (!stretch_spacing) {
+                  spacing <- convertWidth(spacing, "cm")
+              }
+              total_width <- max(inject(unit.c(!!!lapply(widths, sum))))
+              if (stretch_y || stretch_spacing) {
+                  heights <- redistribute_null_units(heights, spacing, 
+                      margin, "height")
+                  vp_height <- unit(1, "npc")
+              }
+              else {
+                  heights <- inject(unit.c(!!!lapply(heights, sum)))
+                  vp_height <- sum(heights, spacing * (length(grobs) - 
+                      1L))
+              }
+              vp <- viewport(x = global_xjust, y = global_yjust, just = global_just, 
+                  height = vp_height, width = total_width)
+              guides <- gtable_col(name = "guides", grobs = grobs, 
+                  width = total_width, heights = heights, vp = vp)
+              guides <- gtable_add_row_space(guides, spacing)
+          }
+          guides <- gtable_add_padding(guides, margin)
+          background <- element_grob(theme$legend.box.background %||% 
+              element_blank())
+          guides <- gtable_add_grob(guides, background, t = 1, l = 1, 
+              b = -1, r = -1, z = -Inf, clip = "off", name = "legend.box.background")
+          if (stretch_x || stretch_spacing) {
+              global_margin[c(2, 4)] <- unit(0, "cm")
+          }
+          if (stretch_y || stretch_spacing) {
+              global_margin[c(1, 3)] <- unit(0, "cm")
+          }
+          guides <- gtable_add_padding(guides, global_margin)
+          guides$name <- "guide-box"
+          guides
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Guide$add_title)$f))
+    Output
+      {
+          if (is_zero(title)) {
+              return(gtable)
+          }
+          title_width_cm <- width_cm(title)
+          title_height_cm <- height_cm(title)
+          gtable <- switch(position, top = gtable_add_rows(gtable, 
+              unit(title_height_cm, "cm"), pos = 0), right = gtable_add_cols(gtable, 
+              unit(title_width_cm, "cm"), pos = -1), bottom = gtable_add_rows(gtable, 
+              unit(title_height_cm, "cm"), pos = -1), left = gtable_add_cols(gtable, 
+              unit(title_width_cm, "cm"), pos = 0))
+          args <- switch(position, top = list(t = 1, l = 1, r = -1, 
+              b = 1), right = list(t = 1, l = -1, r = -1, b = -1), 
+              bottom = list(t = -1, l = 1, r = -1, b = -1), left = list(t = 1, 
+                  l = 1, r = 1, b = -1), )
+          gtable <- inject(gtable_add_grob(x = gtable, grobs = title, 
+              !!!args, z = -Inf, name = "title", clip = "off"))
+          if (position %in% c("top", "bottom")) {
+              if (any(unitType(gtable$widths) == "null")) {
+                  return(gtable)
+              }
+              table_width <- sum(width_cm(gtable$widths))
+              extra_width <- max(0, title_width_cm - table_width)
+              if (extra_width == 0) {
+                  return(gtable)
+              }
+              extra_width <- unit((c(1, -1) * just$hjust + c(0, 1)) * 
+                  extra_width, "cm")
+              gtable <- gtable_add_cols(gtable, extra_width[1], pos = 0)
+              gtable <- gtable_add_cols(gtable, extra_width[2], pos = -1)
+          }
+          else {
+              if (any(unitType(gtable$heights) == "null")) {
+                  return(gtable)
+              }
+              table_height <- sum(height_cm(gtable$heights))
+              extra_height <- max(0, title_height_cm - table_height)
+              if (extra_height == 0) {
+                  return(gtable)
+              }
+              extra_height <- unit((c(-1, 1) * just$vjust + c(1, 0)) * 
+                  extra_height, "cm")
+              gtable <- gtable_add_rows(gtable, extra_height[1], pos = 0)
+              gtable <- gtable_add_rows(gtable, extra_height[2], pos = -1)
+          }
+          gtable
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::Guide$setup_elements)$f))
+    Output
+      {
+          theme <- add_theme(theme, params$theme)
+          is_char <- vapply(elements, is.character, logical(1))
+          elements[is_char] <- lapply(elements[is_char], calc_element, 
+              theme = theme)
+          elements
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideLegend[[m]])$f))
+    Output
+      {
+          params$direction <- arg_match0(params$direction, c("horizontal", 
+              "vertical"), arg_nm = "direction")
+          params$n_breaks <- n_breaks <- nrow(params$key)
+          if (!is.null(params$nrow) && !is.null(params$ncol) && params$nrow * 
+              params$ncol < n_breaks) {
+              cli::cli_abort(paste0("{.arg nrow} * {.arg ncol} needs to be larger than the number of ", 
+                  "breaks ({n_breaks})."))
+          }
+          if (is.null(params$nrow) && is.null(params$ncol)) {
+              if (params$direction == "horizontal") {
+                  params$nrow <- ceiling(n_breaks/5)
+              }
+              else {
+                  params$ncol <- ceiling(n_breaks/20)
+              }
+          }
+          params$nrow <- params$nrow %||% ceiling(n_breaks/params$ncol)
+          params$ncol <- params$ncol %||% ceiling(n_breaks/params$nrow)
+          params
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideLegend[[m]])$f))
+    Output
+      {
+          theme <- add_theme(theme, params$theme)
+          params$theme <- NULL
+          text_position <- theme$legend.text.position %||% "right"
+          title_position <- theme$legend.title.position %||% switch(params$direction, 
+              vertical = "top", horizontal = "left")
+          theme$legend.text.position <- arg_match0(text_position, .trbl, 
+              arg_nm = "legend.text.position")
+          theme$legend.title.position <- arg_match0(title_position, 
+              .trbl, arg_nm = "legend.title.position")
+          theme$legend.key.spacing <- calc_element("legend.key.spacing", 
+              theme)
+          gap <- theme$legend.key.spacing
+          if (params$direction == "vertical") {
+              theme$legend.key.spacing.y <- theme$legend.key.spacing.y %||% 
+                  unit(0, "pt")
+          }
+          margin <- try_prop(calc_element("text", theme), "margin")
+          title <- theme(text = element_text(hjust = 0, vjust = 0.5, 
+              margin = position_margin(title_position, margin, gap)))
+          elements$title <- calc_element("legend.title", add_theme(theme, 
+              title))
+          margin <- position_margin(text_position, margin, gap)
+          text <- theme(text = switch(text_position, top = element_text(hjust = 0.5, 
+              vjust = 0, margin = margin), bottom = element_text(hjust = 0.5, 
+              vjust = 1, margin = margin), left = element_text(hjust = 1, 
+              vjust = 0.5, margin = margin), right = element_text(hjust = 0, 
+              vjust = 0.5, margin = margin)))
+          elements$text <- calc_element("legend.text", add_theme(theme, 
+              text))
+          Guide$setup_elements(params, elements, theme)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideLegend[[m]])$f))
+    Output
+      {
+          if (any(c("key_width", "key_height") %in% names(elements))) {
+              elements$stretch_x <- unitType(elements$key_width) == 
+                  "null"
+              elements$stretch_y <- unitType(elements$key_height) == 
+                  "null"
+              elements$width_cm <- width_cm(elements$key_width)
+              elements$height_cm <- height_cm(elements$key_height)
+          }
+          if (any(c("spacing_x", "spacing_y") %in% names(elements))) {
+              elements$spacing_x <- width_cm(elements$spacing_x)
+              elements$spacing_y <- height_cm(elements$spacing_y)
+          }
+          elements$padding <- convertUnit(elements$margin %||% margin(), 
+              "cm", valueOnly = TRUE)
+          if (!is.null(elements$background)) {
+              elements$background <- ggname("legend.background", element_grob(elements$background))
+          }
+          if (!is.null(elements$key)) {
+              elements$key <- ggname("legend.key", element_grob(elements$key))
+          }
+          if (!is.null(elements$key_just)) {
+              elements$key_just <- valid.just(elements$key_just)
+          }
+          elements$text <- label_angle_heuristic(elements$text, elements$text_position, 
+              params$angle)
+          elements
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideLegend[[m]])$f))
+    Output
+      {
+          key_size <- c(elements$width_cm, elements$height_cm)
+          just <- elements$key_just
+          idx <- seq_len(params$n_breaks)
+          key_glyphs <- lapply(idx, function(i) {
+              glyph <- lapply(decor, function(dec) {
+                  data <- vec_slice(dec$data, i)
+                  if (!(data$.draw %||% TRUE)) {
+                      return(zeroGrob())
+                  }
+                  key <- dec$draw_key(data, dec$params, key_size * 
+                      10)
+                  set_key_size(key, data$linewidth, data$size, key_size)
+              })
+              width <- vapply(glyph, get_attr, which = "width", default = 0, 
+                  numeric(1))
+              width <- max(width, 0, key_size[1], na.rm = TRUE)
+              height <- vapply(glyph, get_attr, which = "height", default = 0, 
+                  numeric(1))
+              height <- max(height, 0, key_size[2], na.rm = TRUE)
+              vp <- NULL
+              if (!is.null(just)) {
+                  vp <- viewport(x = just[1], y = just[2], just = just, 
+                      width = unit(width, "cm"), height = unit(height, 
+                        "cm"))
+              }
+              grob <- gTree(children = inject(gList(elements$key, !!!glyph)), 
+                  vp = vp)
+              attr(grob, "width") <- width
+              attr(grob, "height") <- height
+              grob
+          })
+          key_glyphs
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideLegend[[m]])$f))
+    Output
+      {
+          n_labels <- length(key$.label)
+          if (n_labels < 1) {
+              out <- rep(list(zeroGrob()), nrow(key))
+              return(out)
+          }
+          lapply(key$.label, function(lab) {
+              ggname("guide.label", element_grob(elements$text, label = lab, 
+                  margin_x = TRUE, margin_y = TRUE))
+          })
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideLegend[[m]])$f))
+    Output
+      {
+          byrow <- elements$byrow %||% FALSE
+          n_breaks <- params$n_breaks %||% 1L
+          dim <- c(params$nrow %||% 1L, params$ncol %||% 1L)
+          sizes <- params$sizes %||% measure_legend_keys(grobs$decor, 
+              n = n_breaks, dim = dim, byrow = byrow, default_width = elements$width_cm, 
+              default_height = elements$height_cm)
+          widths <- sizes$widths
+          heights <- sizes$heights
+          zeroes <- rep(0, prod(dim) - n_breaks)
+          label_widths <- apply(matrix(c(width_cm(grobs$labels), zeroes), 
+              nrow = dim[1], ncol = dim[2], byrow = byrow), 2, max)
+          label_heights <- apply(matrix(c(height_cm(grobs$labels), 
+              zeroes), nrow = dim[1], ncol = dim[2], byrow = byrow), 
+              1, max)
+          hgap <- elements$spacing_x %||% 0
+          widths <- switch(elements$text_position, left = list(label_widths, 
+              widths, hgap), right = list(widths, label_widths, hgap), 
+              list(pmax(label_widths, widths), hgap))
+          widths <- head(vec_interleave(!!!widths), -1)
+          vgap <- elements$spacing_y %||% 0
+          heights <- switch(elements$text_position, top = list(label_heights, 
+              heights, vgap), bottom = list(heights, label_heights, 
+              vgap), list(pmax(label_heights, heights), vgap))
+          heights <- head(vec_interleave(!!!heights), -1)
+          list(widths = widths, heights = heights)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideLegend[[m]])$f))
+    Output
+      {
+          break_seq <- seq_len(params$n_breaks %||% 1L)
+          dim <- c(params$nrow %||% 1L, params$ncol %||% 1L)
+          if (elements$byrow %||% FALSE) {
+              row <- ceiling(break_seq/dim[2L])
+              col <- (break_seq - 1L)%%dim[2L] + 1L
+          }
+          else {
+              row <- (break_seq - 1L)%%dim[1L] + 1L
+              col <- ceiling(break_seq/dim[1L])
+          }
+          key_row <- row * 2 - 1
+          key_col <- col * 2 - 1
+          position <- elements$text_position
+          key_row <- key_row + switch(position, top = row, bottom = row - 
+              1, 0)
+          lab_row <- key_row + switch(position, top = -1, bottom = 1, 
+              0)
+          key_col <- key_col + switch(position, left = col, right = col - 
+              1, 0)
+          lab_col <- key_col + switch(position, left = -1, right = 1, 
+              0)
+          data_frame0(key_row = key_row, key_col = key_col, label_row = lab_row, 
+              label_col = lab_col)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideLegend[[m]])$f))
+    Output
+      {
+          widths <- unit(sizes$widths, "cm")
+          if (isTRUE(elements$stretch_x)) {
+              widths[unique0(layout$key_col)] <- elements$key_width
+          }
+          heights <- unit(sizes$heights, "cm")
+          if (isTRUE(elements$stretch_y)) {
+              heights[unique0(layout$key_row)] <- elements$key_height
+          }
+          gt <- gtable(widths = widths, heights = heights)
+          if (!is_zero(grobs$decor)) {
+              n_key_layers <- params$n_key_layers %||% 1L
+              key_cols <- rep(layout$key_col, each = n_key_layers)
+              key_rows <- rep(layout$key_row, each = n_key_layers)
+              gt <- gtable_add_grob(gt, grobs$decor, name = names(grobs$decor) %||% 
+                  paste("key", key_rows, key_cols, c("bg", seq_len(n_key_layers - 
+                      1)), sep = "-"), clip = "off", t = key_rows, 
+                  r = key_cols, b = key_rows, l = key_cols)
+          }
+          if (!is_zero(grobs$labels)) {
+              gt <- gtable_add_grob(gt, grobs$labels, name = names(labels) %||% 
+                  paste("label", layout$label_row, layout$label_col, 
+                      sep = "-"), clip = "off", t = layout$label_row, 
+                  r = layout$label_col, b = layout$label_row, l = layout$label_col)
+          }
+          gt <- self$add_title(gt, grobs$title, elements$title_position, 
+              rotate_just(element = elements$title))
+          gt <- gtable_add_padding(gt, unit(elements$padding, "cm"))
+          if (!is_zero(elements$background)) {
+              gt <- gtable_add_grob(gt, elements$background, name = "background", 
+                  clip = "off", t = 1, r = -1, b = -1, l = 1, z = -Inf)
+          }
+          gt
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideColourbar[[m]])$f))
+    Output
+      {
+          params$direction <- arg_match0(params$direction, c("horizontal", 
+              "vertical"), arg_nm = "direction")
+          params
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideColourbar[[m]])$f))
+    Output
+      {
+          if (params$direction == "horizontal") {
+              theme$legend.key.width <- (theme$legend.key.width %||% 
+                  rel(1)) * 5
+              valid_position <- c("bottom", "top")
+          }
+          else {
+              theme$legend.key.height <- (theme$legend.key.height %||% 
+                  rel(1)) * 5
+              valid_position <- c("right", "left")
+          }
+          theme <- replace_null(theme, legend.text.position = valid_position[1], 
+              legend.ticks = params$default_ticks, legend.frame = params$default_frame)
+          elements <- GuideLegend$setup_elements(params, elements, 
+              theme)
+          if (!elements$text_position %in% valid_position) {
+              cli::cli_abort(paste0("When {.arg direction} is {.val {params$direction}}, ", 
+                  "{.arg legend.text.position} must be one of ", "{.or {.val {valid_position}}}, not {.val {elements$text_position}}."))
+          }
+          elements
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideColourbar[[m]])$f))
+    Output
+      {
+          n_labels <- length(key$.label)
+          if (n_labels < 1) {
+              return(list(labels = zeroGrob()))
+          }
+          list(labels = flip_element_grob(elements$text, label = validate_labels(key$.label), 
+              x = unit(key$.value, "npc"), margin_x = FALSE, margin_y = TRUE, 
+              flip = params$direction == "vertical"))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideColourbar[[m]])$f))
+    Output
+      {
+          pos <- key$.value
+          if (!params$draw_lim[1]) 
+              pos <- pos[-1]
+          if (!params$draw_lim[2]) 
+              pos <- pos[-length(pos)]
+          position <- switch(params$direction, horizontal = c("bottom", 
+              "top"), vertical = c("right", "left"))
+          ticks_length <- rep(elements$ticks_length, length.out = 2)
+          grobTree(Guide$build_ticks(pos, elements, params, position[1], 
+              ticks_length[1]), Guide$build_ticks(pos, elements, params, 
+              position[2], ticks_length[2]))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideColourbar[[m]])$f))
+    Output
+      {
+          if (params$display == "raster") {
+              image <- switch(params$direction, horizontal = t(decor$colour), 
+                  vertical = rev(decor$colour))
+              grob <- rasterGrob(image = image, width = 1, height = 1, 
+                  default.units = "npc", gp = gpar(col = NA), interpolate = TRUE)
+          }
+          else if (params$display == "rectangles") {
+              if (params$direction == "horizontal") {
+                  width <- 1/nrow(decor)
+                  height <- 1
+                  x <- (seq_len(nrow(decor)) - 1) * width
+                  y <- 0
+              }
+              else {
+                  width <- 1
+                  height <- 1/nrow(decor)
+                  y <- (seq_len(nrow(decor)) - 1) * height
+                  x <- 0
+              }
+              grob <- rectGrob(x = x, y = y, vjust = 0, hjust = 0, 
+                  width = width, height = height, default.units = "npc", 
+                  gp = gg_par(col = NA, fill = decor$colour))
+          }
+          else if (params$display == "gradient") {
+              check_device("gradients", call = expr(guide_colourbar()))
+              value <- if (isTRUE(params$reverse)) {
+                  rescale(decor$value, to = c(1, 0))
+              }
+              else {
+                  rescale(decor$value, to = c(0, 1))
+              }
+              position <- switch(params$direction, horizontal = list(y1 = unit(0.5, 
+                  "npc"), y2 = unit(0.5, "npc")), vertical = list(x1 = unit(0.5, 
+                  "npc"), x2 = unit(0.5, "npc")))
+              gradient <- inject(linearGradient(decor$colour, value, 
+                  !!!position))
+              grob <- rectGrob(gp = gg_par(fill = gradient, col = NA))
+          }
+          frame <- element_grob(elements$frame, fill = NA)
+          list(bar = grob, frame = frame, ticks = grobs$ticks)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GuideColourbar[[m]])$f))
+    Output
+      {
+          params$sizes <- list(widths = elements$width_cm, heights = elements$height_cm)
+          GuideLegend$measure_grobs(grobs, params, elements)
+      }
+

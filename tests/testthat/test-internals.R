@@ -251,3 +251,26 @@ test_that("upstream panel and axis drawing match what the Rust drawers mirror", 
   expect_snapshot(print(body(environment(ggplot2::GuideAxis$assemble_drawing)$f)))
   expect_snapshot(print(body(environment(ggplot2::GuideAxis$draw_early_exit)$f)))
 })
+
+test_that("upstream guide assembly matches what the legend drawers mirror", {
+  # legend_boxes() and friends (R/render-legend.R) and
+  # alot-core/src/render/legend.rs mirror these; guides' setup_params() and
+  # setup_elements() are called, not mirrored. If these fail, update the
+  # mirror, then the snapshots.
+  gg_fn <- function(f) utils::getFromNamespace(f, "ggplot2")
+  for (f in c("draw_key_point", "measure_legend_keys", "get_key_size", "set_key_size", "position_margin", "keep_key_data")) {
+    expect_snapshot(print(body(gg_fn(f))))
+  }
+  guides <- gg_fn("Guides")
+  for (m in c("assemble", "draw", "package_box")) {
+    expect_snapshot(print(body(environment(guides[[m]])$f)))
+  }
+  expect_snapshot(print(body(environment(ggplot2::Guide$add_title)$f)))
+  expect_snapshot(print(body(environment(ggplot2::Guide$setup_elements)$f)))
+  for (m in c("setup_params", "setup_elements", "override_elements", "build_decor", "build_labels", "measure_grobs", "arrange_layout", "assemble_drawing")) {
+    expect_snapshot(print(body(environment(ggplot2::GuideLegend[[m]])$f)))
+  }
+  for (m in c("setup_params", "setup_elements", "build_labels", "build_ticks", "build_decor", "measure_grobs")) {
+    expect_snapshot(print(body(environment(ggplot2::GuideColourbar[[m]])$f)))
+  }
+})

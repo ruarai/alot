@@ -43,7 +43,7 @@ fn at(v: &[f64], i: usize) -> f64 {
 impl PointLayer {
     /// The layer's points in panel cell `c`, as the hybrid tier's
     /// `rs_render_points()` places them.
-    fn batch(&self, c: &Rect, threads: usize) -> PointBatch {
+    pub(crate) fn batch(&self, c: &Rect, threads: usize) -> PointBatch {
         let (pw, ph) = (c.x1 - c.x0, c.y1 - c.y0);
         let npc = |v: f64, r: &[f64; 2]| {
             if v == f64::INFINITY {

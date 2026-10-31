@@ -12,6 +12,7 @@ use crate::render::agg::{Cap, Join, Rule};
 use crate::render::axis::Axis;
 use crate::render::display::{DisplayList, Item, Rect};
 use crate::render::layout::{Box as Cell, Table};
+use crate::render::legend::LegendGroup;
 use crate::render::panel::Panel;
 use crate::render::paths::{PathBatch, PathSpec, Stroke};
 use crate::render::rects::{RectBatch, RectSpec, RectStyle};
@@ -96,6 +97,18 @@ impl<'f, 'a> Painter<'f, 'a> {
         }
     }
 
+    /// `rasterGrob()` of a colourbar's colours (low to high, opaque or not)
+    /// stretched over `c` with `interpolate = TRUE`, as ragg's
+    /// `drawRaster()` draws it: AGG's bilinear span generator over the
+    /// image with edge pixels cloned, at the rect's exact position with
+    /// its edge coverage. The image is one pixel wide with the highest
+    /// colour first (vertical), or one high (horizontal).
+    pub fn raster(&mut self, c: &Rect, colours: &[[u8; 4]], horizontal: bool) {
+        if let Some(image) = bar_image(c, colours, horizontal, self.page_clip) {
+            self.list.push(Item::Image(image));
+        }
+    }
+
     /// Text runs in one style. `None` if ragg's drawing of them isn't
     /// mirrored (a glyph missing from the font).
     pub fn text(&mut self, runs: &[Run], st: &TextStyle) -> Option<()> {
@@ -113,6 +126,78 @@ impl<'f, 'a> Painter<'f, 'a> {
     }
 }
 
+/// `agg::multiply()` of 8-bit values.
+fn mul8(a: u32, b: u32) -> u32 {
+    let t = a * b + 128;
+    ((t >> 8) + t) >> 8
+}
+
+fn iround(v: f64) -> i64 {
+    (if v < 0.0 { v - 0.5 } else { v + 0.5 }) as i64
+}
+
+/// The pixels `Painter::raster()` draws, premultiplied, cropped to the page
+/// (`clip` is ragg's inclusive clip box).
+fn bar_image(c: &Rect, colours: &[[u8; 4]], horizontal: bool, clip: [i32; 4]) -> Option<text::Image> {
+    let n = colours.len();
+    if n == 0 || !(c.x1 > c.x0 && c.y1 > c.y0) {
+        return None;
+    }
+    // The source image as AGG holds it, premultiplied.
+    let pre: Vec<[u32; 4]> = colours
+        .iter()
+        .map(|&[r, g, b, a]| {
+            let a = a as u32;
+            if a == 255 {
+                [r as u32, g as u32, b as u32, a]
+            } else if a == 0 {
+                [0; 4]
+            } else {
+                [mul8(r as u32, a), mul8(g as u32, a), mul8(b as u32, a), a]
+            }
+        })
+        .collect();
+    let (w, h) = if horizontal { (n, 1) } else { (1, n) };
+    let at = |x: i64, y: i64| {
+        let (x, y) = (x.clamp(0, w as i64 - 1) as usize, y.clamp(0, h as i64 - 1) as usize);
+        if horizontal { pre[x] } else { pre[n - 1 - y] }
+    };
+    let (fx0, fx1, fy0, fy1) = (iround(c.x0 * 256.0), iround(c.x1 * 256.0), iround(c.y0 * 256.0), iround(c.y1 * 256.0));
+    let (i0, i1) = ((fx0 >> 8).max(clip[0] as i64), ((fx1 + 255) >> 8).min(clip[2] as i64 + 1));
+    let (j0, j1) = ((fy0 >> 8).max(clip[1] as i64), ((fy1 + 255) >> 8).min(clip[3] as i64 + 1));
+    if i0 >= i1 || j0 >= j1 {
+        return None;
+    }
+    let overlap = |i: i64, lo: i64, hi: i64| (hi.min((i + 1) * 256) - lo.max(i * 256)).clamp(0, 256);
+    let (iw, ih) = ((i1 - i0) as usize, (j1 - j0) as usize);
+    let (dw, dh) = (c.x1 - c.x0, c.y1 - c.y0);
+    let mut px = vec![[0.0f32; 4]; iw * ih];
+    for j in j0..j1 {
+        let oy = overlap(j, fy0, fy1);
+        // span_interpolator_linear: the pixel centre mapped into the image
+        // in 1/256ths, less the filter's half pixel.
+        let y_hr = iround((j as f64 + 0.5 - c.y0) * h as f64 / dh * 256.0) - 128;
+        let (y_lr, yf) = (y_hr >> 8, (y_hr & 255) as u32);
+        for i in i0..i1 {
+            let cover = ((overlap(i, fx0, fx1) * oy) >> 8).min(255) as f32 / 255.0;
+            if cover == 0.0 {
+                continue;
+            }
+            let x_hr = iround((i as f64 + 0.5 - c.x0) * w as f64 / dw * 256.0) - 128;
+            let (x_lr, xf) = (x_hr >> 8, (x_hr & 255) as u32);
+            let weights = [(256 - xf) * (256 - yf), xf * (256 - yf), (256 - xf) * yf, xf * yf];
+            let corners = [at(x_lr, y_lr), at(x_lr + 1, y_lr), at(x_lr, y_lr + 1), at(x_lr + 1, y_lr + 1)];
+            let mut out = [0.0f32; 4];
+            for ch in 0..4 {
+                let sum: u32 = 32768 + (0..4).map(|k| weights[k] * corners[k][ch]).sum::<u32>();
+                out[ch] = (sum >> 16) as f32 / 255.0 * cover;
+            }
+            px[(j - j0) as usize * iw + (i - i0) as usize] = out;
+        }
+    }
+    Some(text::Image { x0: i0 as i32, y0: j0 as i32, w: iw, h: ih, px })
+}
+
 /// What a plot's cells draw.
 pub struct PageSpec {
     pub width: usize,
@@ -127,6 +212,8 @@ pub struct PageSpec {
     pub axes: Vec<(String, Axis)>,
     /// Titles by cell name (axis titles, title, subtitle, caption, tag).
     pub titles: Vec<(String, Title)>,
+    /// Legend boxes by cell name ("guide-box-right", ...).
+    pub legends: Vec<(String, LegendGroup)>,
     pub threads: usize,
 }
 
@@ -160,6 +247,48 @@ pub fn draw_page(spec: &PageSpec, fonts: &[Font]) -> Option<DisplayList> {
         if let Some((_, title)) = spec.titles.iter().find(|(n, _)| *n == b.name) {
             title.draw(&mut p, &rect_of(b))?;
         }
+        if let Some((_, legends)) = spec.legends.iter().find(|(n, _)| *n == b.name) {
+            legends.draw(&mut p, &rect_of(b))?;
+        }
     }
     Some(p.list)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const CLIP: [i32; 4] = [0, 0, 99, 99];
+
+    #[test]
+    fn a_vertical_bar_has_its_last_colour_on_top_and_blends_between_the_ends() {
+        let colours = [[0, 0, 0, 255], [200, 100, 50, 255]];
+        let img = bar_image(&Rect { x0: 2.0, y0: 3.0, x1: 6.0, y1: 23.0 }, &colours, false, CLIP).unwrap();
+        assert_eq!((img.x0, img.y0, img.w, img.h), (2, 3, 4, 20));
+        let at = |j: usize| img.px[j * img.w][0] * 255.0;
+        // Edge pixels clone the end colours; between the two image pixels'
+        // centres (a quarter and three quarters down) the colour blends.
+        assert!((at(0) - 200.0).abs() < 1.0, "{}", at(0));
+        assert!(at(19) < 1.0, "{}", at(19));
+        assert!((at(10) - 90.0).abs() < 2.0, "{}", at(10));
+        assert!(at(5) > at(15));
+    }
+
+    #[test]
+    fn a_horizontal_bar_runs_from_the_first_colour_to_the_last() {
+        let colours = [[255, 0, 0, 255], [0, 0, 255, 255]];
+        let img = bar_image(&Rect { x0: 0.0, y0: 0.0, x1: 20.0, y1: 4.0 }, &colours, true, CLIP).unwrap();
+        assert!(img.px[0][0] > 0.99 && img.px[19][2] > 0.99);
+    }
+
+    #[test]
+    fn fractional_edges_have_partial_coverage_and_the_page_clips() {
+        let colours = [[10, 20, 30, 255]];
+        let img = bar_image(&Rect { x0: 1.5, y0: 1.0, x1: 3.0, y1: 2.0 }, &colours, false, CLIP).unwrap();
+        assert_eq!((img.x0, img.w), (1, 2));
+        assert!((img.px[0][3] - 0.5).abs() < 0.01 && (img.px[1][3] - 1.0).abs() < 1e-6);
+        let img = bar_image(&Rect { x0: 90.0, y0: 0.0, x1: 120.0, y1: 4.0 }, &colours, false, CLIP).unwrap();
+        assert_eq!((img.x0, img.w), (90, 10));
+        assert!(bar_image(&Rect { x0: 120.0, y0: 0.0, x1: 130.0, y1: 4.0 }, &colours, false, CLIP).is_none());
+    }
 }

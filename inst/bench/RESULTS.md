@@ -1080,3 +1080,31 @@ colours, which the hybrid computes too), `rs_render_page` 157 ms; the whole
 tier is no slower at drawing. The full tier avoids the hybrid's gtable build
 and grid drawing, which is the whole gain at 1e3 points. ggplot2 on ragg took
 7.7 s for 1e6 points in an earlier run (debug build of alot, unaffected).
+
+## R5.3: legends in the full tier (2026-10-31)
+
+Release build, 1050 × 1050 px at 150 dpi, the README plot without its facets
+(`income`, `spend`, colour `age`, shape `segment`, log x; R5.2's facets are
+not built yet), `render_full()` against `render_hybrid()` on a built plot, 5
+reps, medians:
+
+| case | full | hybrid |
+|---|---:|---:|
+| 1e3 points, no legend | 25 ms | 60 ms |
+| 1e3 points, colourbar + point legend | 34 ms | 99 ms |
+| 1e6 points, no legend | 113 ms | 156 ms |
+| 1e6 points, colourbar + point legend | 116 ms | 187 ms |
+
+The legends add 9 ms at 1e3 points, of which `legend_boxes()` (R/render-legend.R:
+guide elements, text metrics, key sizes) is 7 ms and Rust's assembly and
+drawing under 2 ms. Resolving the guides' theme with ggplot2's own
+`setup_elements()` cost 23 ms (S7 validation at every inheritance step), so
+`legend_elements()` mirrors it on `theme_calc()`'s property lists, the way
+`resolve_theme()` does for the whole theme. The legend adds 3 ms at 1e6
+points (within noise), against 31 ms for the hybrid's gtable and grid
+drawing.
+
+Pixel fidelity against ggplot2 on ragg at 96 dpi: the colourbar's box differs
+by at most 1/255 from ragg's raster, and the legend keys by at most 5 (the
+point drawer's sprite coverage, as in the panel). Legend, bar and box sizes
+match grid's layout within 0.5 px in every `test-render-legend.R` case.
