@@ -872,11 +872,32 @@ anything else.
   so they run through the hybrid tier; `test-render-geoms.R` covers the
   full tier.
 
-### R6.2 Complete themes
+### R6.2 Complete themes — done
 - **Depends:** R4.2
 - **Do:** Cover every built-in complete theme, and the theme elements and
   options they use.
 - **Done when:** blank and point plots pass in each theme.
+- **Result:** every complete theme (`theme_grey()`/`theme_gray()`,
+  `_bw`, `_linedraw`, `_light`, `_dark`, `_minimal`, `_classic`, `_void`,
+  `_test`) renders blank and point plots, with titles, a legend, a
+  colourbar and `facet_wrap()`, in the full tier and passes the image and
+  layout checks, as do their arguments (`base_size`, `base_family`,
+  `header_family`, `ink`, `paper`, `accent`, `base_line_size`,
+  `base_rect_size`; `test-render-themes.R`). Most of it already held after
+  R4.2–R5.3; what changed: element rects with dashed line types are drawn
+  (`Painter::rect()` hands them to the path drawer as ragg's `drawRect()`
+  builds the path, from grid's bottom-left corner, round ends);
+  `panel.ontop = TRUE` draws the background and grid over the layers
+  (`Coord$draw_panel()`; it drew them under, wrongly, once a panel had
+  layers); `lines` and `char` units are converted with the device's
+  default gpar wherever no grob sets one (`plot.margin`, `panel.spacing`,
+  tick lengths, legend sizes; `layout_px()`); `element_text(debug = TRUE)`
+  declines (it drew without the debug marks). Still declined (hybrid
+  tier): text margins in `lines`/`char` (titleGrob() sizes them in the
+  parent's gpar but places the text in its own), arrows on `axis.line`,
+  debug text, and `legend.box.background`/`legend.box.margin` (R6.4).
+  `test-internals.R` snapshots the complete themes and
+  `element_grob()` for rects and lines.
 
 ### R6.3 Facets in full
 - **Depends:** R5.2

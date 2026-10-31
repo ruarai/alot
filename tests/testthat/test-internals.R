@@ -307,3 +307,15 @@ test_that("upstream facet_wrap() assembly matches what the Rust layout mirrors",
     expect_snapshot(print(body(environment(ggplot2::FacetWrap[[m]])$f)))
   }
 })
+
+test_that("upstream complete themes and element grobs match what the full tier covers", {
+  # full_rect() and full_line() (R/render-full.R) mirror element_grob() for
+  # element_rect and element_line; test-render-themes.R covers the
+  # complete themes' elements and options (R6.2). If these fail, update the
+  # mirror and recheck the themes' elements, then the snapshots.
+  expect_snapshot(print(body(utils::getS3method("element_grob", "ggplot2::element_rect", envir = asNamespace("ggplot2")))))
+  expect_snapshot(print(body(utils::getS3method("element_grob", "ggplot2::element_line", envir = asNamespace("ggplot2")))))
+  for (f in c("theme_grey", "theme_bw", "theme_linedraw", "theme_light", "theme_dark", "theme_minimal", "theme_classic", "theme_void", "theme_test")) {
+    expect_snapshot(print(body(utils::getFromNamespace(f, "ggplot2"))))
+  }
+})

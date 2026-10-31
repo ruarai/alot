@@ -304,6 +304,10 @@ ir_element_decline <- function(x) {
       if (is.na(ir_face(x$face))) {
         return("unsupported font face")
       }
+      # titleGrob()'s debug rectangles and points (ggplot2 R/margins.R).
+      if (isTRUE(x$debug)) {
+        return("debug text")
+      }
       if (!is.null(x$margin) && !inherits(x$margin, "simpleUnit") && is.null(ir_unit(x$margin))) {
         return("margin is not a simple unit")
       }

@@ -81,6 +81,9 @@ pub enum Layer {
 
 pub struct Panel {
     pub clip: bool,
+    /// `panel.ontop`: the background and grid over the layers
+    /// (`Coord$draw_panel()`).
+    pub ontop: bool,
     /// `panel.background`.
     pub background: Option<RectEl>,
     /// In drawing order: minor y, minor x, major y, major x.
@@ -98,6 +101,38 @@ impl Panel {
         if self.clip {
             p.push_clip(*c);
         }
+        if !self.ontop {
+            self.draw_bg(p, c);
+        }
+        // ragg's clip box for text: the panel's, or the page.
+        let clip = if self.clip { p.text_clip_box(c) } else { p.page_clip() };
+        for layer in &self.layers {
+            match layer {
+                Layer::Points(l) => p.list.push(Item::Points(l.batch(c, p.threads))),
+                Layer::Rects(l) => p.list.push(Item::Rects(l.batch(c))),
+                Layer::Paths(l) => {
+                    let specs = l.specs(c);
+                    if !specs.is_empty() {
+                        p.list.push(Item::Paths(PathBatch::new(&specs)));
+                    }
+                }
+                Layer::Text(l) => l.draw(p, c, clip)?,
+            }
+        }
+        if self.ontop {
+            self.draw_bg(p, c);
+        }
+        if let Some(border) = &self.border {
+            p.rect(c, border);
+        }
+        if self.clip {
+            p.pop_clip();
+        }
+        Some(())
+    }
+
+    /// `Coord$render_bg()`: the background and the grid lines.
+    fn draw_bg(&self, p: &mut Painter, c: &Rect) {
         if let Some(bg) = &self.background {
             p.rect(c, bg);
         }
@@ -119,27 +154,5 @@ impl Panel {
                 .collect();
             p.lines(lines, &g.style);
         }
-        // ragg's clip box for text: the panel's, or the page.
-        let clip = if self.clip { p.text_clip_box(c) } else { p.page_clip() };
-        for layer in &self.layers {
-            match layer {
-                Layer::Points(l) => p.list.push(Item::Points(l.batch(c, p.threads))),
-                Layer::Rects(l) => p.list.push(Item::Rects(l.batch(c))),
-                Layer::Paths(l) => {
-                    let specs = l.specs(c);
-                    if !specs.is_empty() {
-                        p.list.push(Item::Paths(PathBatch::new(&specs)));
-                    }
-                }
-                Layer::Text(l) => l.draw(p, c, clip)?,
-            }
-        }
-        if let Some(border) = &self.border {
-            p.rect(c, border);
-        }
-        if self.clip {
-            p.pop_clip();
-        }
-        Some(())
     }
 }

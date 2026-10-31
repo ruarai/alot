@@ -13,9 +13,15 @@ layout_decline <- function(reason) {
 }
 
 # Pixels of each element of a unit (or margin) on a device of `res` pixels
-# per inch. grid's absolute units only; `lines`, `char`, `npc` and the like
-# depend on the viewport and font, so they decline.
-layout_px <- function(u, res) {
+# per inch. grid's absolute units, and with `font = TRUE` the font-relative
+# `lines` and `char` as grid converts them where no viewport or grob sets a
+# gpar (the plot table, the facet panel table, axis ticks): from the
+# device's default gpar, fontsize 12 (ragg's `pointsize`) and lineheight
+# 1.2 (grid's transformLines(): value * fontsize * cex * lineheight / 72
+# inches; R src/library/grid/src/unit.c). `npc`, `null` and the like depend
+# on the viewport, so they decline, as do font-relative units with `font =
+# FALSE` (a text grob's own gpar sets them).
+layout_px <- function(u, res, font = TRUE) {
   if (is.null(u)) {
     return(NULL)
   }
@@ -25,7 +31,8 @@ layout_px <- function(u, res) {
   type <- grid::unitType(u)
   per_inch <- c(
     points = 72.27, pt = 72.27, bigpts = 72, picas = 72.27 / 12, cm = 2.54, mm = 25.4,
-    inches = 1, `in` = 1, inch = 1
+    inches = 1, `in` = 1, inch = 1,
+    if (font) c(lines = 72 / (12 * 1.2), char = 72 / 12)
   )
   scale <- per_inch[type]
   if (anyNA(scale) || !is.null(attr(u, "data"))) {
@@ -66,7 +73,10 @@ layout_title <- function(element, label, res, mx, my, angle = NULL, hjust = NULL
     layout_decline("text alot doesn't measure as ragg does")
   }
   n <- length(label)
-  margin <- layout_px(element$margin %||% ggplot2::margin(), res)
+  # titleGrob() sizes its margins in the parent's gpar but places the text
+  # with the text's own, so font-relative margins would differ between the
+  # two; they decline.
+  margin <- layout_px(element$margin %||% ggplot2::margin(), res, font = FALSE)
   angle <- as.numeric(angle %||% element$angle %||% 0)
   hjust <- as.numeric(hjust %||% element$hjust)
   vjust <- as.numeric(vjust %||% element$vjust)

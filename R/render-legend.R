@@ -13,8 +13,8 @@
 
 # Pixels of a unit on a device of `res` pixels per inch, where grid
 # converts it outside any viewport: `lines` and `char` follow the device's
-# default gpar (fontsize 12, lineheight 1.2). `null` units stretch the
-# guide, which declines.
+# default gpar (layout_px()). `null` units stretch the guide, which
+# declines.
 legend_px <- function(u, res) {
   if (is.null(u)) {
     return(NULL)
@@ -22,21 +22,10 @@ legend_px <- function(u, res) {
   if (!grid::is.unit(u)) {
     layout_decline("a legend size that is not a unit")
   }
-  type <- grid::unitType(u)
-  if (any(type == "null")) {
+  if (any(grid::unitType(u) == "null")) {
     layout_decline("a stretched legend")
   }
-  inches <- c(lines = 12 * 1.2 / 72, char = 12 / 72)
-  known <- type %in% names(inches)
-  if (!any(known)) {
-    return(layout_px(u, res))
-  }
-  if (!all(known)) {
-    out <- numeric(length(u))
-    for (i in seq_along(u)) out[i] <- legend_px(u[i], res)
-    return(out)
-  }
-  as.numeric(u) * inches[type] * res
+  layout_px(u, res)
 }
 
 # Legend justification as valid.just() reads it: two numbers (x, y).

@@ -36,6 +36,10 @@ fn rect_el(l: &List) -> Option<RectEl> {
         fill: rgba(l, "fill")?,
         col: rgba(l, "col")?,
         lwd: num(l, "lwd")?,
+        lty: match field(l, "lty") {
+            None => 0,
+            Some(_) => num(l, "lty")? as u32,
+        },
         join: [Join::Miter, Join::Round, Join::Bevel].get(num(l, "join")? as usize).copied()?,
     })
 }
@@ -345,7 +349,7 @@ fn panel(l: &List, layers: Vec<Layer>) -> Option<Panel> {
         let g = List::try_from(g).ok()?;
         grid.push(GridLines { pos: nums(&g, "pos")?, horizontal: flag(&g, "horizontal")?, style: line_style(&list_of(&g, "style")?)? });
     }
-    Some(Panel { clip: flag(l, "clip")?, background: opt(l, "background", rect_el)?, grid, layers, border: opt(l, "border", rect_el)? })
+    Some(Panel { clip: flag(l, "clip")?, ontop: flag(l, "ontop")?, background: opt(l, "background", rect_el)?, grid, layers, border: opt(l, "border", rect_el)? })
 }
 
 impl Fonts {

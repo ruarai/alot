@@ -45,26 +45,32 @@ full_line <- function(el, res) {
 }
 
 # A resolved element_rect as rectGrob() draws it: fill, outline colour and
-# width in pixels (0 for blank line types), and the join (0 mitre, 1 round,
-# 2 bevel). `fill = NA` overrides the fill. NULL for a blank element.
+# width in pixels (0 for blank line types), R's line type code (0 solid;
+# dashed outlines start at the bottom-left corner, as GERect() hands ragg
+# the corners) and the join (0 mitre, 1 round, 2 bevel). `fill = NA`
+# overrides the fill. NULL for a blank element.
 full_rect <- function(el, res, fill = el$fill %||% NA) {
   if (layout_blank(el)) {
     return(NULL)
   }
-  solid <- rect_linetype(el$linetype %||% 1)
+  lty <- lty_code(el$linetype %||% 1)
   fill <- point_colours(as.character(fill), NA)
   colour <- point_colours(as.character(el$colour %||% NA), NA)
   join <- as.numeric(match(el$linejoin %||% "round", c("mitre", "round", "bevel")) - 1L)
-  if (is.null(solid) || is.null(fill) || is.null(colour) || length(fill) != 1 || length(colour) != 1 || is.na(join)) {
+  if (length(lty) != 1 || is.null(fill) || is.null(colour) || length(fill) != 1 || length(colour) != 1 || is.na(join)) {
     layout_decline("a rect alot doesn't draw")
   }
-  list(fill = fill, col = colour, lwd = (el$linewidth %||% 0) * ggplot2::.pt * solid * res / 96, join = join)
+  list(
+    fill = fill, col = colour, lwd = (el$linewidth %||% 0) * ggplot2::.pt * (lty >= 0) * res / 96,
+    lty = as.numeric(max(lty, 0)), join = join
+  )
 }
 
 # Coord$render_bg(), guide_grid() and Coord$render_fg() (ggplot2
 # R/coord-.R, R/guides-grid.R) for the panel: the background, the grid
 # lines (minor y, minor x, major y, major x) as break positions in npc, and
-# the border.
+# the border. With `panel.ontop`, Coord$draw_panel() draws the background
+# and grid over the layers.
 full_panel <- function(built, ir, res) {
   layout <- built@layout
   pp <- layout$panel_params[[1]]
@@ -89,7 +95,7 @@ full_panel <- function(built, ir, res) {
     grid[[length(grid) + 1L]] <- list(pos = as.numeric(pos[seq(1, length(pos), by = 2)]), horizontal = as.numeric(horizontal), style = style)
   }
   list(
-    clip = as.numeric(identical(coord$clip, "on")),
+    clip = as.numeric(identical(coord$clip, "on")), ontop = as.numeric(isTRUE(theme[["panel.ontop"]])),
     background = full_rect(theme[["panel.background"]], res), grid = grid,
     border = full_rect(theme[["panel.border"]], res, fill = NA)
   )

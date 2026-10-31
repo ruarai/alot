@@ -89,7 +89,9 @@ test_that("plots alot doesn't lay out decline with a reason", {
   expect_match(reason(base + facet_grid(. ~ cyl)), "more than one panel")
   expect_match(reason(base + coord_polar()), "coord not laid out")
   expect_match(reason(base + theme(panel.widths = unit(5, "cm"))), "fixed panel sizes")
-  expect_match(reason(base + theme(plot.margin = unit(c(1, 1, 1, 1), "lines"))), "unit lines")
+  expect_match(reason(base + theme(plot.margin = unit(c(1, 1, 1, 1), "npc"))), "unit npc")
+  # A text margin in lines: titleGrob() sizes and places it in different gpars.
+  expect_match(reason(base + theme(axis.title.x = element_text(margin = margin(t = 1, unit = "lines")))), "unit lines")
   expect_match(reason(base + labs(title = quote(alpha^2))), "plain text")
   expect_match(reason(base + aes(colour = qsec) + guides(colour = guide_coloursteps())), "GuideColoursteps")
 })

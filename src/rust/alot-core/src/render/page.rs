@@ -30,12 +30,14 @@ pub struct LineStyle {
     pub join: Join,
 }
 
-/// A theme `element_rect`: fill, outline colour and width in pixels.
+/// A theme `element_rect`: fill, outline colour, width in pixels and R's
+/// packed line type (0 solid).
 #[derive(Clone, Copy, Debug)]
 pub struct RectEl {
     pub fill: [u8; 4],
     pub col: [u8; 4],
     pub lwd: f64,
+    pub lty: u32,
     pub join: Join,
 }
 
@@ -73,8 +75,24 @@ impl<'f, 'a> Painter<'f, 'a> {
         self.list.push(Item::PopClip);
     }
 
-    /// `rectGrob()` of one element rect over `r`.
+    /// `rectGrob()` of one element rect over `r`. A dashed outline goes
+    /// through the path drawer as ragg's `drawRect()` builds it: the
+    /// filled path from GERect()'s first corner (grid's left, bottom) up,
+    /// right and down, dashed and stroked with grid's default round ends.
     pub fn rect(&mut self, r: &Rect, el: &RectEl) {
+        if el.lty != 0 && el.lwd > 0.0 && el.col[3] > 0 {
+            let ring = vec![[r.x0, r.y1], [r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1]];
+            let spec = PathSpec {
+                rings: vec![ring],
+                closed: true,
+                fill: el.fill,
+                rule: Rule::NonZero,
+                col: el.col,
+                stroke: Stroke { lwd: el.lwd, lty: el.lty, cap: Cap::Round, join: el.join, mitre: 10.0 },
+            };
+            self.list.push(Item::Paths(PathBatch::new(&[spec])));
+            return;
+        }
         let spec = RectSpec { x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1, fill: el.fill, col: el.col, lwd: el.lwd };
         self.list.push(Item::Rects(RectBatch::new(vec![spec], RectStyle { join: el.join, mitre: 10.0, snap: true })));
     }
@@ -369,5 +387,26 @@ mod tests {
         let img = bar_image(&Rect { x0: 90.0, y0: 0.0, x1: 120.0, y1: 4.0 }, &colours, false, CLIP).unwrap();
         assert_eq!((img.x0, img.w), (90, 10));
         assert!(bar_image(&Rect { x0: 120.0, y0: 0.0, x1: 130.0, y1: 4.0 }, &colours, false, CLIP).is_none());
+    }
+
+    fn draw_rect(el: RectEl) -> Vec<u32> {
+        let fonts: Vec<Font> = Vec::new();
+        let mut p = Painter::new(&fonts, 40, 30);
+        p.rect(&Rect { x0: 5.0, y0: 5.0, x1: 35.0, y1: 25.0 }, &el);
+        crate::render::raster::render(&p.list, 40, 30, &crate::render::raster::Options { threads: 1, band_rows: 8 })
+    }
+
+    #[test]
+    fn dashed_element_rects_start_at_the_bottom_left_and_keep_their_fill() {
+        let solid = RectEl { fill: [0, 0, 255, 255], col: [255, 0, 0, 255], lwd: 1.0, lty: 0, join: Join::Round };
+        let dashed = draw_rect(RectEl { lty: 0x44, ..solid });
+        let solid = draw_rect(solid);
+        // Inside, both are the fill.
+        assert_eq!(dashed[15 * 40 + 20], solid[15 * 40 + 20]);
+        // The dashed outline has gaps where the solid one has none; its
+        // first dash runs up from the bottom-left corner (4 px on, 4 off).
+        let red = |img: &[u32], x: usize, y: usize| img[y * 40 + x] & 0xFF;
+        assert!((5..25).all(|y| red(&solid, 5, y) > 100));
+        assert!(red(&dashed, 5, 23) > 100 && red(&dashed, 5, 19) < 100 && red(&dashed, 5, 15) > 100);
     }
 }
