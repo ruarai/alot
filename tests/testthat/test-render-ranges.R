@@ -83,7 +83,7 @@ test_that("ranges the full tier doesn't draw decline to another tier", {
     set.seed(1)
     attr(render_full(suppressMessages(ggplot_build(p)), render_size), "reason")
   }
-  expect_match(reason(rg + geom_crossbar() + coord_flip()), "coord")
+  expect_match(reason(rg + geom_crossbar() + coord_polar()), "coord")
   expect_match(reason(rg + geom_errorbar() + coord_cartesian(clip = "off")), "clip")
   expect_match(reason(rg + geom_linerange(lineend = "foo")), "lineend")
   expect_match(reason(ggplot(mpg, aes(class, hwy)) + geom_boxplot(notch = TRUE)), "notch outside")

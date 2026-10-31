@@ -90,6 +90,9 @@ full_panel <- function(built, ir, res, panel = 1L) {
     horizontal <- endsWith(type, ".y")
     df <- data.frame(var = rep(var, each = 2), alt = rep(c(-Inf, Inf), length(var)))
     names(df) <- if (horizontal) c("y", "x") else c("x", "y")
+    # guide_grid() flips the labels for CoordFlip first, so its transform
+    # flips them back.
+    if (inherits(coord, "CoordFlip")) df <- gg_flip_axis_labels(df)
     df <- coord$transform(df, pp)
     pos <- if (horizontal) df$y else df$x
     grid[[length(grid) + 1L]] <- list(pos = as.numeric(pos[seq(1, length(pos), by = 2)]), horizontal = as.numeric(horizontal), style = style)
@@ -123,14 +126,23 @@ full_layers <- function(built, ir, res) {
     r <- lapply(pps[first], function(pp) as.double(linear_range(pp[[aes]])))
     if (length(r) == 1) r[[1]] else unlist(r[scales])
   }
-  ranges <- list(x_range = pair("x"), y_range = pair("y"))
+  # coord_flip(): the drawers work in data space (as the geoms decompose
+  # before Coord$transform()), so data x takes the vertical scale's range;
+  # full_flip() then swaps the marks' axes.
+  flip <- inherits(built@layout$coord, "CoordFlip")
+  trans <- inherits(built@layout$coord, "CoordTransform")
+  ranges <- if (flip) list(x_range = pair("y"), y_range = pair("x")) else list(x_range = pair("x"), y_range = pair("y"))
   n_panels <- nrow(ir$layout$panels)
   out <- list()
   for (i in seq_along(ir$layers)) {
     layer <- ir$layers[[i]]
     if (is.null(layer$kind) || nrow(layer$data) == 0) next
     spec <- switch(layer$kind,
-      points = full_points(layer$data, ranges, n_panels, res),
+      points = if (trans) {
+        full_points(full_transform(built, layer$data), list(x_range = c(0, 1), y_range = c(0, 1)), n_panels, res)
+      } else {
+        full_points(layer$data, ranges, n_panels, res)
+      },
       rects = full_rects(built@plot@layers[[i]], layer$data, ranges, n_panels, res),
       paths = full_paths(built@plot@layers[[i]], layer$data, ranges, n_panels, res),
       text = full_text(built@plot@layers[[i]], layer$data, built@layout$coord, pps, scales, n_panels, res),
@@ -153,7 +165,59 @@ full_layers <- function(built, ir, res) {
     kind <- if (layer$kind %in% c("ribbons", "smooth")) "paths" else layer$kind
     if (!is.null(spec)) out[[length(out) + 1L]] <- c(list(kind = kind), spec)
   }
-  out
+  if (flip) lapply(out, full_flip) else out
+}
+
+# CoordTransform$transform() (ggplot2 R/coord-transform.R) of each row's
+# position through its panel's params: npc, Inf squished to the edges.
+full_transform <- function(built, data) {
+  pps <- built@layout$panel_params
+  panel <- as.integer(data$PANEL)
+  for (k in unique(panel)) {
+    rows <- which(panel == k)
+    data[rows, c("x", "y")] <- built@layout$coord$transform(data[rows, c("x", "y")], pps[[k]])[c("x", "y")]
+  }
+  data
+}
+
+# coord_transform() declines where its transformations make a drawn
+# position infinite or NaN: ggplot2 warns (warn_new_infinites()) as it
+# squishes them, which the full tier doesn't mirror.
+full_transform_check <- function(built, ir) {
+  tr <- built@layout$coord$trans
+  ranges <- unlist(lapply(built@layout$panel_params, function(pp) c(pp$x.range, pp$y.range)))
+  if (any(!is.finite(ranges))) {
+    return("coord_transform() makes a panel range infinite")
+  }
+  for (layer in ir$layers) {
+    if (is.null(layer$kind) || nrow(layer$data) == 0) next
+    for (aes in c("x", "y")) {
+      v <- layer$data[[aes]]
+      v <- v[is.finite(v)]
+      if (any(!is.finite(tr[[aes]]$transform(v)))) {
+        return("coord_transform() makes a position infinite")
+      }
+    }
+  }
+  NULL
+}
+
+# CoordFlip$transform() (ggplot2 R/coord-flip.R): flip_axis_labels() then
+# CoordCartesian's rescale, here as a swap of a layer's position columns
+# and ranges. Text is placed through coord$transform() already
+# (full_text()); a label layer's boxes swap, their pixel offsets don't.
+full_flip <- function(spec) {
+  if (identical(spec$kind, "text")) {
+    return(spec)
+  }
+  if (identical(spec$kind, "labels")) {
+    spec$boxes <- full_flip(spec$boxes)
+    return(spec)
+  }
+  swap <- c(x = "y", y = "x", xmin = "ymin", ymin = "xmin", xmax = "ymax", ymax = "xmax", x_range = "y_range", y_range = "x_range")
+  hit <- names(spec) %in% names(swap)
+  names(spec)[hit] <- swap[names(spec)[hit]]
+  spec
 }
 
 # The rows of each panel (1-based, in the order given), NULL for a panel
@@ -388,7 +452,8 @@ full_text <- function(layer, data, coord, pps, scales, n_panels, res) {
   tr <- data[c("x", "y")]
   for (k in unique(key)) {
     rows <- which(key == k)
-    tr[rows, ] <- coord$transform(data[rows, c("x", "y")], pps[[match(k, scales)]])
+    # CoordFlip$transform() returns the columns as y, x: assign by name.
+    tr[rows, ] <- coord$transform(data[rows, c("x", "y")], pps[[match(k, scales)]])[c("x", "y")]
   }
   hjust <- as.double(gg_compute_just(data$hjust, tr$x, tr$y, data$angle))
   vjust <- as.double(gg_compute_just(data$vjust, tr$y, tr$x, data$angle))
@@ -430,7 +495,8 @@ full_geoms <- function() {
 
 # Why the full tier can't draw `built`, or NULL: it draws the layers of
 # full_geoms() and geom_blank(), and only the cartesian axes and guides
-# above.
+# above, with coord_cartesian()/coord_fixed(), coord_flip() and, for points
+# and text, coord_transform() (hybrid_decline(full = TRUE)).
 full_decline <- function(built, ir) {
   drawn <- vapply(built@plot@layers, function(l) {
     geom <- drawn_geom(l$geom)
@@ -445,8 +511,14 @@ full_decline <- function(built, ir) {
   if (nrow(support) > 0) {
     return(support$reason[1])
   }
-  if (!ir$coord$class %in% c("CoordCartesian", "CoordFixed") || !identical(ir$coord$reverse %||% "none", "none")) {
+  if (!ir$coord$class %in% c("CoordCartesian", "CoordFixed", "CoordFlip", "CoordTransform") || !identical(ir$coord$reverse %||% "none", "none")) {
     return("coord not drawn yet")
+  }
+  if (ir$coord$class == "CoordTransform") {
+    reason <- full_transform_check(built, ir)
+    if (!is.null(reason)) {
+      return(reason)
+    }
   }
   caps <- unlist(lapply(ir$scales, function(s) vapply(s$axes, function(a) !identical(a$cap %||% "none", "none"), logical(1))))
   if (any(caps)) {

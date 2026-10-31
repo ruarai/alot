@@ -6712,3 +6712,105 @@
           ggplot_global$theme_all_null %+replace% t
       }
 
+# upstream coords match what the full tier mirrors
+
+    Code
+      print(body(environment(ggplot2::CoordFlip$transform)$f))
+    Output
+      {
+          data <- flip_axis_labels(data)
+          CoordCartesian$transform(data, panel_params)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::CoordFlip$setup_panel_params)$f))
+    Output
+      {
+          params$expand <- params$expand[c(2, 1, 4, 3)]
+          parent <- ggproto_parent(CoordCartesian, self)
+          panel_params <- parent$setup_panel_params(scale_x, scale_y, 
+              params)
+          flip_axis_labels(panel_params)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::CoordTransform$transform)$f))
+    Output
+      {
+          reverse <- panel_params$reverse %||% "none"
+          x_range <- switch(reverse, xy = , x = rev, identity)(panel_params$x.range)
+          y_range <- switch(reverse, xy = , y = rev, identity)(panel_params$y.range)
+          trans_x <- function(data) {
+              idx <- !is.infinite(data)
+              data[idx] <- transform_value(self$trans$x, data[idx], 
+                  x_range)
+              data
+          }
+          trans_y <- function(data) {
+              idx <- !is.infinite(data)
+              data[idx] <- transform_value(self$trans$y, data[idx], 
+                  y_range)
+              data
+          }
+          new_data <- transform_position(data, trans_x, trans_y)
+          warn_new_infinites(data$x, new_data$x, "x")
+          warn_new_infinites(data$y, new_data$y, "y")
+          transform_position(new_data, squish_infinite, squish_infinite)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("transform_value", "ggplot2")))
+    Output
+      {
+          if (is.null(value)) 
+              return(value)
+          rescale(trans$transform(value), 0:1, range)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("guide_grid", "ggplot2")))
+    Output
+      {
+          x_major <- panel_params$x$mapped_breaks()
+          x_minor <- setdiff(panel_params$x$mapped_breaks_minor(), 
+              x_major)
+          y_major <- panel_params$y$mapped_breaks()
+          y_minor <- setdiff(panel_params$y$mapped_breaks_minor(), 
+              y_major)
+          transform <- if (isTRUE(square)) {
+              if (inherits(coord, "CoordFlip")) {
+                  function(x) coord$transform(flip_axis_labels(x), 
+                      panel_params)
+              }
+              else {
+                  function(x) coord$transform(x, panel_params)
+              }
+          }
+          else {
+              function(x) coord_munch(coord, x, panel_params)
+          }
+          grill <- Map(f = breaks_as_grid, var = list(y_minor, x_minor, 
+              y_major, x_major), type = c("minor.y", "minor.x", "major.y", 
+              "major.x"), MoreArgs = list(theme = theme, transform = transform))
+          grill <- compact(grill)
+          background <- element_render(theme, "panel.background")
+          if (!isTRUE(square) && !is_zero(background)) {
+              gp <- background$gp
+              background <- data_frame0(x = c(1, 1, -1, -1), y = c(1, 
+                  -1, -1, 1)) * Inf
+              background <- coord_munch(coord, background, panel_params, 
+                  is_closed = TRUE)
+              background <- polygonGrob(x = background$x, y = background$y, 
+                  gp = gp)
+          }
+          ggname("grill", inject(grobTree(background, !!!grill)))
+      }
+

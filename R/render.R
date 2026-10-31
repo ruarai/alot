@@ -336,14 +336,26 @@ point_handle_na <- function(layer, data) {
 # Why the hybrid tier draws a layer with ggplot2, or NULL if Rust draws it,
 # given the layer's data from hybrid_data(). draw_points_layer() makes the
 # same check, so coverage and drawing agree.
-hybrid_decline <- function(layer, data, layout, kind = hybrid_kind(layer)) {
+# With `full`, the full tier's check: it also draws coord_flip()
+# (full_flip(), R/render-full.R), but not its rugs.
+hybrid_decline <- function(layer, data, layout, kind = hybrid_kind(layer), full = FALSE) {
   if (is.null(kind)) {
     return("no Rust drawer for this geom")
   }
   coord <- layout$coord
-  if (!identical(class(coord), class(ggplot2::coord_cartesian())) ||
+  flip <- full && identical(class(coord), class(ggplot2::coord_flip()))
+  trans <- full && identical(class(coord), class(ggplot2::coord_transform()))
+  if (!(identical(class(coord), class(ggplot2::coord_cartesian())) || flip || trans) ||
     !identical(coord$reverse %||% "none", "none")) {
     return("coord is not an unreversed coord_cartesian()")
+  }
+  if (flip && identical(kind, "rug")) {
+    return("a rug with coord_flip()")
+  }
+  # coord_transform(): points and text are placed by coord$transform()
+  # alone; the other geoms are munched (coord_munch()), not mirrored.
+  if (trans && !kind %in% c("points", "text")) {
+    return("coord_transform() munches this geom")
   }
   if (!identical(coord$clip, "on")) {
     return("clip is not \"on\"")
@@ -374,7 +386,7 @@ hybrid_decline <- function(layer, data, layout, kind = hybrid_kind(layer)) {
   linear <- vapply(layout$panel_params[!duplicated(pair)], function(pp) {
     !is.null(linear_range(pp$x)) && !is.null(linear_range(pp$y))
   }, logical(1))
-  if (!all(linear)) {
+  if (!all(linear) && !trans) {
     return("position scale does not rescale linearly")
   }
   NULL

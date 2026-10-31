@@ -155,6 +155,21 @@ render_cases <- list(
       ggplot(d, aes(x, y, group = g, fill = f)) + geom_polygon(colour = "black", linewidth = 0.2)
     },
     size = readme_size
+  ),
+  # R6.6: 1e5 points under coord_flip() and under coord_transform().
+  flip_1e5 = list(
+    plot = function() {
+      d <- data.frame(x = stats::rnorm(1e5), y = stats::rnorm(1e5), g = rep(letters[1:4], 2.5e4))
+      ggplot(d, aes(x, y, colour = g)) + geom_point() + coord_flip()
+    },
+    size = readme_size
+  ),
+  transform_1e5 = list(
+    plot = function() {
+      d <- data.frame(x = stats::rlnorm(1e5), y = stats::rlnorm(1e5), g = rep(letters[1:4], 2.5e4))
+      ggplot(d, aes(x, y, colour = g)) + geom_point() + coord_transform(x = "log10", y = "log10")
+    },
+    size = readme_size
   )
 )
 

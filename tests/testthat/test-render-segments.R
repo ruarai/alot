@@ -79,7 +79,7 @@ test_that("segments the full tier doesn't draw decline to another tier", {
   }
   expect_match(reason(sp + geom_curve()), "layers other than")
   expect_match(reason(sp + geom_segment(arrow = arrow())), "arrows")
-  expect_match(reason(sp + geom_segment() + coord_flip()), "coord")
+  expect_match(reason(sp + geom_segment() + coord_trans(x = "sqrt")), "coord")
   expect_match(reason(pts + geom_hline(yintercept = 20) + coord_cartesian(clip = "off")), "clip")
   expect_match(reason(pts + geom_rug(length = unit(2, "mm"))), "npc")
   expect_match(reason(pts + geom_vline(xintercept = 3, lineend = "foo")), "lineend")

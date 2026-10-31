@@ -151,7 +151,7 @@ test_that("layers and plots the full tier doesn't draw decline to another tier",
   expect_identical(tier(ggplot(d, aes(x, y, colour = c(1, 2, 2))) + geom_line(show.legend = FALSE) + geom_point()), "hybrid")
   expect_identical(tier(txt + geom_col(linetype = "dashed", colour = "black")), "ggplot2")
   expect_identical(tier(txt + geom_line() + geom_label(parse = TRUE)), "hybrid")
-  expect_identical(tier(txt + geom_col() + coord_flip()), "ggplot2")
+  expect_identical(tier(txt + geom_col() + coord_trans(y = "sqrt")), "ggplot2")
   expect_identical(tier(txt + geom_col() + coord_cartesian(clip = "off")), "ggplot2")
   expect_identical(tier(ggplot(d, aes(x, y, group = 1, colour = lab)) + geom_line()), "ggplot2")
 })

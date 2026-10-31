@@ -91,7 +91,7 @@ test_that("ribbons the full tier doesn't draw decline to another tier", {
   expect_match(reason(rb + geom_ribbon(aes(colour = x))), "vary along a ribbon")
   expect_match(reason(ggplot(band[1, ], aes(x, ymin = lo, ymax = hi)) + geom_ribbon()), "fewer than two rows")
   expect_match(reason(rb + geom_ribbon(linejoin = "foo")), "linejoin")
-  expect_match(reason(rb + geom_ribbon() + coord_flip()), "coord")
+  expect_match(reason(rb + geom_ribbon() + coord_polar()), "coord")
   expect_match(reason(rb + geom_ribbon() + coord_polar()), "coord")
   expect_match(reason(rb + geom_ribbon() + coord_cartesian(clip = "off")), "clip")
   sm <- data.frame(x = 1:5, y = 1:5, ymin = c(0, NA, 2, 3, 4), ymax = 2:6)

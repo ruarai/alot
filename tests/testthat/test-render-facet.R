@@ -173,7 +173,7 @@ test_that("facets alot doesn't draw fall back", {
   expect_match(declined(base + facet_wrap(~carb, ncol = 4, strip.position = "bottom") + theme(strip.placement = "outside")), "outside strips")
   # ggplot2 aborts on these.
   expect_match(declined(base + facet_wrap(~cyl, scales = "free") + coord_fixed()), "fixed coord")
-  b <- suppressWarnings(ggplot_build(base + facet_wrap(~cyl) + coord_flip()))
+  b <- suppressWarnings(ggplot_build(base + facet_wrap(~cyl) + coord_polar()))
   expect_false(is.null(attr(render_full(b, render_size), "reason")))
 })
 

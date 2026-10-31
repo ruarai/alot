@@ -1264,3 +1264,17 @@ build is not timed), release build, 1600 × 1000 at 150 dpi, median of 3:
 Overlapping labels are drawn in batches (a box batch, then a text batch)
 that break wherever a label's box would overlap an earlier one in the
 batch, so dense labels cost more batches but stay well ahead of ragg.
+
+## R6.6: coord_flip() and coord_transform() in the full tier (2026-10-31)
+
+`render_full()` against ggplot2's gtable drawn on `ragg::agg_capture()` (the
+build is not timed), release build, 1600 × 1000 at 150 dpi, median of 3:
+
+| Plot | Full tier | ggplot2 + ragg |
+|---|---:|---:|
+| 1e5 points coloured by 4 groups, `coord_flip()` (`flip_1e5`) | 344 ms | 798 ms |
+| 1e5 log-normal points coloured by 4 groups, `coord_transform(x = "log10", y = "log10")` (`transform_1e5`) | 63 ms | 730 ms |
+
+`coord_flip()` adds only a swap of the marks' columns; `coord_transform()`
+places points with `CoordTransform$transform()` in R (vectorised, as ggplot2
+does). coord_fixed(), aspect ratios and secondary axes add no per-row work.

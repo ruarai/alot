@@ -84,7 +84,7 @@ test_that("labels, polygons and rasters the full tier doesn't draw decline to an
   expect_match(reason(ggplot(data.frame(x = 1, y = 1, l = "two\nlines"), aes(x, y, label = l)) + geom_label()), "multi-line")
   expect_match(reason(lp + geom_label(border.colour = c("red", "blue"))), "border.colour")
   expect_match(reason(lp + geom_label(aes(fill = g), key_glyph = "label") + guides(fill = guide_legend(override.aes = list(angle = 45)))), "label key")
-  expect_match(reason(lp + geom_label() + coord_flip()), "coord")
+  expect_match(reason(lp + geom_label() + coord_polar()), "coord")
   hole <- data.frame(x = c(0, 4, 4, 0, 1, 2, 2, 1), y = c(0, 0, 4, 4, 1, 1, 2, 2), s = rep(1:2, each = 4))
   expect_match(reason(ggplot(hole, aes(x, y, subgroup = s)) + geom_polygon()), "subgroups")
   na <- poly

@@ -404,3 +404,15 @@ test_that("upstream complete themes and element grobs match what the full tier c
     expect_snapshot(print(body(utils::getFromNamespace(f, "ggplot2"))))
   }
 })
+
+test_that("upstream coords match what the full tier mirrors", {
+  # full_flip(), full_transform() and full_panel() (R/render-full.R) mirror
+  # CoordFlip$transform(), CoordTransform$transform() and guide_grid();
+  # layout_axis() (R/render-layout.R) gives NaN keys no room as grid does.
+  # If these fail, recheck test-render-coords.R, then the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::CoordFlip$transform)$f)))
+  expect_snapshot(print(body(environment(ggplot2::CoordFlip$setup_panel_params)$f)))
+  expect_snapshot(print(body(environment(ggplot2::CoordTransform$transform)$f)))
+  expect_snapshot(print(body(utils::getFromNamespace("transform_value", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("guide_grid", "ggplot2"))))
+})

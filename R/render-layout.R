@@ -180,6 +180,12 @@ layout_axis <- function(ir, built, position, res, panel = 1L, draw = NULL) {
       item <- layout_title(text, labels[i], res, mx = vertical, my = !vertical)
       if (!is.null(item)) {
         item[[aes]] <- as.numeric(major_key[[aes]][i])
+        # grid's text bounds skip labels at non-finite positions (NaN keys
+        # where coord_transform() maps a range to infinity), so they take
+        # no room.
+        off <- !is.finite(item[[aes]])
+        item$w[off] <- 0
+        item$h[off] <- 0
         item$check_overlap <- as.numeric(check)
       }
       item

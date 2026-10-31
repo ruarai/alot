@@ -42,7 +42,7 @@ render_ir <- function(built) {
     layer <- plot@layers[[i]]
     data <- suppressWarnings(hybrid_data(layer, built@data[[i]]))
     kind <- full_kind(layer)
-    reason <- hybrid_decline(layer, data, layout, kind)
+    reason <- hybrid_decline(layer, data, layout, kind, full = TRUE)
     geom <- class(layer$geom)[1]
     if (!is.null(reason)) support$add("layer", geom, reason)
     list(geom = geom, kind = kind, data = data, reason = reason %||% NA_character_)
