@@ -167,11 +167,16 @@ close_device <- function(dev, old = 1L) {
 
 # Like ggplot2::ggplot_gtable(), but layers with a Rust drawer become grobs
 # that draw as a raster rendered in Rust when the device is a ragg device.
+# Text grobs draw through Rust only with options(alot.hybrid_text = TRUE),
+# which the text tests use: ragg draws a page's few text grobs faster than a
+# raster per grob (inst/bench/RESULTS.md, R2.2). The full tier draws text in
+# Rust regardless.
 hybrid_gtable <- function(data) {
   plot <- data@plot
   plot@layers <- lapply(plot@layers, hybrid_layer)
   data@plot <- plot
-  hybrid_text(ggplot2::ggplot_gtable(data))
+  gtable <- ggplot2::ggplot_gtable(data)
+  if (isTRUE(getOption("alot.hybrid_text"))) hybrid_text(gtable) else gtable
 }
 
 hybrid_layer <- function(layer) {

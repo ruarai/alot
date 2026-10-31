@@ -77,10 +77,11 @@ test_that("fonts resolve once per style as ragg does", {
   expect_true(is.na(f$path[4]))
 })
 
-# Glyph drawing (R2.2): the hybrid tier draws the gtable's text grobs in
+# Glyph drawing (R2.2): with options(alot.hybrid_text = TRUE) the hybrid tier draws the gtable's text grobs in
 # Rust, mirroring ragg's hinted glyph cache, so text matches ragg pixel
 # for pixel at the default tolerance.
 test_that("axis labels, rotated and multi-line titles render like ragg", {
+  withr::local_options(alot.hybrid_text = TRUE)
   base <- ggplot2::ggplot(ggplot2::mpg, ggplot2::aes(displ, hwy, colour = class)) + ggplot2::geom_point()
   plots <- list(
     titles = base + ggplot2::facet_wrap(~drv) + ggplot2::labs(
@@ -110,6 +111,7 @@ test_that("axis labels, rotated and multi-line titles render like ragg", {
 })
 
 test_that("text alot doesn't mirror falls back to grid", {
+  withr::local_options(alot.hybrid_text = TRUE)
   p <- ggplot2::ggplot(ggplot2::mpg, ggplot2::aes(displ, hwy)) + ggplot2::geom_point() +
     ggplot2::labs(title = quote(alpha^2), x = "排気量")
   expect_render_close(p, tier = "hybrid")

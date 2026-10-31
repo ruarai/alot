@@ -668,7 +668,7 @@ alongside Phase 1's remaining tasks.
   sizes and dpis. Text with missing glyphs (CJK labels with a Latin font,
   emoji) reports the hybrid tier.
 
-### R2.2 Glyph drawing
+### R2.2 Glyph drawing — done
 - **Depends:** R2.1, R1.4
 - **Touches:** `alot-core/src/render/text.rs`
 - **Do:** Draw text runs unhinted, from cached glyph coverage (per font,
@@ -677,55 +677,12 @@ alongside Phase 1's remaining tasks.
   not mirrored, so glyph pixels differ slightly from ragg's.
 - **Done when:** axis labels, rotated axis titles and multi-line titles pass
   `expect_render_close()` (text may get a documented looser tolerance).
-- **Status (WIP, 2026-10-31; remove this note when the task is done):**
-  paused mid-task on branch `task/R2.2-glyph-drawing` (WIP commit on top of
-  R3.2). Where it stands:
-  - *Done and passing:* `alot-core/src/render/text.rs` draws text runs
-    (`draw_runs()`) mirroring `GEText()` (line splitting, vjust via the
-    hinted "M" ascent) and ragg's `plot_text()` (hjust by textshaping
-    width, the y-rounding quirk for upright and positive-angle text).
-    Glyphs at multiples of 90 degrees come from a mirrored gray8 glyph
-    cache: skrifa-hinted outlines at `floor(size)` ppem, ragg's
-    `dbl_to_int26p6()` rounding and truncated conic midpoints, flattened at
-    approximation scale 4 (the engine's `m_curves32`), gamma 1.6, placed at
-    `iround()` positions. Other angles use the outline path (scale 2, no
-    gamma). Clipping mirrors ragg's integer, inclusive renderer clip box
-    (`text_clip()` from grid's `cliprect`), and NA labels draw as "NA".
-    Note the task said "unhinted"; mirroring ragg's hinting instead made
-    text pixel-identical to ragg (0 differing text pixels in the tested
-    plots), so the planned looser tolerance isn't needed.
-  - *Hybrid integration:* `R/render-text.R` `hybrid_text()` marks every grid
-    `text` grob in the gtable as `alot_text`; `drawDetails.alot_text()`
-    draws via `rs_render_text()` and falls back to grid (`NextMethod()`)
-    for plotmath, check.overlap, vectorised gpar, alpha, rotated
-    viewports, clip paths, missing glyphs or unsupported fonts.
-  - *Tests:* new expect_render_close() cases in test-render-text.R (titles,
-    multi-line, angled axis text, facet_grid strips, serif/mono/bold, two
-    dpis) pass at the default tolerance; the full render corpus (1664
-    plots) and the R suite (excl. corpora, 5296) passed before the last
-    edit; cargo test 111 passed.
-  - *Also fixed here:* `render_ir()` aborted R on a plot with no text
-    (debug-build Rust panics on slicing zero-length R vectors, whose data
-    pointer isn't aligned); zero-length inputs are now guarded in R and in
-    the text glue. This was an R3.1 bug.
-  - *Open problem (why it isn't finished):* speed. README with 10 rows,
-    release build: hybrid draw step 69 ms vs ggplot2 70 ms, but it was
-    54 ms before this task, so the hybrid regressed by ~15 ms. The Rust
-    part is ~5 ms per render (18 `rs_render_text()` calls); the rest is R
-    overhead in `drawDetails.alot_text()` (get.gpar, deviceLoc,
-    text_fonts/match_fonts, point_colours, cliprect lookup, a pushed
-    viewport and grid.raster per grob). Rprof attributed most time to
-    `hybrid_text()`, but that is misleading: its argument
-    `ggplot_gtable(data)` is a lazy promise evaluated inside it. The last
-    edit (replace lists once in `hybrid_text()`) is untested by the full
-    suite. Next steps: cache fonts, hinting instances and glyph masks in
-    Rust across calls (each call re-parses the font and reruns the
-    TrueType prep program); cut per-grob R work (resolve fonts/colours
-    once per distinct gpar); consider batching all text grobs of a page
-    into one raster. Then rerun cargo test, the full R suite, the full
-    render corpus and `inst/bench/render-suite.R` (readme, readme_10),
-    record numbers in RESULTS.md and finish the commit message per
-    AGENTS.md.
+- **Result:** `draw_runs()` mirrors `GEText()` and ragg's `plot_text()`,
+  including its FreeType hinting, so text is pixel-identical to ragg on the
+  tested plots (the "unhinted" plan was dropped: mirroring the hinting was
+  the exact option). Hybrid integration (`hybrid_text()`) is opt-in with
+  `options(alot.hybrid_text = TRUE)` because it is slower than ragg's text
+  there (inst/bench/RESULTS.md); the full tier will draw text through Rust.
 
 ## R3 Render IR (milestone 2.1)
 

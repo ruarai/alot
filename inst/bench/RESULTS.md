@@ -1038,3 +1038,25 @@ installed package; median of 60 runs of `render_ir()` on a built plot.
 - Without byte compilation (`pkgload::load_all()`) the times are the same
   (README 8 ms; theme 3 ms). An earlier draft defined the resolver's helpers
   as closures inside it, which R's JIT recompiled on every call.
+
+## R2.2: glyph drawing in the hybrid tier (2026-10-31)
+
+`inst/bench/render-suite.R`, release build, readme_10 (1600 × 1000, 150 dpi,
+7 reps, medians in ms). "Rust text" is `options(alot.hybrid_text = TRUE)`:
+each text grob in the gtable draws as a raster from `rs_render_text()`.
+
+| step | ggplot2 | hybrid, ragg text | hybrid, Rust text |
+|---|---:|---:|---:|
+| draw | 70 | 51 | 70 |
+| encode | 35 | 4 | 8 |
+| render | 249 | 204 | 225 |
+
+Rust text is slower than ragg's own text in the hybrid (+19 ms draw, +4 ms
+encode), so by PHASE2.md's rule that no drawer may be slower than ragg it is
+off by default there. The Rust part is only about 5 ms for the page's 12
+text grobs; the rest is per-grob grid work (`get.gpar`, `deviceLoc`, a
+pushed viewport and a `grid.raster` each, about 0.6 ms) that batching would
+only partly remove. The glyph drawer stays for the full tier, where there is
+no grid; the hybrid integration remains as the way the tests compare Rust
+glyphs with ragg's. Pixel differences from ragg on the tested plots: none
+in text pixels.
