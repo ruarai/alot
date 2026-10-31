@@ -16,3 +16,5 @@
 ^tools/render-corpus\.R$
 ^tools/readme-data$
 ^tools/readme-figures\.R$
+^tools/readme-pairs\.R$
+^tools/readme-trajectories\.R$

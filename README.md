@@ -90,3 +90,27 @@ Tests compare every build against `ggplot2::ggplot_build()`:
 ```sh
 NOT_CRAN=true Rscript -e 'pkgload::load_all(); testthat::test_dir("tests/testthat", load_package = "none")'
 ```
+
+## Example: MCMC pairs plot
+
+A pairs plot of 13 parameters from 4 simulated MCMC chains of 4,000 draws
+(169 facet panels: 1.25 million points off the diagonal, per-chain
+densities on it) is drawn entirely in Rust. From ggplot to a 1600×1700
+PNG, `ggsave()` with ragg takes 5.6 s and `alot_png()` 1.0 s, about 5.5×
+faster (medians of three interleaved runs, same machine as above).
+[tools/readme-pairs.R](tools/readme-pairs.R) simulates the draws, builds
+the plot, times both and draws the figure:
+
+![Pairs plot of 13 parameters from 4 MCMC chains: per-chain density curves on the diagonal that overlap closely, scatter panels of chains 1 and 2 below the diagonal and chains 3 and 4 above, including a funnel between theta[1] and log(tau) and correlations between mu and the betas and between log(tau) and the sigmas.](man/figures/readme-pairs.png)
+
+## Example: forecast trajectories
+
+A forecast ensemble of 4,500 `geom_line()` trajectories (500 per facet over
+9 facets, 1.8 million rows) on a log scale, with observed counts as points,
+is drawn entirely in Rust. From ggplot to a 1600×1400 PNG, `ggsave()` with
+ragg takes 3.5 s and `alot_png()` 0.87 s, about 4× faster (medians of three
+interleaved runs, same machine as above).
+[tools/readme-trajectories.R](tools/readme-trajectories.R) simulates the
+trajectories, builds the plot, times both and draws the figure:
+
+![Nine facets, A to I, each with 500 faint blue simulated trajectories of daily counts on a log scale following recurring waves through 2025, observed counts as black points along them, and a dashed line in early January 2026 after which the trajectories fan out into a forecast.](man/figures/readme-trajectories.png)
