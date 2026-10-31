@@ -19,6 +19,10 @@
 #' ggplot2 are drawn from [ggplot2::ggplot_gtable()] instead. Warnings are
 #' raised on the first draw only.
 #'
+#' On a screen with more pixels than the device reports (a retina display),
+#' set `options(alot.pixel_ratio = 2)` (the number of screen pixels per
+#' device pixel) so the page is rendered at the screen's density.
+#'
 #' With `options(alot.autoprint = TRUE)`, printing a ggplot (including
 #' autoprinting `p` at the console) calls `alot_print()`.
 #'
@@ -68,6 +72,13 @@ vector_device <- function() {
   grepl("^(pdf|postscript|cairo_pdf|cairo_ps|svg|svglite|xfig|pictex|tikz|devSVG|win\\.metafile|emf)", names(grDevices::dev.cur()))
 }
 
+# Screen pixels per device pixel: `options(alot.pixel_ratio = 2)` for a
+# retina screen, 1 otherwise.
+device_pixel_ratio <- function() {
+  ratio <- getOption("alot.pixel_ratio", 1)
+  if (is.numeric(ratio) && length(ratio) == 1 && is.finite(ratio) && ratio >= 1) ratio else 1
+}
+
 # Mirrors ggplot2's print method's drawing of the gtable, which lays the
 # plot out on the device with ggplot_gtable().
 draw_gtable <- function(built) {
@@ -85,7 +96,12 @@ drawDetails.alot_page <- function(x, recording) {
   tr <- grid::current.transform()
   w_in <- grid::convertWidth(grid::unit(1, "npc"), "in", valueOnly = TRUE)
   h_in <- grid::convertHeight(grid::unit(1, "npc"), "in", valueOnly = TRUE)
-  res <- grDevices::dev.size("px")[1] / grDevices::dev.size("in")[1]
+  # The device's pixels are logical on a high-density screen: RStudio's plot
+  # pane on a retina Mac reports half the pixels it shows, and scales up a
+  # raster drawn at that size. The page is rendered at the screen's density
+  # and drawn into the same viewport, so the device scales it down.
+  ratio <- device_pixel_ratio()
+  res <- grDevices::dev.size("px")[1] / grDevices::dev.size("in")[1] * ratio
   w <- round(w_in * res)
   h <- round(h_in * res)
   if (vector_device() || tr[1, 2] != 0 || tr[2, 1] != 0 || !is.finite(res) || !is.finite(w) || !is.finite(h) || w < 1 || h < 1) {

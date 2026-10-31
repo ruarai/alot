@@ -124,3 +124,20 @@ test_that("options(alot.autoprint) sends ggplot's print to alot_print", {
   print(p)
   expect_equal(calls, 2)
 })
+
+test_that("options(alot.pixel_ratio) renders at the screen's density", {
+  p <- ggplot(mtcars, aes(wt, mpg)) + geom_point()
+  sizes <- list()
+  local_mocked_bindings(render_raster = function(built, size) {
+    sizes[[length(sizes) + 1L]] <<- c(size$width, size$height, size$res)
+    real_render_raster(built, size)
+  })
+  cap <- capture_device(400, 300)
+  alot_print(p)
+  withr::local_options(alot.pixel_ratio = 2)
+  alot_print(p)
+  grDevices::dev.off()
+  expect_equal(sizes, list(c(400, 300, 96), c(800, 600, 192)))
+  withr::local_options(alot.pixel_ratio = "x")
+  expect_equal(device_pixel_ratio(), 1)
+})

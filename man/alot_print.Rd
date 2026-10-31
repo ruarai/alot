@@ -34,6 +34,10 @@ plot is kept between draws. Vector devices (`pdf()`, `svg()`,
 ggplot2 are drawn from [ggplot2::ggplot_gtable()] instead. Warnings are
 raised on the first draw only.
 
+On a screen with more pixels than the device reports (a retina display),
+set `options(alot.pixel_ratio = 2)` (the number of screen pixels per
+device pixel) so the page is rendered at the screen's density.
+
 With `options(alot.autoprint = TRUE)`, printing a ggplot (including
 autoprinting `p` at the console) calls `alot_print()`.
 }
