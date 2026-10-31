@@ -410,7 +410,11 @@ fn glyph(l: &List, fonts: &mut Fonts) -> Option<Glyph> {
                 join: [Join::Miter, Join::Round, Join::Bevel].get(num(l, "join")? as usize).copied()?,
             };
             let cap = [Cap::Round, Cap::Butt, Cap::Square].get(num(l, "cap")? as usize).copied()?;
-            Some(Glyph::Rect { inset: num(l, "inset")?, el, cap })
+            let frac = match field(l, "frac") {
+                Some(_) => Some(pair(l, "frac")?),
+                None => None,
+            };
+            Some(Glyph::Rect { inset: num(l, "inset")?, el, cap, frac })
         }
         "path" => {
             let (x, y) = (nums(l, "x")?, nums(l, "y")?);

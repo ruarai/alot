@@ -150,33 +150,45 @@ impl PathBatch {
                     clipped = agg::clip_contours(contours, c.x0, c.y0, c.x1, c.y1);
                     &clipped
                 };
-                agg::rasterize_in(contours, rule, 0, top as i32, width as i32, (top + h) as i32)
+                // Only the pixels of the path's bounding box (with a pixel
+                // to spare) in the band: the rest have no coverage, and
+                // rasterising a box gives the full rasterisation's alpha.
+                let x0 = (p.bbox[0].floor() as i64 - 1).clamp(0, width as i64) as i32;
+                let x1 = (p.bbox[2].floor() as i64 + 2).clamp(0, width as i64) as i32;
+                let y0 = (p.bbox[1].floor() as i64 - 1).clamp(top as i64, (top + h) as i64) as i32;
+                let y1 = (p.bbox[3].floor() as i64 + 2).clamp(top as i64, (top + h) as i64) as i32;
+                agg::rasterize_in(contours, rule, x0, y0, x1, y1)
             };
             if let Some((contours, colour, rule)) = &p.fill {
-                blend(buf, width, &layer(contours, *rule), *colour);
+                blend(buf, width, top, &layer(contours, *rule), *colour);
             }
             if let Some((contours, colour)) = &p.stroke {
-                blend(buf, width, &layer(contours, Rule::NonZero), *colour);
+                blend(buf, width, top, &layer(contours, Rule::NonZero), *colour);
             }
         }
     }
 }
 
-/// Blends band-shaped coverage (`c` covers the band's rows and columns).
-fn blend(buf: &mut [[f32; 4]], width: usize, c: &agg::Coverage, colour: [u8; 4]) {
+/// Blends coverage of a box of the band (`c`, within the band's columns
+/// and its rows from page row `top`).
+fn blend(buf: &mut [[f32; 4]], width: usize, top: usize, c: &agg::Coverage, colour: [u8; 4]) {
     let a = colour[3] as f32 / 255.0;
     let col = [colour[0] as f32 / 255.0 * a, colour[1] as f32 / 255.0 * a, colour[2] as f32 / 255.0 * a, a];
-    if c.w != width {
+    if c.w == 0 || c.h == 0 || c.x0 < 0 || (c.y0 as usize) < top || c.x0 as usize + c.w > width {
         return;
     }
-    for (d, &k) in buf.iter_mut().zip(&c.alpha) {
-        if k == 0 {
-            continue;
-        }
-        let k = k as f32 / 255.0;
-        let inv = 1.0 - a * k;
-        for ch in 0..4 {
-            d[ch] = col[ch] * k + d[ch] * inv;
+    for j in 0..c.h {
+        let start = (c.y0 as usize - top + j) * width + c.x0 as usize;
+        let Some(row) = buf.get_mut(start..start + c.w) else { return };
+        for (d, &k) in row.iter_mut().zip(&c.alpha[j * c.w..(j + 1) * c.w]) {
+            if k == 0 {
+                continue;
+            }
+            let k = k as f32 / 255.0;
+            let inv = 1.0 - a * k;
+            for ch in 0..4 {
+                d[ch] = col[ch] * k + d[ch] * inv;
+            }
         }
     }
 }

@@ -57,8 +57,11 @@ pub enum Glyph {
     Point(PointLayer),
     /// `draw_key_polygon()` and `draw_key_rect()`: a `rectGrob()` centred
     /// in the key, `inset` pixels narrower and shorter than it, its
-    /// dashes ended with `cap` (the layer's `lineend`).
-    Rect { inset: f64, el: RectEl, cap: Cap },
+    /// dashes ended with `cap` (the layer's `lineend`). With `frac`, the
+    /// rect is that share of the key's width and height instead
+    /// (`rectGrob(width = 0.75, height = 0.5)` of `draw_key_boxplot()` and
+    /// `draw_key_crossbar()`).
+    Rect { inset: f64, el: RectEl, cap: Cap, frac: Option<(f64, f64)> },
     /// `draw_key_path()` (a segment across the middle) and
     /// `draw_key_timeseries()`: a polyline through points in npc of the
     /// key.
@@ -71,9 +74,12 @@ impl Glyph {
     fn draw(&self, p: &mut Painter, c: &Rect) -> Option<()> {
         match self {
             Glyph::Point(l) => p.list.push(Item::Points(l.batch(c, p.threads))),
-            Glyph::Rect { inset, el, cap } => {
+            Glyph::Rect { inset, el, cap, frac } => {
                 let (cx, cy) = ((c.x0 + c.x1) / 2.0, (c.y0 + c.y1) / 2.0);
-                let (hw, hh) = ((c.x1 - c.x0 - inset) / 2.0, (c.y1 - c.y0 - inset) / 2.0);
+                let (hw, hh) = match frac {
+                    Some((fw, fh)) => ((c.x1 - c.x0) * fw / 2.0, (c.y1 - c.y0) * fh / 2.0),
+                    None => ((c.x1 - c.x0 - inset) / 2.0, (c.y1 - c.y0 - inset) / 2.0),
+                };
                 p.rect_capped(&Rect { x0: cx - hw, y0: cy - hh, x1: cx + hw, y1: cy + hh }, el, *cap);
             }
             Glyph::Line { x, y, style } => {
@@ -750,7 +756,7 @@ mod tests {
 
     #[test]
     fn a_polygon_key_is_inset_by_its_line_width() {
-        let glyph = Glyph::Rect { inset: 6.0, el: RED, cap: Cap::Butt };
+        let glyph = Glyph::Rect { inset: 6.0, el: RED, cap: Cap::Butt, frac: None };
         let img = render(20, 20, |p| {
             glyph.draw(p, &Rect { x0: 0.0, y0: 0.0, x1: 20.0, y1: 20.0 });
         });
@@ -759,5 +765,21 @@ mod tests {
         assert_eq!(img[10 * 20 + 3] & 0xFF, 255);
         assert_eq!(img[16 * 20 + 10] & 0xFF, 255);
         assert_eq!(img[17 * 20 + 10] & 0xFF, 0);
+    }
+
+    #[test]
+    fn a_boxplot_key_box_is_a_share_of_the_key() {
+        // rectGrob(width = 0.75, height = 0.5): x 2.5..17.5, y 5..15.
+        let glyph = Glyph::Rect { inset: 6.0, el: RED, cap: Cap::Butt, frac: Some((0.75, 0.5)) };
+        let img = render(20, 20, |p| {
+            glyph.draw(p, &Rect { x0: 0.0, y0: 0.0, x1: 20.0, y1: 20.0 });
+        });
+        assert_eq!(img[10 * 20 + 1] & 0xFF, 0);
+        assert_eq!(img[10 * 20 + 3] & 0xFF, 255);
+        assert_eq!(img[10 * 20 + 16] & 0xFF, 255);
+        assert_eq!(img[10 * 20 + 18] & 0xFF, 0);
+        assert_eq!(img[3 * 20 + 10] & 0xFF, 0);
+        assert_eq!(img[6 * 20 + 10] & 0xFF, 255);
+        assert_eq!(img[16 * 20 + 10] & 0xFF, 0);
     }
 }

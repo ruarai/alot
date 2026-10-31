@@ -291,7 +291,8 @@ full_kind <- function(layer) {
   if (identical(class(geom)[1], "GeomSmooth") && same(ggplot2::GeomSmooth, "draw_group") && same(ggplot2::GeomSmooth, "draw_panel")) {
     return("smooth")
   }
-  NULL
+  # Boxplots, violins and the range geoms (R6.5b, R/render-ranges.R).
+  range_kind(geom)
 }
 
 # A layer's data as its geom draws it: Layer$draw_geom() removes missing
@@ -317,6 +318,11 @@ point_handle_na <- function(layer, data) {
   # GeomRibbon$handle_na() (ggplot2 R/geom-ribbon.R) checks its own columns
   # and splits groups at the rows it removes.
   if (inherits(geom, "GeomRibbon")) {
+    return(geom$handle_na(data, layer$computed_geom_params))
+  }
+  # So do the geoms of R/render-ranges.R, whose required_aes ("x|y",
+  # "ymin|xmin", ...) aren't column names.
+  if (!is.null(range_kind(drawn_geom(geom)))) {
     return(geom$handle_na(data, layer$computed_geom_params))
   }
   vars <- intersect(c(geom$required_aes, geom$non_missing_aes), names(data))
@@ -349,7 +355,8 @@ hybrid_decline <- function(layer, data, layout, kind = hybrid_kind(layer)) {
     polygons = polygons_decline(data, layer$computed_geom_params),
     text = text_decline(data, layer$computed_geom_params),
     ribbons = ribbons_decline(data, layer$computed_geom_params, FALSE),
-    smooth = ribbons_decline(data, layer$computed_geom_params, TRUE)
+    smooth = ribbons_decline(data, layer$computed_geom_params, TRUE),
+    range_decline(kind, data, layer$computed_geom_params)
   )
   if (!is.null(reason)) {
     return(reason)

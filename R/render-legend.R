@@ -252,7 +252,91 @@ legend_glyph <- function(f, data, params, res, default_cm) {
     path <- legend_glyph(gg("draw_key_path"), data, params, res, default_cm)
     return(list(marks = c(if (!is.null(rect)) list(rect), if (!is.null(path$mark)) list(path$mark)), size = path$size))
   }
+  if (is_key("boxplot") || is_key("crossbar")) {
+    return(list(marks = legend_box_marks(data, params, res, is_key("boxplot")), size = px(legend_key_cm(data, default = default_cm))))
+  }
+  # draw_key_linerange(): draw_key_path() when flipped, else
+  # draw_key_vpath(), a segment up the middle; draw_key_pointrange(): that,
+  # then draw_key_point() of four times the size, the key sized as the
+  # linerange's.
+  if (is_key("vpath") || is_key("linerange") || is_key("pointrange")) {
+    if (!is_key("vpath") && isTRUE(params$flipped_aes)) {
+      line <- legend_glyph(gg("draw_key_path"), data, params, res, default_cm)
+    } else {
+      if (!is.null(params[["arrow"]])) {
+        layout_decline("a legend key with an arrow")
+      }
+      mark <- legend_line_mark(c(0.5, 0.5), c(0.1, 0.9), legend_colour(data$colour %||% data$fill %||% "black", data$alpha %||% NA),
+        data$linewidth %||% 0.5, data$linetype %||% 1, params$lineend %||% "butt", "round", res)
+      line <- list(mark = mark, size = px(legend_key_cm(data, default = default_cm)))
+    }
+    if (!is_key("pointrange")) {
+      return(line)
+    }
+    pdata <- data
+    pdata$size <- (data$size %||% 1.5) * 4
+    point <- legend_point_glyph(pdata, res)
+    return(list(marks = c(if (!is.null(line$mark)) list(line$mark), if (!is.null(point)) list(point)), size = line$size))
+  }
   layout_decline("a legend key alot doesn't draw")
+}
+
+# A polyline key mark through `x` and `y` (npc of the key): NULL for a
+# blank line type, or for a line of no length (agg drops the coincident
+# vertex and strokes nothing).
+legend_line_mark <- function(x, y, col, lwd, lty, cap, join, res) {
+  lty <- legend_lty(lty)
+  cap <- match(cap, c("round", "butt", "square")) - 1L
+  join <- match(join, c("round", "mitre", "bevel")) - 1L
+  if (!is.numeric(lwd) || length(lwd) != 1 || is.na(lwd) || length(cap) != 1 || is.na(cap) || length(join) != 1 || is.na(join)) {
+    layout_decline("a legend key line alot doesn't draw")
+  }
+  if (lty < 0 || (x[1] == x[2] && y[1] == y[2])) {
+    return(NULL)
+  }
+  list(type = "path", x = as.double(x), y = as.double(y), col = col, lwd = lwd * ggplot2::.pt * res / 96, lty = as.numeric(lty),
+    cap = as.numeric(cap), join = as.numeric(join))
+}
+
+# draw_key_boxplot() and draw_key_crossbar() (ggplot2 R/legend-draw.R): a
+# grobTree() whose gpar (colour, fill_alpha(fill, alpha), linewidth,
+# linetype, lineend, linejoin) the parts' *_gp parameters override. The
+# boxplot's: two whiskers, the box (0.75 by 0.5 of the key), the median and
+# two staples; the crossbar's: the box and the middle line. Flipped keys
+# turn them a quarter.
+legend_box_marks <- function(data, params, res, boxplot) {
+  flipped <- isTRUE(params$flipped_aes)
+  colour <- data$colour %||% "grey20"
+  lwd <- data$linewidth %||% 0.5
+  lty <- data$linetype %||% 1
+  cap <- params$lineend %||% "butt"
+  join <- params$linejoin %||% "mitre"
+  line <- function(gp, x, y) {
+    xy <- if (flipped) list(y, x) else list(x, y)
+    xy <- lapply(xy, rep_len, 2)
+    legend_line_mark(xy[[1]], xy[[2]], legend_colour(gp$colour %||% colour), gp$linewidth %||% lwd, gp$linetype %||% lty, cap, join, res)
+  }
+  gp <- function(name) {
+    v <- params[[name]]
+    if (!is.null(v) && !is.list(v)) layout_decline("a gp parameter alot doesn't draw")
+    v
+  }
+  box_gp <- gp("box_gp")
+  box <- legend_rect_glyph(
+    fill = legend_colour(data$fill %||% "white", data$alpha %||% NA), colour = legend_colour(box_gp$colour %||% colour),
+    lwd = box_gp$linewidth %||% lwd, lty = box_gp$linetype %||% lty, join = join, cap = cap, inset = 0, res = res
+  )
+  box$frac <- if (flipped) c(0.5, 0.75) else c(0.75, 0.5)
+  if (!boxplot) {
+    marks <- list(box, line(gp("middle_gp"), c(0.125, 0.875), 0.5))
+  } else {
+    staple <- 0.5 + c(0.375, -0.375) * (params$staplewidth %||% 0)
+    marks <- list(
+      line(gp("whisker_gp"), 0.5, c(0.1, 0.25)), line(gp("whisker_gp"), 0.5, c(0.75, 0.9)), box,
+      line(gp("median_gp"), c(0.125, 0.875), 0.5), line(gp("staple_gp"), staple, 0.1), line(gp("staple_gp"), staple, 0.9)
+    )
+  }
+  Filter(Negate(is.null), marks)
 }
 
 # A theme_calc() state (R/render-ir.R) over `elements`, a list of theme

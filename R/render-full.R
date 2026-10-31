@@ -135,7 +135,11 @@ full_layers <- function(built, ir, res) {
       paths = full_paths(built@plot@layers[[i]], layer$data, ranges, n_panels, res),
       text = full_text(built@plot@layers[[i]], layer$data, built@layout$coord, pps, scales, n_panels, res),
       ribbons = full_ribbons(built@plot@layers[[i]], layer$data, ranges, n_panels, res, FALSE),
-      smooth = full_ribbons(built@plot@layers[[i]], layer$data, ranges, n_panels, res, TRUE)
+      smooth = full_ribbons(built@plot@layers[[i]], layer$data, ranges, n_panels, res, TRUE),
+      {
+        out <- c(out, full_range(layer$kind, built@plot@layers[[i]], layer$data, ranges, n_panels, res))
+        next
+      }
     )
     kind <- if (layer$kind %in% c("ribbons", "smooth")) "paths" else layer$kind
     if (!is.null(spec)) out[[length(out) + 1L]] <- c(list(kind = kind), spec)
@@ -408,7 +412,9 @@ full_geoms <- function() {
   list(
     ggplot2::GeomPoint, ggplot2::GeomRect, ggplot2::GeomTile, ggplot2::GeomBar,
     ggplot2::GeomCol, ggplot2::GeomPath, ggplot2::GeomLine, ggplot2::GeomStep, ggplot2::GeomText,
-    ggplot2::GeomRibbon, ggplot2::GeomArea, ggplot2::GeomDensity, ggplot2::GeomSmooth
+    ggplot2::GeomRibbon, ggplot2::GeomArea, ggplot2::GeomDensity, ggplot2::GeomSmooth,
+    ggplot2::GeomBoxplot, ggplot2::GeomViolin, ggplot2::GeomCrossbar, ggplot2::GeomErrorbar,
+    ggplot2::GeomLinerange, ggplot2::GeomPointrange
   )
 }
 
@@ -421,7 +427,7 @@ full_decline <- function(built, ir) {
     ir_is_ggplot2(geom, "GeomBlank") || any(vapply(full_geoms(), identical, logical(1), geom))
   }, logical(1))
   if (!all(drawn)) {
-    return("layers other than geom_point(), geom_line() and the other core geoms")
+    return("layers other than geom_point(), geom_line() and the other geoms the full tier draws")
   }
   support <- ir$support
   # Layers without rows draw nothing.

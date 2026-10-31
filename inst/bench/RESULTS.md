@@ -1216,3 +1216,22 @@ build is not timed), release build, 1600 × 1000 at 150 dpi, median of 3:
 
 Both are faster than ragg drawing the same marks. The area's 2.7 s has not
 been profiled by stage (left to R7.2).
+
+## R6.5b: boxplots, violins and ranges in the full tier (2026-10-31)
+
+`render_full()` against ggplot2's gtable drawn on `ragg::agg_capture()` (the
+build is not timed), release build, 1600 × 1000 at 150 dpi, median of 3:
+
+| Plot | Full tier | ggplot2 + ragg |
+|---|---:|---:|
+| `geom_errorbar()`, 1e5 bars by 4 colours (`errorbar_1e5`) | 324 ms | 10660 ms |
+| `geom_boxplot(notch = TRUE)`, 1e6 rows in 10 groups, with outliers (`boxplot_1e6`) | 58 ms | 199 ms |
+| `geom_pointrange()`, 1e4 rows | 50 ms | 240 ms |
+| `geom_violin(quantile.linetype = 1)`, 1e5 rows in 5 groups | 39 ms | 120 ms |
+
+Before this task the path drawer rasterised every path over its whole band
+of the page (`PathBatch::draw()`, alot-core/src/render/paths.rs), which made
+many small paths slower than ragg: 1e5 error bars took 11.4 s, and 1e4
+two-point `geom_path()` groups 706 ms to draw. Each path is now rasterised
+over its bounding box only (`agg::rasterize_in()` of a box gives the full
+rasterisation's alpha); those take 324 ms and 24 ms.

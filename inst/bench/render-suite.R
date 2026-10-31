@@ -113,6 +113,22 @@ render_cases <- list(
       ggplot(d, aes(x, y, fill = g)) + geom_area(colour = "black")
     },
     size = readme_size
+  ),
+  # R6.5b: 1e5 error bars (three polylines each) coloured by group, and
+  # boxplots of 1e6 rows with their outliers.
+  errorbar_1e5 = list(
+    plot = function() {
+      d <- data.frame(x = seq_len(1e5), g = rep(letters[1:4], 2.5e4), y = stats::runif(1e5))
+      ggplot(d, aes(x, ymin = y - 0.1, ymax = y + 0.1, colour = g)) + geom_errorbar()
+    },
+    size = readme_size
+  ),
+  boxplot_1e6 = list(
+    plot = function() {
+      d <- data.frame(g = rep(letters[1:10], 1e5), y = stats::rnorm(1e6))
+      ggplot(d, aes(g, y, fill = g)) + geom_boxplot(notch = TRUE)
+    },
+    size = readme_size
   )
 )
 

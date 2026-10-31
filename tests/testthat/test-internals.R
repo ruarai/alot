@@ -231,6 +231,22 @@ test_that("upstream ribbon and smooth drawing match what the full tier mirrors",
   expect_snapshot(print(body(ggplot2::draw_key_smooth)))
 })
 
+test_that("upstream boxplot, violin and range drawing match what the full tier mirrors", {
+  # R/render-ranges.R mirrors these draw methods (and GeomSegment's and
+  # GeomPoint's, which they call); legend_glyph() mirrors the keys.
+  expect_snapshot(print(body(environment(ggplot2::GeomBoxplot$draw_group)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomViolin$draw_group)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomCrossbar$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomErrorbar$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomLinerange$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomPointrange$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomSegment$draw_panel)$f)))
+  expect_snapshot(print(body(environment(ggplot2::GeomPoint$draw_panel)$f)))
+  for (f in c("draw_key_boxplot", "draw_key_crossbar", "draw_key_linerange", "draw_key_pointrange", "draw_key_vpath")) {
+    expect_snapshot(print(body(utils::getFromNamespace(f, "ggplot2"))))
+  }
+})
+
 test_that("upstream theme and label resolution match what the render IR mirrors", {
   # resolve_theme() (R/render-ir.R) mirrors calc_element() and
   # combine_elements(); ir_labels() mirrors Layout$render()'s axis titles.

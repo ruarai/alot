@@ -2626,6 +2626,356 @@
           grob
       }
 
+# upstream boxplot, violin and range drawing match what the full tier mirrors
+
+    Code
+      print(body(environment(ggplot2::GeomBoxplot$draw_group)$f))
+    Output
+      {
+          data <- fix_linewidth(data, snake_class(self))
+          data <- flip_data(data, flipped_aes)
+          if (nrow(data) != 1) {
+              cli::cli_abort(c("Can only draw one boxplot per group.", 
+                  i = "Did you forget {.code aes(group = ...)}?"))
+          }
+          common <- list(fill = fill_alpha(data$fill, data$alpha), 
+              group = data$group)
+          whiskers <- data_frame0(x = c(data$x, data$x), xend = c(data$x, 
+              data$x), y = c(data$upper, data$lower), yend = c(data$ymax, 
+              data$ymin), colour = rep(whisker_gp$colour %||% data$colour, 
+              2), linetype = rep(whisker_gp$linetype %||% data$linetype, 
+              2), linewidth = rep(whisker_gp$linewidth %||% data$linewidth, 
+              2), alpha = c(NA_real_, NA_real_), !!!common, .size = 2)
+          whiskers <- flip_data(whiskers, flipped_aes)
+          box <- transform(data, y = middle, ymax = upper, ymin = lower, 
+              ynotchlower = ifelse(notch, notchlower, NA), ynotchupper = ifelse(notch, 
+                  notchupper, NA), notchwidth = notchwidth)
+          box <- flip_data(box, flipped_aes)
+          if (!is.null(data$outliers) && length(data$outliers[[1]]) >= 
+              1) {
+              outliers <- data_frame0(y = data$outliers[[1]], x = data$x[1], 
+                  colour = outlier_gp$colour %||% data$colour[1], fill = outlier_gp$fill %||% 
+                      data$fill[1], shape = outlier_gp$shape %||% data$shape[1] %||% 
+                      19, size = outlier_gp$size %||% data$size[1] %||% 
+                      1.5, stroke = outlier_gp$stroke %||% data$stroke[1] %||% 
+                      0.5, fill = NA, alpha = outlier_gp$alpha %||% 
+                      data$alpha[1], .size = length(data$outliers[[1]]))
+              outliers <- flip_data(outliers, flipped_aes)
+              outliers_grob <- GeomPoint$draw_panel(outliers, panel_params, 
+                  coord)
+          }
+          else {
+              outliers_grob <- NULL
+          }
+          if (staplewidth != 0) {
+              staples <- data_frame0(x = rep((data$xmin - data$x) * 
+                  staplewidth + data$x, 2), xend = rep((data$xmax - 
+                  data$x) * staplewidth + data$x, 2), y = c(data$ymax, 
+                  data$ymin), yend = c(data$ymax, data$ymin), linetype = rep(staple_gp$linetype %||% 
+                  data$linetype, 2), linewidth = rep(staple_gp$linewidth %||% 
+                  data$linewidth, 2), colour = rep(staple_gp$colour %||% 
+                  data$colour, 2), alpha = c(NA_real_, NA_real_), !!!common, 
+                  .size = 2)
+              staples <- flip_data(staples, flipped_aes)
+              staple_grob <- GeomSegment$draw_panel(staples, panel_params, 
+                  coord, lineend = lineend)
+          }
+          else {
+              staple_grob <- NULL
+          }
+          ggname("geom_boxplot", grobTree(outliers_grob, staple_grob, 
+              GeomSegment$draw_panel(whiskers, panel_params, coord, 
+                  lineend = lineend), GeomCrossbar$draw_panel(box, 
+                  fatten = fatten, panel_params, coord, lineend = lineend, 
+                  linejoin = linejoin, flipped_aes = flipped_aes, middle_gp = median_gp, 
+                  box_gp = box_gp)))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomViolin$draw_group)$f))
+    Output
+      {
+          data <- flip_data(data, flipped_aes)
+          data <- transform(data, xminv = x - violinwidth * (x - xmin), 
+              xmaxv = x + violinwidth * (xmax - x))
+          newdata <- vec_rbind0(transform(data, x = xminv)[order(data$y), 
+              ], transform(data, x = xmaxv)[order(data$y, decreasing = TRUE), 
+              ])
+          newdata <- vec_rbind0(newdata, newdata[1, ])
+          newdata <- flip_data(newdata, flipped_aes)
+          violin_grob <- GeomPolygon$draw_panel(newdata, ...)
+          if (!"quantile" %in% names(newdata) || all(quantile_gp$linetype == 
+              0) || all(quantile_gp$linetype == "blank")) {
+              return(ggname("geom_violin", violin_grob))
+          }
+          quantiles <- newdata[!is.na(newdata$quantile), ]
+          quantiles$group <- match(quantiles$quantile, unique(quantiles$quantile))
+          quantiles$linetype <- quantile_gp$linetype %||% quantiles$linetype
+          quantiles$linewidth <- quantile_gp$linewidth %||% quantiles$linewidth
+          quantiles$colour <- quantile_gp$colour %||% quantiles$colour
+          quantile_grob <- if (nrow(quantiles) == 0) {
+              zeroGrob()
+          }
+          else {
+              GeomPath$draw_panel(quantiles, ...)
+          }
+          ggname("geom_violin", grobTree(violin_grob, quantile_grob))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomCrossbar$draw_panel)$f))
+    Output
+      {
+          data <- fix_linewidth(data, snake_class(self))
+          data <- flip_data(data, flipped_aes)
+          middle <- transform(data, x = xmin, xend = xmax, yend = y, 
+              linewidth = linewidth * fatten, alpha = NA)
+          middle <- data_frame0(!!!defaults(compact(middle_gp), middle))
+          has_notch <- !is.null(data$ynotchlower) && !is.null(data$ynotchupper) && 
+              !is.na(data$ynotchlower) && !is.na(data$ynotchupper)
+          if (has_notch) {
+              if (data$ynotchlower < data$ymin || data$ynotchupper > 
+                  data$ymax) 
+                  cli::cli_inform(c("Notch went outside hinges", i = "Do you want {.code notch = FALSE}?"))
+              notchindent <- (1 - data$notchwidth) * (data$xmax - data$xmin)/2
+              middle$x <- middle$x + notchindent
+              middle$xend <- middle$xend - notchindent
+              box <- data_frame0(x = c(data$xmin, data$xmin, data$xmin + 
+                  notchindent, data$xmin, data$xmin, data$xmax, data$xmax, 
+                  data$xmax - notchindent, data$xmax, data$xmax, data$xmin), 
+                  y = c(data$ymax, data$ynotchupper, data$y, data$ynotchlower, 
+                      data$ymin, data$ymin, data$ynotchlower, data$y, 
+                      data$ynotchupper, data$ymax, data$ymax), alpha = rep(data$alpha, 
+                      11), colour = rep(data$colour, 11), linewidth = rep(data$linewidth, 
+                      11), linetype = rep(data$linetype, 11), fill = rep(data$fill, 
+                      11), group = rep(seq_len(nrow(data)), 11))
+          }
+          else {
+              box <- data_frame0(x = c(data$xmin, data$xmin, data$xmax, 
+                  data$xmax, data$xmin), y = c(data$ymax, data$ymin, 
+                  data$ymin, data$ymax, data$ymax), alpha = rep(data$alpha, 
+                  5), colour = rep(data$colour, 5), linewidth = rep(data$linewidth, 
+                  5), linetype = rep(data$linetype, 5), fill = rep(data$fill, 
+                  5), group = rep(seq_len(nrow(data)), 5))
+          }
+          box <- data_frame0(!!!defaults(compact(box_gp), box))
+          box <- flip_data(box, flipped_aes)
+          middle <- flip_data(middle, flipped_aes)
+          ggname("geom_crossbar", gTree(children = gList(GeomPolygon$draw_panel(box, 
+              panel_params, coord, lineend = lineend, linejoin = linejoin), 
+              GeomSegment$draw_panel(middle, panel_params, coord, lineend = lineend, 
+                  linejoin = linejoin))))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomErrorbar$draw_panel)$f))
+    Output
+      {
+          data <- fix_linewidth(data, snake_class(self))
+          data <- flip_data(data, flipped_aes)
+          x <- vec_interleave(data$xmin, data$xmax, NA, data$x, data$x, 
+              NA, data$xmin, data$xmax)
+          y <- vec_interleave(data$ymax, data$ymax, NA, data$ymax, 
+              data$ymin, NA, data$ymin, data$ymin)
+          data <- data_frame0(x = x, y = y, colour = rep(data$colour, 
+              each = 8), alpha = rep(data$alpha, each = 8), linewidth = rep(data$linewidth, 
+              each = 8), linetype = rep(data$linetype, each = 8), group = rep(seq_len(nrow(data)), 
+              each = 8), .size = nrow(data) * 8)
+          data <- flip_data(data, flipped_aes)
+          GeomPath$draw_panel(data, panel_params, coord, lineend = lineend)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomLinerange$draw_panel)$f))
+    Output
+      {
+          data <- flip_data(data, flipped_aes)
+          data <- transform(data, xend = x, y = ymin, yend = ymax)
+          data <- flip_data(data, flipped_aes)
+          ggname("geom_linerange", GeomSegment$draw_panel(data, panel_params, 
+              coord, lineend = lineend, na.rm = na.rm))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomPointrange$draw_panel)$f))
+    Output
+      {
+          line_grob <- GeomLinerange$draw_panel(data, panel_params, 
+              coord, lineend = lineend, flipped_aes = flipped_aes, 
+              na.rm = na.rm)
+          if (is.null(data[[flipped_names(flipped_aes)$y]])) 
+              return(line_grob)
+          ggname("geom_pointrange", gTree(children = gList(line_grob, 
+              GeomPoint$draw_panel(transform(data, size = size * fatten), 
+                  panel_params, coord, na.rm = na.rm))))
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomSegment$draw_panel)$f))
+    Output
+      {
+          data$xend <- data$xend %||% data$x
+          data$yend <- data$yend %||% data$y
+          data <- fix_linewidth(data, snake_class(self))
+          data <- remove_missing(data, na.rm = na.rm, c("x", "y", "xend", 
+              "yend", "linetype", "linewidth"), name = "geom_segment")
+          if (empty(data)) 
+              return(zeroGrob())
+          if (coord$is_linear()) {
+              coord <- coord$transform(data, panel_params)
+              arrow.fill <- arrow.fill %||% coord$colour
+              return(segmentsGrob(coord$x, coord$y, coord$xend, coord$yend, 
+                  default.units = "native", gp = gg_par(col = alpha(coord$colour, 
+                      coord$alpha), fill = alpha(arrow.fill, coord$alpha), 
+                      lwd = coord$linewidth, lty = coord$linetype, 
+                      lineend = lineend, linejoin = linejoin), arrow = arrow))
+          }
+          data$group <- seq_len(nrow(data))
+          starts <- subset(data, select = c(-xend, -yend))
+          ends <- rename(subset(data, select = c(-x, -y)), c(xend = "x", 
+              yend = "y"))
+          pieces <- vec_rbind0(starts, ends)
+          pieces <- pieces[order(pieces$group), ]
+          GeomPath$draw_panel(pieces, panel_params, coord, arrow = arrow, 
+              lineend = lineend)
+      }
+
+---
+
+    Code
+      print(body(environment(ggplot2::GeomPoint$draw_panel)$f))
+    Output
+      {
+          data$shape <- translate_shape_string(data$shape)
+          coords <- coord$transform(data, panel_params)
+          ggname("geom_point", pointsGrob(coords$x, coords$y, pch = coords$shape, 
+              gp = gg_par(col = alpha(coords$colour, coords$alpha), 
+                  fill = fill_alpha(coords$fill, coords$alpha), pointsize = coords$size, 
+                  stroke = coords$stroke)))
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          gp <- gg_par(col = data$colour %||% "grey20", fill = fill_alpha(data$fill %||% 
+              "white", data$alpha), lwd = data$linewidth %||% 0.5, 
+              lty = data$linetype %||% 1, lineend = params$lineend %||% 
+                  "butt", linejoin = params$linejoin %||% "mitre")
+          whisker <- gg_par(col = params$whisker_gp$colour, lty = params$whisker_gp$linetype, 
+              lwd = params$whisker_gp$linewidth)
+          median <- gg_par(col = params$median_gp$colour, lty = params$median_gp$linetype, 
+              lwd = params$median_gp$linewidth)
+          box <- gg_par(col = params$box_gp$colour, lty = params$box_gp$linetype, 
+              lwd = params$box_gp$linewidth)
+          staple_size <- 0.5 + c(0.375, -0.375) * (params$staplewidth %||% 
+              0)
+          staple <- gg_par(col = params$staple_gp$colour, lty = params$staple_gp$linetype, 
+              lwd = params$staple_gp$linewidth)
+          if (isTRUE(params$flipped_aes)) {
+              grobTree(linesGrob(c(0.1, 0.25), 0.5, gp = whisker), 
+                  linesGrob(c(0.75, 0.9), 0.5, gp = whisker), rectGrob(width = 0.5, 
+                      height = 0.75, gp = box), linesGrob(0.5, c(0.125, 
+                      0.875), gp = median), linesGrob(0.1, staple_size, 
+                      gp = staple), linesGrob(0.9, staple_size, gp = staple), 
+                  gp = gp)
+          }
+          else {
+              grobTree(linesGrob(0.5, c(0.1, 0.25), gp = whisker), 
+                  linesGrob(0.5, c(0.75, 0.9), gp = whisker), rectGrob(height = 0.5, 
+                      width = 0.75, gp = box), linesGrob(c(0.125, 0.875), 
+                      0.5, gp = median), linesGrob(staple_size, 0.1, 
+                      gp = staple), linesGrob(staple_size, 0.9, gp = staple), 
+                  gp = gp)
+          }
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          gp <- gg_par(col = data$colour %||% "grey20", fill = fill_alpha(data$fill %||% 
+              "white", data$alpha), lwd = data$linewidth %||% 0.5, 
+              lty = data$linetype %||% 1, lineend = params$lineend %||% 
+                  "butt", linejoin = params$linejoin %||% "mitre")
+          middle <- gg_par(col = params$middle_gp$colour, lty = params$middle_gp$linetype, 
+              lwd = params$middle_gp$linewidth)
+          box <- gg_par(col = params$box_gp$colour, lty = params$box_gp$linetype, 
+              lwd = params$box_gp$linewidth)
+          if (isTRUE(params$flipped_aes)) {
+              grobTree(rectGrob(height = 0.75, width = 0.5, gp = box), 
+                  linesGrob(0.5, c(0.125, 0.875), gp = middle), gp = gp)
+          }
+          else {
+              grobTree(rectGrob(height = 0.5, width = 0.75, gp = box), 
+                  linesGrob(c(0.125, 0.875), 0.5, gp = middle), gp = gp)
+          }
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          if (isTRUE(params$flipped_aes)) {
+              draw_key_path(data, params, size)
+          }
+          else {
+              draw_key_vpath(data, params, size)
+          }
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          linerange <- draw_key_linerange(data, params, size)
+          grob <- grobTree(linerange, draw_key_point(transform(data, 
+              size = (data$size %||% 1.5) * 4), params))
+          attr(grob, "width") <- attr(linerange, "width")
+          attr(grob, "height") <- attr(linerange, "height")
+          grob
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "ggplot2")))
+    Output
+      {
+          grob <- segmentsGrob(0.5, 0.1, 0.5, 0.9, gp = gg_par(col = alpha(data$colour %||% 
+              data$fill %||% "black", data$alpha), lwd = data$linewidth %||% 
+              0.5, lty = data$linetype %||% 1, lineend = params$lineend %||% 
+              "butt"), arrow = params[["arrow"]])
+          if (!is.null(params[["arrow"]])) {
+              angle <- deg2rad(params[["arrow"]]$angle)
+              length <- convertUnit(params[["arrow"]]$length[1], "cm", 
+                  valueOnly = TRUE)
+              attr(grob, "width") <- sin(angle) * length * 2
+              attr(grob, "height") <- cos(angle) * length * 1.25
+          }
+          grob
+      }
+
 # upstream theme and label resolution match what the render IR mirrors
 
     Code
