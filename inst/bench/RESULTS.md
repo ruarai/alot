@@ -1502,3 +1502,199 @@ more on this machine. **Memory at 300 dpi:** the executor holds 8 band
 buffers of 64 × 2100 px (21.5 MB with the output rows, `band_memory()`), and the page itself
 is no longer materialised for `alot_png()`; the point layer's dealt
 columns (about 48 MB for 1e6 rows) and placements (24 MB) dominate.
+
+## S0.2: spatial baseline (2026-11-01)
+
+`inst/bench/spatial.R` (SPATIAL.md, Verification), release build,
+sequential with ggplot2 and alot interleaved, 7 × 7 in at 300 dpi (a
+2100 × 2100 page) for every case:
+
+```sh
+NOT_CRAN=true Rscript -e 'pkgbuild::compile_dll(force = TRUE, debug = FALSE)'
+NOT_CRAN=true Rscript -e 'pkgload::load_all(compile = FALSE, helpers = FALSE); source("inst/bench/spatial.R")'
+```
+
+The whole suite takes about 3 minutes. R 4.6.1, ggplot2 4.0.3, ragg 1.5.2, sf 1.1.3 (GEOS 3.10.2,
+GDAL 3.4.1, PROJ 8.2.1), 16 vCPUs. Cases:
+
+- `raster_<n>`: an n × n raster in EPSG:3577 metres, about half the cells
+  absent (an irregular disc of "land"), continuous `suitability`,
+  `geom_raster()` + `scale_fill_viridis_c()` + `coord_fixed()`. Rows: 500²
+  0.13e6, 1000² 0.51e6, 2000² 2.02e6.
+- `sf_<k>_<crs>`: k jagged polygon features (1e2, 1e3, 1e4) with 1e6
+  vertices in total, `geom_sf(aes(fill = value), colour = "grey20")`, in
+  EPSG:3577 or EPSG:4326, with the default `coord_sf()` (the data's CRS).
+  `sf_1e3_reproject` draws the 4326 layer in `coord_sf(crs = 3577)`.
+- `north_star`: SPATIAL.md's map. A 2000² raster (2.02e6 rows) and 500
+  features with 1e6 vertices, both in 3577. `north_star_facet` has four
+  species with a 1000² raster each (2.02e6 rows in all) in `facet_wrap()`,
+  with the sf layer drawn in every panel (4e6 vertices drawn).
+- `real_sf`, `real_raster`, `real_north_star`: opt-in, read from
+  `ALOT_SPATIAL_DATA`. This machine has no real data. The code path was
+  checked once with `nc.shp` and a small `.rds` grid.
+
+Stages: **build** (`ggplot_build()` / `alot_build()`); **decide** (alot
+only: `render_raster()`'s full-tier attempt and `render_coverage()`);
+**gtable** (`ggplot_gtable()` on the open ragg device); **draw**
+(`grid.newpage()` + `grid.draw()`); **encode** (`dev.off()`, which writes
+the PNG). Today every case goes to the **ggplot2 tier**: the render path
+declines `geom_raster()` and `geom_sf()`. So alot's current path is
+`alot_build()` + 10 ms of decide + ggplot2's render.
+
+### Baseline per stage (ms; medians of 3 reps, 1 rep for 2000² and the north stars)
+
+| case | gg build | gg gtable | gg draw | gg encode | **gg total** | alot build | alot render | **alot total** | speedup |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| raster_500 | 115 | 80 | 124 | 122 | **439** | 134 | 342 | **476** | 0.92× |
+| raster_1000 | 609 | 319 | 135 | 246 | **1,310** | 158 | 709 | **873** | 1.50× |
+| raster_2000 | 2,125 | 873 | 183 | 221 | **3,402** | 597 | 1,039 | **1,636** | 2.08× |
+| sf_1e2_3577 | 181 | 66 | 803 | 116 | **1,163** | 179 | 1,003 | **1,181** | 0.98× |
+| sf_1e3_3577 | 192 | 71 | 711 | 165 | **1,140** | 196 | 950 | **1,146** | 0.99× |
+| sf_1e4_3577 | 320 | 128 | 751 | 292 | **1,485** | 321 | 1,167 | **1,488** | 1.00× |
+| sf_1e2_4326 | 162 | 86 | 844 | 115 | **1,209** | 165 | 1,053 | **1,220** | 0.99× |
+| sf_1e3_4326 | 179 | 71 | 726 | 168 | **1,140** | 181 | 964 | **1,145** | 1.00× |
+| sf_1e4_4326 | 326 | 151 | 745 | 334 | **1,556** | 323 | 1,243 | **1,566** | 0.99× |
+| sf_1e3_reproject | 978 | 94 | 726 | 164 | **1,965** | 970 | 996 | **1,966** | 1.00× |
+| north_star | 2,346 | 912 | 725 | 190 | **4,173** | 809 | 1,621 | **2,430** | 1.72× |
+| north_star_facet | 1,925 | 1,139 | 2,435 | 202 | **5,701** | 723 | 3,621 | **4,344** | 1.31× |
+
+Single-rep stage splits move by up to about 100 ms, mostly because of
+where garbage collection lands. ggplot2's build leaves more garbage than
+alot's, so a collection often falls in ggplot2's gtable stage (e.g.
+raster_2000's gtable: 873 vs 643 ms for the same ggplot2 code). Totals are
+steadier.
+
+### PROJ floor
+
+The time with PROJ on the stack (`st_transform()`, `sf_project()`,
+`st_graticule()`, `CPL_transform`) comes from one Rprof'd rep (10 ms
+samples). All of it falls in the build:
+
+| case | gg total | PROJ | share | best possible speedup |
+|---|---:|---:|---:|---:|
+| raster_* | 439–3,402 | 0 | 0% | — |
+| sf_1e2/1e3/1e4_3577 | 1,140–1,485 | 110–170 | 10–12% | 8–10× |
+| sf_1e2/1e3/1e4_4326 | 1,140–1,556 | 90–200 | 8–13% | 8–13× |
+| sf_1e3_reproject | 1,965 | 900 | 47% | **2.2×** |
+| north_star | 4,173 | 70 | 2% | 52× |
+| north_star_facet | 5,701 | 60 | 1% | 102× |
+
+Measured directly (median of 3): `st_transform()` of 1e6 vertices from
+4326 to 3577 takes 440 ms. From 3577 to 3577 it takes 57 ms. `st_graticule()`
+for the north star's panel takes 24 ms.
+
+**The same-CRS transform is not free.** `CoordSf$setup_data` (ggplot2
+R/coord-sf.R) calls `sf::st_transform()` on every sf layer whenever
+`params$crs` is set, and it is set by default from the first sf layer's
+CRS. `st_transform.sfc` always calls `CPL_transform` and then rebuilds the
+sfc with `st_sfc()`, which recomputes the bbox and scans types and
+emptiness. So a layer that is already in the coord's CRS still spends
+100–200 ms of a 160–330 ms build (55–60% of it) in this step. That is
+most of the "PROJ" figure for the in-CRS sf cases. For these synthetic
+layers the result is `identical()` to the input, in both 3577 and 4326.
+
+### Where the time goes
+
+**Raster build** (ggplot2 2,125 ms → alot 597 ms at 2000²). ggplot2's time
+is in scale mapping and training. The per-step table at 2.02e6 rows (3
+builds, kernels off → on): `npscales_map` 502 → 246, `map_position_2`
+453 → 179, `train_position_2` 201 → 91, `map_position_1` 151 → 25,
+`train_position_1` 62 → 31. Each of these already has a kernel (T1.x,
+T2.3). `compute_geom_1`, which is `GeomRaster$setup_data` (`resolution()`
+on x and y plus the per-row xmin/xmax/ymin/ymax), takes 36 → 40 ms there.
+On its own, `GeomRaster$setup_data` takes **19 ms at 1.01e6 rows**, 16 of
+them in `resolution()` (vctrs `vec_unique()` and `sort()`). That is
+about 1% of the 1e6-row raster's end-to-end time. What alot's raster
+build still spends at 2e6 rows: `npscales_map` ~240 ms
+(`rs_map_colour()`, which returns one hex string per row),
+`map_position_2` 55–180 ms (six columns), `train_position_2` ~90–100 ms
+(about 60 ms of R-side self time in `scales_train()`), and `as.integer()` on
+the PANEL factor in `match_panel()` and the train/map wrappers (~25 ms).
+
+**Raster render** (ggplot2 tier, 2000²). gtable takes 640–900 ms, which is
+`GeomRaster$draw_panel`: `transform_position()`, the `nrow × ncol`
+colour matrix, `t()`, `is.na()` and colour encoding. Draw takes 170–180
+ms (`grid.newpage()` clears the 2100² page in 80 ms; ragg's
+`drawRaster()` takes about 60). Encode takes 220 ms. S1.1 replaces all of
+it.
+
+**sf build** (160–330 ms in the data's CRS). `layout_setup` takes 55–65%
+(the same-CRS `st_transform()` above). `setup_panel_params` takes 21–35 ms
+(`st_graticule()`, mostly `CPL_crs_parameters`), and `compute_geom_2`
+(`GeomSf$use_defaults`) takes 18 ms at 1e2 features and 60 ms at 1e4.
+About half of the 60 ms is sf's `vec_restore()` re-building the sliced
+sfc (`st_sfc()`: bbox, types) and about 10 ms is the per-feature
+`st_geometry_type()` `vapply()`. `compute_geom_1` (`detect_sf_type()`,
+again `st_geometry_type()`) takes 12 ms at 1e4 features, and
+`compute_statistic` (`StatSf`, cached bbox; `detect_missing()`) takes 8–15
+ms. alot's build equals ggplot2's here because nothing sf-specific has a
+mirror or kernel yet (S0.1).
+
+**sf render** (~1 s, flat in the feature count at 1e6 vertices). Draw
+takes 710–850 ms, of which 470–670 ms is ragg filling and stroking the
+paths (`grid.Call.graphics`) and 80 ms is `grid.newpage()`. gtable is
+small: 66–150 ms for `sf_rescale01()`/`normalize_sfc()` and `st_as_grob()`
+per feature. Encode takes 115–330 ms and grows with image complexity (1e4
+filled features). SPATIAL.md's expectation that sf's O(vertices) work
+happens at render time holds, but the time is in ragg's rasterisation,
+not in R's grob building. This is the target for S3.2.
+
+**North star** (ggplot2 4,173 ms). Build 2,346 ms (all raster scale work;
+PROJ 70), gtable 912 ms (`GeomRaster$draw_panel` and sf grobs), draw 725
+ms (ragg stroking 1e6 vertices: 560), encode 190 ms. The faceted variant
+spends 2,435 ms drawing, because the outlines are stroked once per panel.
+
+### Verdicts
+
+**S1.2 (raster build kernels): drop as specified.** The candidate step,
+`GeomRaster$setup_data` (`resolution()` and xmin/xmax/ymin/ymax), takes 19
+ms at 1e6 rows: about 1% of ggplot2's end-to-end time (≈2.2 s) and 3–6%
+of alot's raster build. A Rust `resolution()` would pass the per-step
+1.25× rule easily, but would save about 15 ms at 1e6 rows. If S1.1's
+drawer computes `resolution()` in Rust anyway, the build can reuse it then.
+The raster build time that matters for the north star is overhead in
+**existing** kernels at 2e6 rows (`npscales_map` ~240 ms,
+`train_position_2` ~95, `map_position_1/2` ~80–200, PANEL `as.integer()`
+~25). A performance pass on those (S4.1, or S1.2 re-scoped to it) is
+where the north-star budget below is won or lost.
+
+**S2.2 (sf build kernels): drop.** No sf build step is both large and
+cuttable under SPATIAL.md's decisions. At 1e4 features (the "1e6 rows"
+analogue, since sf build work is O(features) apart from PROJ), the
+per-feature candidates are the geometry-type scans in `compute_geom_1`
+(12 ms) and in `compute_geom_2` (~10 of its 60 ms), plus
+`compute_statistic` (8–15 ms). That is about 2% of the 1,485 ms end to end.
+The other half of `compute_geom_2` is sf's own sfc restore after
+slicing, which a kernel can't avoid without rewriting the geometry
+column. The dominant build step is `CoordSf$setup_data`'s
+`st_transform()`, which stays in sf. **Open decision for S2.1:** skipping
+that call when the layer's CRS equals `params$crs` (same `crs` object)
+would remove 100–200 ms (8–13% end to end, 55–60% of the sf build) with
+`identical()` output on these layers. It isn't a PROJ port, but it departs
+from "call sf as ggplot2 calls it", so it needs sign-off and tests that
+the sfc (coordinates, bbox, crs, classes) is unchanged.
+
+**North-star target: ≥5× kept for both north-star cases. Revised for
+reprojecting workloads.**
+
+- `north_star`: ggplot2 takes 4,173 ms, so 5× means ≤ 835 ms. PROJ (70 ms) is
+  not the constraint. alot's build alone takes 750–810 ms today. If S1.1/S3.2/S4.1
+  bring the render to about 300 ms (the R7.2 page at 2100² with 1e6
+  points draws in 190 ms), the total is about 1.1 s, or **≈3.8×**. 5× also
+  needs alot's raster build cut to ≈500 ms, through the existing-kernel overheads
+  listed under S1.2. The target stays, with that build budget made
+  explicit for S4.1.
+- `north_star_facet`: ggplot2 takes 5,701 ms, so 5× means ≤ 1,140 ms. alot's build
+  takes about 720 ms, leaving about 400 ms for four panels of raster and 4e6
+  stroked vertices. That is reachable with the band-parallel drawer.
+- `sf_1e3_reproject`, and any sf workload whose layer CRS differs from the
+  coord's: `st_transform()` is 47% of ggplot2's time, so the ceiling is
+  2.2×. **Target ≥1.6×** (render ≈5× faster, build unchanged).
+- sf-only in the layer's own CRS (`sf_*_3577`, `sf_*_4326`): the build
+  (160–330 ms, mostly the same-CRS `st_transform()`) stays in R with S2.2
+  dropped. With a render around 150 ms, the best case is ≈3–3.5×. **Target
+  ≥3×.** It becomes ≥5× only if the same-CRS skip above is adopted.
+- Raster-only: no PROJ. raster_2000 is 3,402 → 597 ms build today plus
+  the S1.1 render; ≥5× (≤ 680 ms) again depends on the build overheads.
+  SPATIAL.md doesn't set a raster-only end-to-end target; S1.1 keeps its
+  draw-step target.

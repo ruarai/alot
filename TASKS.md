@@ -1290,7 +1290,7 @@ ones. sf is in Suggests: every sf test and corpus file uses
     the 28 sf blocks skip in `test-corpus.R` and the 4 sf blocks skip in
     `test-render-corpus.R`; no other test file or R file uses sf.
 
-### S0.2 Spatial bench suite and profile
+### S0.2 Spatial bench suite and profile — done
 - **Depends:** S0.1
 - **Touches:** `inst/bench/spatial.R` (new), `inst/bench/RESULTS.md`
 - **Do:** Add generators for rasters of 500², 1000² and 2000² cells
@@ -1304,6 +1304,21 @@ ones. sf is in Suggests: every sf test and corpus file uses
   stage. It lists which build steps are worth a kernel (S1.2, S2.2) and
   confirms the ≥5× north-star target, or records a revised one with the
   reason.
+- **Result:** `inst/bench/spatial.R`; tables in RESULTS.md ("S0.2:
+  spatial baseline"). Today every spatial case takes the ggplot2 tier.
+  alot's end-to-end speedup is 1.5–2.1× on rasters ≥1000² (from
+  the build), 1.0× on sf, 1.72× on the north star (4,173 → 2,430 ms) and
+  1.31× on the faceted variant. PROJ is 1–2% of the north stars, 8–13% of
+  in-CRS sf plots (`CoordSf$setup_data` calls `st_transform()` even when
+  the CRS already matches: 100–200 ms per 1e6 vertices) and 47% when
+  reprojecting. Verdicts: S1.2 drop as specified (`GeomRaster$setup_data`
+  takes 19 ms at 1e6 rows, ~1% end to end; the raster build's remaining time
+  is existing-kernel overhead at 2e6 rows); S2.2 drop (per-feature steps
+  are ~2% at 1e4 features; the rest is sf's own transform and sfc restore).
+  The ≥5× target is kept for both north stars, but needs alot's raster build
+  cut from ~780 to ~500 ms in S4.1. Revised targets: ≥1.6× when sf layers
+  are reprojected (PROJ ceiling 2.2×), ≥3× for sf-only plots in their own
+  CRS. Open decision for S2.1: skipping the same-CRS `st_transform()`.
 
 ## S1 Raster
 
@@ -1338,6 +1353,10 @@ ones. sf is in Suggests: every sf test and corpus file uses
   RESULTS.md.
 - **Done when:** the Phase 1 criteria hold, or the task is dropped with
   the reason recorded.
+- **S0.2 verdict:** drop as specified. `GeomRaster$setup_data` takes 19 ms at
+  1e6 rows, about 1% end to end. Re-scoping to the existing kernels'
+  overhead at 2e6 rows (`npscales_map`, position train and map) is the
+  alternative; see RESULTS.md "S0.2: spatial baseline".
 
 ## S2 sf build
 
@@ -1367,6 +1386,10 @@ ones. sf is in Suggests: every sf test and corpus file uses
   SPATIAL.md lands here if S2.2 needs it, otherwise in S3.1. Any other
   candidate fails the 1.25× rule and is recorded in RESULTS.md.
 - **Done when:** the Phase 1 criteria hold for each kept kernel.
+- **S0.2 verdict:** drop. The per-feature steps are about 2% end to end at 1e4
+  features. The build is dominated by `st_transform()` in
+  `CoordSf$setup_data`, which stays in sf (see RESULTS.md, "S0.2: spatial
+  baseline", including the open same-CRS question).
 
 ## S3 sf render (hybrid)
 
