@@ -1,9 +1,10 @@
-# geom_sf() polygons in the hybrid tier (S3.2, R/render-sf.R): GeomSf's
-# per-feature gpar and sf::st_as_grob()'s even-odd paths, drawn in Rust as
-# lazy grobs on ggplot2's gtable, against ggplot2 on ragg. Covers holes,
-# MULTIPOLYGONs, outline-only and fill-only styles, line types, NA fill and
-# colour, reversed ranges, projected and longlat CRSs, facets, and the cases
-# that decline.
+# geom_sf() in the hybrid tier (S3.2, S3.3, R/render-sf.R): GeomSf's
+# per-feature gpar and sf::st_as_grob()'s even-odd paths, polylines and
+# points, drawn in Rust as lazy grobs on ggplot2's gtable, against ggplot2
+# on ragg. Covers holes, MULTIPOLYGONs, outline-only and fill-only styles,
+# (MULTI)LINESTRINGs, (MULTI)POINTs in every shape, line types, ends and
+# joins, NA styles, mixed point/line/polygon layers, reversed ranges,
+# projected and longlat CRSs, facets, and the cases that decline.
 
 skip_on_cran()
 skip_if_not_installed("sf")
@@ -103,6 +104,111 @@ test_that("coord_sf() without breaks", {
   check_sf(ggplot(nc) + geom_sf() + coord_sf(datum = NA), "no datum")
 })
 
+lines <- suppressWarnings(sf::st_cast(sf::st_cast(nc[1:25, c("AREA", "g")], "MULTILINESTRING"), "LINESTRING"))
+multilines <- sf::st_cast(nc[1:25, c("AREA", "g")], "MULTILINESTRING")
+centroids <- sf::st_sf(AREA = nc$AREA, g = nc$g, geometry = suppressWarnings(sf::st_centroid(sf::st_geometry(nc))))
+pt <- function(x, y) sf::st_point(as.double(c(x, y)))
+shape_grid <- sf::st_sf(
+  shape = 0:25,
+  geometry = sf::st_sfc(lapply(0:25, function(i) pt(i %% 7, i %/% 7)), crs = 3857)
+)
+multipoints <- sf::st_sf(
+  id = c("a", "b", "c"),
+  geometry = sf::st_sfc(
+    sf::st_multipoint(cbind(c(0, 1, 2, 3), c(0, 1, 0, 1))),
+    pt(1.5, 2),
+    sf::st_multipoint(cbind(c(0.5, 2.5), c(1.6, 1.6))),
+    crs = 3857
+  )
+)
+zigzag <- function(x0, n = 6) cbind(x0 + seq(0, 1, length.out = n), rep(c(0, 1), length.out = n))
+line_shapes <- sf::st_sf(
+  id = c("zig", "multi", "long"),
+  geometry = sf::st_sfc(
+    sf::st_linestring(zigzag(0)),
+    sf::st_multilinestring(list(zigzag(1.5), zigzag(1.5)[, 2:1] + c(0, 0.2))),
+    sf::st_linestring(cbind(c(-1, 4), c(0.5, 0.6))),
+    crs = 3857
+  )
+)
+# Points, lines and polygons interleaved in one sfc: drawn in data order.
+mixed <- sf::st_sf(
+  id = letters[1:8],
+  geometry = sf::st_sfc(
+    sf::st_polygon(list(square(0, 0, 3))),
+    pt(1, 1),
+    sf::st_linestring(cbind(c(-1, 4), c(1, 2))),
+    sf::st_multipoint(cbind(c(2, 3, 2.5), c(2, 0.5, 1.2))),
+    sf::st_multipolygon(list(list(square(3.5, 2, 1)), list(square(1, 2.5, 1)))),
+    sf::st_multilinestring(list(cbind(c(0, 4), c(3.5, 0)), cbind(c(0, 4), c(0, 3.5)))),
+    pt(3, 3),
+    pt(0.5, 3.2),
+    crs = 3857
+  )
+)
+
+test_that("lines draw as ggplot2 draws them", {
+  check_sf(ggplot(lines) + geom_sf(), "linestrings")
+  check_sf(ggplot(multilines) + geom_sf(aes(colour = AREA)), "multilinestrings")
+  check_sf(ggplot(line_shapes) + geom_sf(aes(colour = id), linewidth = 2), "line shapes")
+  check_sf(ggplot(line_shapes) + geom_sf(aes(linewidth = id)) + scale_linewidth_discrete(range = c(0.3, 3)), "linewidth varies")
+  check_sf(ggplot(lines) + geom_sf(colour = "#FF000080", linewidth = 1.5, alpha = 0.5), "alpha on lines")
+  check_sf(ggplot(lines) + geom_sf(linetype = "dashed"), "dashed lines")
+  check_sf(ggplot(line_shapes) + geom_sf(aes(linetype = id), linewidth = 1), "mapped line types on lines")
+  check_sf(ggplot(line_shapes) + geom_sf(linetype = "1342", linewidth = 1.5), "hex line type on lines")
+  check_sf(ggplot(line_shapes) + geom_sf(linewidth = 4, lineend = "round"), "round ends")
+  check_sf(ggplot(line_shapes) + geom_sf(linewidth = 4, lineend = "square", linejoin = "mitre"), "square ends, mitre joins")
+  check_sf(ggplot(line_shapes) + geom_sf(linewidth = 4, linejoin = "bevel"), "bevel joins on lines")
+  line_shapes$col <- c("red", NA, "blue")
+  check_sf(ggplot(line_shapes) + geom_sf(aes(colour = col), na.rm = TRUE) + scale_colour_identity(), "NA colour on lines")
+})
+
+test_that("points draw as ggplot2 draws them", {
+  check_sf(ggplot(centroids) + geom_sf(), "points")
+  check_sf(ggplot(centroids) + geom_sf(aes(colour = AREA, size = AREA)), "points, colour and size")
+  check_sf(ggplot(multipoints) + geom_sf(aes(colour = id), size = 4), "multipoints")
+  check_sf(ggplot(shape_grid) + geom_sf(aes(shape = shape), size = 5, fill = "orange", colour = "navy") + scale_shape_identity(), "every shape")
+  check_sf(ggplot(shape_grid) + geom_sf(aes(shape = shape), size = 6, stroke = 2, fill = "orange", lineend = "round") + scale_shape_identity(), "every shape, round ends")
+  check_sf(ggplot(shape_grid) + geom_sf(aes(shape = shape), size = 6, stroke = 2, linejoin = "mitre") + scale_shape_identity(), "every shape, mitre joins")
+  check_sf(ggplot(shape_grid) + geom_sf(aes(shape = shape), size = 4, stroke = 0, fill = "orange") + scale_shape_identity(), "every shape, no stroke")
+  check_sf(ggplot(shape_grid) + geom_sf(aes(stroke = shape / 5), shape = 21, size = 4, fill = "orange"), "stroke varies")
+  check_sf(ggplot(shape_grid) + geom_sf(aes(size = shape / 3), shape = 4) + scale_size_identity(), "size varies")
+  check_sf(ggplot(centroids) + geom_sf(shape = "triangle filled", fill = "red", size = 3), "shape name")
+  check_sf(ggplot(centroids) + geom_sf(colour = "blue", alpha = 0.3, size = 4), "alpha on points")
+  check_sf(ggplot(shape_grid) + geom_sf(shape = 21, size = 5, fill = NA, colour = "black"), "NA fill on points")
+  shape_grid$col <- ifelse(shape_grid$shape %% 4 == 0, NA, "darkgreen")
+  shape_grid$sz <- ifelse(shape_grid$shape %% 5 == 0, NA, 3)
+  check_sf(ggplot(shape_grid) + geom_sf(aes(colour = col, size = sz), na.rm = TRUE) + scale_colour_identity() + scale_size_identity(), "NA colour and size on points")
+})
+
+test_that("mixed point, line and polygon layers draw in data order", {
+  check_sf(ggplot(mixed) + geom_sf(), "mixed defaults")
+  check_sf(ggplot(mixed) + geom_sf(aes(colour = id, fill = id), linewidth = 1.5, size = 5, shape = 21, alpha = 0.6), "mixed styles")
+  check_sf(ggplot(mixed[8:1, ]) + geom_sf(aes(colour = id), linewidth = 2, size = 6, shape = 3), "mixed, reversed order")
+  check_sf(ggplot(mixed) + geom_sf(aes(linewidth = id), shape = 4, size = 4), "mixed linewidths")
+  mixed$lt <- ifelse(sf::st_geometry_type(mixed) %in% c("POINT", "MULTIPOINT"), "solid", "dashed")
+  check_sf(ggplot(mixed) + geom_sf(aes(linetype = I(lt)), linewidth = 1), "mixed line types")
+  check_sf(ggplot(nc) + geom_sf(aes(fill = AREA)) + geom_sf(data = centroids, colour = "red") + geom_sf(data = lines, colour = "white"), "three layers")
+  # Integer coordinates, as sf stores st_point(0:1) (test-geom-sf.R).
+  ints <- sf::st_sfc(sf::st_point(0:1), sf::st_linestring(rbind(0:1, 1:2)), sf::st_polygon(list(rbind(0:1, 1:2, 2:1, 0:1))), sf::st_multipoint(cbind(1:2, 3:4)))
+  check_sf(ggplot(ints) + geom_sf(colour = "#FF0000FF", fill = "#FF0000FF", alpha = 0.5), "integer coordinates")
+})
+
+test_that("lines and points under CRSs, reversed ranges and facets", {
+  check_sf(ggplot(centroids) + geom_sf(aes(colour = AREA)) + coord_sf(crs = 32119), "points, projected crs")
+  check_sf(ggplot(multilines) + geom_sf(aes(colour = AREA)) + coord_sf(crs = 32119), "lines, projected crs")
+  check_sf(ggplot(sf::st_transform(centroids, 4326)) + geom_sf(shape = 4) + coord_sf(crs = 4326), "points, longlat")
+  check_sf(ggplot(sf::st_transform(lines, 4326)) + geom_sf() + coord_sf(crs = 4326), "lines, longlat")
+  check_sf(ggplot(centroids) + geom_sf(shape = 2, size = 3) + coord_sf(reverse = "y"), "points, reversed y")
+  check_sf(ggplot(mixed) + geom_sf(aes(colour = id), size = 3) + coord_sf(reverse = "xy"), "mixed, reversed xy")
+  check_sf(ggplot(centroids) + geom_sf(size = 4) + coord_sf(xlim = c(-80, -76), ylim = c(34, 36.5)), "points, zoomed, clipped")
+  check_sf(ggplot(lines) + geom_sf(linewidth = 1) + coord_sf(xlim = c(-80, -76), ylim = c(35.5, 37)), "lines, zoomed, clipped")
+  check_sf(ggplot(centroids) + geom_sf(aes(colour = AREA)) + facet_wrap(vars(g)), "points, facets")
+  check_sf(ggplot(lines) + geom_sf() + facet_grid(rows = vars(g)), "lines, facet grid")
+  check_sf(ggplot(centroids[1, ]) + geom_sf(size = 5), "one point")
+  check_sf(ggplot(mixed) + geom_sf(aes(colour = id), size = 3, linewidth = 1), "mixed, high resolution", size = list(width = 900, height = 600, res = 300))
+})
+
 test_that("unsupported sf layers decline to ggplot2, with a reason", {
   reason <- function(p) {
     cov <- suppressWarnings(alot_render_coverage(p))
@@ -114,8 +220,19 @@ test_that("unsupported sf layers decline to ggplot2, with a reason", {
   collection <- sf::st_sf(geometry = sf::st_sfc(sf::st_geometrycollection(list(sf::st_polygon(list(square(0, 0, 1)))))))
   empty <- sf::st_sf(geometry = sf::st_sfc(sf::st_polygon(list(square(0, 0, 1))), sf::st_polygon()))
   xyz <- sf::st_sf(geometry = sf::st_sfc(sf::st_polygon(list(cbind(square(0, 0, 1), 0)))))
-  expect_match(reason(ggplot(pts) + geom_sf()), "features other than polygons")
-  expect_match(reason(ggplot(mixed) + geom_sf()), "features other than polygons")
+  expect_match(reason(ggplot(pts) + geom_sf(shape = "a")), "character or unknown pch")
+  expect_match(reason(ggplot(pts) + geom_sf(shape = 65)), "unsupported shape")
+  expect_match(reason(ggplot(pts) + geom_sf(stroke = NA)), "NA in size or stroke")
+  expect_match(reason(ggplot(pts) + geom_sf(linetype = "dashed")), "points with a line type other than solid")
+  expect_match(reason(ggplot(mixed) + geom_sf(linetype = "dashed")), "points with a line type other than solid")
+  expect_match(reason(ggplot(lines) + geom_sf(linetype = "zz")), "unsupported linetype")
+  expect_match(reason(ggplot(lines) + geom_sf(arrow = grid::arrow())), "arrows")
+  expect_match(reason(ggplot(lines) + geom_sf(lineend = "squared")), "lineend")
+  expect_match(reason(ggplot(pts) + geom_sf(linejoin = "mitred")), "linejoin")
+  point_collection <- sf::st_sf(geometry = sf::st_sfc(sf::st_geometrycollection(list(pt(0, 0), sf::st_linestring(cbind(c(0, 1), c(0, 1)))))))
+  expect_match(reason(ggplot(point_collection) + geom_sf()), "sfc reader")
+  int_na <- sf::st_sf(geometry = sf::st_sfc(sf::st_point(1:2), sf::st_point(c(3L, NA))))
+  expect_match(suppressWarnings(reason(ggplot(int_na) + geom_sf())), "sfc reader")
   expect_match(reason(ggplot(collection) + geom_sf()), "sfc reader")
   expect_match(suppressWarnings(reason(ggplot(empty) + geom_sf())), "sfc reader")
   expect_match(reason(ggplot(xyz) + geom_sf()), "sfc reader")
@@ -130,12 +247,13 @@ test_that("unsupported sf layers decline to ggplot2, with a reason", {
   data$geometry <- "other"
   expect_equal(sf_decline(b@plot@layers[[1]], data, b@layout), "geometry is not an sfc")
   # Each declined case still draws, with ggplot2.
-  for (p in list(ggplot(pts) + geom_sf(), ggplot(nc) + geom_sf() + coord_sf(default_crs = sf::st_crs(4326)))) {
+  for (p in list(ggplot(pts) + geom_sf(shape = 65), ggplot(nc) + geom_sf() + coord_sf(default_crs = sf::st_crs(4326)))) {
     file <- withr::local_tempfile(fileext = ".png")
     expect_equal(attr(suppressMessages(alot_png(p, file, width = 200, height = 150, units = "px", dpi = 72)), "tier"), "ggplot2")
   }
-  # The polygon layer of a plot with a point layer is still drawn in Rust.
-  cov <- alot_render_coverage(ggplot(nc) + geom_sf() + geom_sf(data = pts))
+  # The polygon layer of a plot with a declined point layer is still drawn
+  # in Rust.
+  cov <- alot_render_coverage(ggplot(nc) + geom_sf() + geom_sf(data = pts, shape = 65))
   expect_equal(cov$tier, "hybrid")
   expect_equal(cov$layers$engine, c("rust", "ggplot2"))
 })

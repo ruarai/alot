@@ -85,6 +85,19 @@ test_that("panel ranges from a built coord_sf() plot, including reverse", {
   }
 })
 
+test_that("integer coordinates are read as the doubles sf_rescale01() gives", {
+  # The build path's walker stays strict (rs_sfc_plain_xy()).
+  sfc <- sf::st_sfc(
+    sf::st_point(0:1), sf::st_linestring(rbind(0:1, 1:2)), sf::st_polygon(list(rbind(0:1, 1:2, 2:1, 0:1))),
+    sf::st_multipoint(cbind(1:2, 3:4)), sf::st_multilinestring(list(cbind(1:3, 4:6)))
+  )
+  expect_null(rs_sfc_plain_xy(sfc))
+  expect_equal(rs_sfc_render_types(sfc), c(1L, 3L, 5L, 2L, 4L))
+  expect_rescale_equal(sfc, c(-0.1, 3.3), c(0.7, 6.2))
+  expect_rescale_equal(sfc, c(3.3, -0.1), c(6.2, 0.7))
+  expect_null(rs_sfc_render_types(sf::st_sfc(sf::st_geometrycollection(list(sf::st_point(0:1))))))
+})
+
 test_that("unsupported geometry declines", {
   r <- ranges
   declines <- function(x) expect_null(rs_sf_rescale01(x, r$x, r$y))
@@ -102,7 +115,7 @@ test_that("unsupported geometry declines", {
   declines(sf::st_sfc(sf::st_polygon(list(cbind(square(0, 0), 0)))))
   declines(sf::st_sfc(sf::st_point(c(NA_real_, 1))))
   declines(sf::st_sfc(sf::st_linestring(rbind(c(0, 0), c(Inf, 1)))))
-  declines(sf::st_sfc(sf::st_point(1:2)))
+  declines(sf::st_sfc(sf::st_point(c(1L, NA))))
   # sf's arithmetic leaves a class on each matrix.
   declines(sf::st_sfc(features$polygon + c(1, 1)))
   # Ranges where st_normalize() errors.

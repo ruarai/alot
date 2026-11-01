@@ -57,7 +57,7 @@ fn sfc_plain_xy(sfc: Robj) -> Robj {
         if TYPEOF(x) != VECSXP || XLENGTH(x) == 0 {
             return ().into();
         }
-        let mut walk = Walk::new(false);
+        let mut walk = Walk::new(false, false);
         let ok = (0..XLENGTH(x)).all(|i| walk.feature(VECTOR_ELT(x, i)));
         let n_protected = walk.n_protected;
         let out = match (ok, walk.bbox.0) {
@@ -69,11 +69,35 @@ fn sfc_plain_xy(sfc: Robj) -> Robj {
     }
 }
 
+/// The type code of each feature of an sfc that `sfc_geometry()` reads (as
+/// `rs_sfc_plain_xy()`'s `types`), or NULL where it declines: the render
+/// path's check (R/render-sf.R), which unlike `rs_sfc_plain_xy()` also
+/// takes integer coordinates.
+/// @noRd
+#[extendr(r_name = "rs_sfc_render_types")]
+fn sfc_render_types(sfc: Robj) -> Robj {
+    // SAFETY: as in sfc_plain_xy().
+    unsafe {
+        let x = sfc.get();
+        if TYPEOF(x) != VECSXP || XLENGTH(x) == 0 {
+            return ().into();
+        }
+        let mut walk = Walk::new(false, true);
+        let ok = (0..XLENGTH(x)).all(|i| walk.feature(VECTOR_ELT(x, i)));
+        Rf_unprotect(walk.n_protected);
+        if ok { Integers::from_values(walk.types).into() } else { ().into() }
+    }
+}
+
 /// Reads an sfc in one pass, borrowing each coordinate matrix. None (decline)
 /// unless every feature is a non-empty XY POINT/MULTIPOINT/LINESTRING/
 /// MULTILINESTRING/POLYGON/MULTIPOLYGON stored as the existing
-/// `rs_sfc_plain_xy()` walker accepts (GEOMETRYCOLLECTION, empty features,
-/// XYZ/XYM/XYZM all decline). An empty sfc (length 0) also gives None.
+/// `rs_sfc_plain_xy()` walker accepts, except that integer coordinates are
+/// read too (GEOMETRYCOLLECTION, empty features, NA, XYZ/XYM/XYZM all
+/// decline). An empty sfc (length 0) also gives None. Integers are
+/// converted to doubles exactly; `sf_rescale01()` gives an integer sfc the
+/// same doubles as its double copy (st_normalize(); sf src/ops.cpp reads
+/// the coordinates as doubles), so nothing downstream sees the difference.
 pub(crate) fn sfc_geometry(sfc: &Robj) -> Option<Geometry> {
     // SAFETY: as in sfc_plain_xy().
     unsafe {
@@ -81,7 +105,7 @@ pub(crate) fn sfc_geometry(sfc: &Robj) -> Option<Geometry> {
         if TYPEOF(x) != VECSXP || XLENGTH(x) == 0 {
             return None;
         }
-        let mut walk = Walk::new(true);
+        let mut walk = Walk::new(true, true);
         let ok = (0..XLENGTH(x)).all(|i| walk.feature(VECTOR_ELT(x, i)));
         Rf_unprotect(walk.n_protected);
         if !ok {
@@ -113,6 +137,8 @@ struct Walk {
     bbox: Bbox,
     // The flat geometry, when sfc_geometry() reads the sfc.
     build: Option<Builder>,
+    // Whether integer coordinates are read (as doubles), for the renderer.
+    ints: bool,
     types: Vec<i32>,
     // An empty double vector that receives a value's attributes (except
     // names, dim and dimnames) to compare them with `plain` or `classed`;
@@ -124,7 +150,7 @@ struct Walk {
 }
 
 impl Walk {
-    unsafe fn new(build: bool) -> Walk {
+    unsafe fn new(build: bool, ints: bool) -> Walk {
         let mut n_protected = 0;
         let mut protect = |s: SEXP| {
             n_protected += 1;
@@ -143,7 +169,7 @@ impl Walk {
             v
         });
         let build = build.then(Builder::new);
-        Walk { bbox: Bbox::default(), build, types: Vec::new(), scratch, plain, classed, n_protected }
+        Walk { bbox: Bbox::default(), build, ints, types: Vec::new(), scratch, plain, classed, n_protected }
     }
 
     /// True if the attributes of `x` other than names, dim and dimnames are
@@ -170,7 +196,7 @@ impl Walk {
         match kind {
             Kind::Point => {
                 self.part();
-                TYPEOF(f) == REALSXP && XLENGTH(f) == 2 && is_null(Rf_getAttrib(f, R_DimSymbol)) && self.coords(f, Add::Ring)
+                self.numeric(f) && XLENGTH(f) == 2 && is_null(Rf_getAttrib(f, R_DimSymbol)) && self.coords(f, Add::Ring)
             }
             Kind::MultiPoint => self.matrix(f, Add::Points),
             Kind::LineString => {
@@ -214,7 +240,7 @@ impl Walk {
 
     /// An `n x 2` double matrix, n >= 1, without names or dimnames.
     unsafe fn matrix(&mut self, m: SEXP, add: Add) -> bool {
-        if TYPEOF(m) != REALSXP || has_names(m) {
+        if !self.numeric(m) || has_names(m) {
             return false;
         }
         let dim = Rf_getAttrib(m, R_DimSymbol);
@@ -225,10 +251,26 @@ impl Walk {
         nrow >= 1 && ncol == 2 && XLENGTH(m) == 2 * nrow as isize && self.coords(m, add)
     }
 
+    /// A double vector, or an integer one when integers are read.
+    unsafe fn numeric(&self, v: SEXP) -> bool {
+        TYPEOF(v) == REALSXP || (self.ints && TYPEOF(v) == INTSXP)
+    }
+
     /// Extends the bbox over the coordinates of `v` (borrowed, not copied
-    /// out of R) and, when building, adds them to the current part.
+    /// out of R, unless integers, which are converted and decline at NA)
+    /// and, when building, adds them to the current part.
     unsafe fn coords(&mut self, v: SEXP, add: Add) -> bool {
-        let xy = std::slice::from_raw_parts(REAL(v), XLENGTH(v) as usize);
+        let converted: Vec<f64>;
+        let xy = if TYPEOF(v) == INTSXP {
+            let ints = std::slice::from_raw_parts(INTEGER(v), XLENGTH(v) as usize);
+            if ints.contains(&i32::MIN) {
+                return false;
+            }
+            converted = ints.iter().map(|&i| i as f64).collect();
+            &converted[..]
+        } else {
+            std::slice::from_raw_parts(REAL(v), XLENGTH(v) as usize)
+        };
         self.bbox.extend(xy)
             && match (&mut self.build, add) {
                 (None, _) => true,
@@ -270,5 +312,6 @@ unsafe fn sfg_type(f: SEXP) -> Option<Kind> {
 extendr_module! {
     mod sf;
     fn sfc_plain_xy;
+    fn sfc_render_types;
     fn sf_rescale01;
 }

@@ -1825,3 +1825,24 @@ feature. With per-feature fills, as in a choropleth, it would rarely merge
 at all. The cost is in stroking and in per-pixel work, which batching
 doesn't reduce, and row bands already run in parallel. So the code was
 removed.
+
+## S3.3: geom_sf() lines and points in the hybrid tier (2026-11-01)
+
+`inst/bench/spatial.R` (`ALOT_BENCH_CASES=sf_lines_1e3_3577,sf_points_1e5_3577
+ALOT_BENCH_CORES=1 ALOT_BENCH_PROFILE=false`), release build, same machine
+and page (7 × 7 in at 300 dpi) as S3.2, 3 interleaved reps, medians in ms.
+Two new cases: `sf_lines_1e3_3577` is S3.2's 1e3 regions cast to 1e3
+LINESTRINGs (1e6 vertices) with mapped colour; `sf_points_1e5_3577` is 1e5
+POINTs (the vertices of 1e4 regions), mapped colour, pch 19 and 3. Both go
+to the hybrid tier: the sf layer is a lazy Rust grob (polylines through the
+path drawer, points through the point sprites, with GeomSf's butt line
+ends).
+
+| case | ragg draw | alot draw | draw speedup | gg render | alot render | gg total | alot total | speedup |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| sf_lines_1e3_3577 | 840 | 127 | 6.6× | 1,087 | 198 | 1,323 | 288 | 4.59× |
+| sf_points_1e5_3577 | 874 | 122 | 7.2× | 1,588 | 465 | 2,720 | 1,296 | 2.10× |
+
+The draw stage passes the 1.25× rule for both. The points case's total is
+dominated by the build (828 ms) and the gtable (314 ms), which this task
+doesn't change.

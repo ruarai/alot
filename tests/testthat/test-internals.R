@@ -471,3 +471,24 @@ test_that("upstream sf drawing matches what the sf polygon drawer mirrors", {
     expect_snapshot(print(body(utils::getFromNamespace(f, "sf"))))
   }
 })
+
+test_that("upstream sf drawing matches what the sf line and point drawer mirrors", {
+  # R/render-sf.R (sf_check(), sf_gpar()) and alot-core/src/render/sf.rs
+  # mirror what sf::st_as_grob() gives for (MULTI)LINESTRING features (one
+  # polyline per linestring) and (MULTI)POINT features (one symbol per
+  # point, pch and gpar repeated per point), and the columns
+  # GeomSf$use_defaults() gives each type of feature, with GeomPoint's and
+  # GeomPath's missing-value checks in GeomSf$handle_na(). If these fail,
+  # update the mirrors to match, then update the snapshots.
+  skip_if_not_installed("sf")
+  body_of <- function(obj, name) body(environment(obj[[name]])$f)
+  expect_snapshot(print(body_of(ggplot2::GeomSf, "use_defaults")))
+  expect_snapshot(print(ggplot2::GeomSf$default_aes))
+  expect_snapshot(print(c(ggplot2::GeomPoint$required_aes, ggplot2::GeomPoint$non_missing_aes)))
+  expect_snapshot(print(c(ggplot2::GeomPath$required_aes, ggplot2::GeomPath$non_missing_aes)))
+  for (f in c("st_as_grob.sfc_POINT", "st_as_grob.sfc_MULTIPOINT", "st_as_grob.sfc_LINESTRING",
+    "st_as_grob.sfc_MULTILINESTRING", "st_as_grob.POINT", "st_as_grob.MULTIPOINT", "st_as_grob.LINESTRING",
+    "st_as_grob.MULTILINESTRING")) {
+    expect_snapshot(print(body(utils::getFromNamespace(f, "sf"))))
+  }
+})

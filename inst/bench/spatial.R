@@ -11,10 +11,10 @@
 #            drawing, and dev.off(), which writes the PNG (encode).
 #   hybrid   alot_build(), then the hybrid tier (run_hybrid()), for cases
 #            where it draws a layer in Rust (S1.1: the rasters; S3.2: sf
-#            polygons).
+#            polygons; S3.3: sf lines and points).
 #   alot     what alot_png() does: alot_build(), then the tier it picks
 #            (run_alot()): the full tier for the rasters since S1.1, the
-#            hybrid tier for sf polygons since S3.2; the ggplot2 tier,
+#            hybrid tier for sf layers since S3.2 / S3.3; the ggplot2 tier,
 #            after the full tier's attempt, for the rest.
 # The device is opened before the gtable is built, as print.ggplot() does.
 #
@@ -155,6 +155,22 @@ spatial_cases <- list(
       ggplot(sf_regions(1e3, crs = 4326)) +
         geom_sf(aes(fill = value), colour = "grey20") +
         coord_sf(crs = 3577)
+    },
+    reps = 3L
+  ),
+  # S3.3: the regions' boundaries as 1e3 LINESTRINGs (1e6 vertices), and 1e5
+  # POINTs (one per 10 vertices) in two shapes.
+  sf_lines_1e3_3577 = list(
+    plot = function() {
+      lines <- sf::st_cast(sf::st_cast(sf_regions(1e3, crs = 3577), "MULTILINESTRING"), "LINESTRING", warn = FALSE)
+      ggplot(lines) + geom_sf(aes(colour = value))
+    },
+    reps = 3L
+  ),
+  sf_points_1e5_3577 = list(
+    plot = function() {
+      pts <- sf::st_cast(sf::st_cast(sf_regions(1e4, vertices = 1e5, crs = 3577), "MULTIPOINT", warn = FALSE), "POINT", warn = FALSE)
+      ggplot(pts) + geom_sf(aes(colour = value, shape = value > 0.5)) + scale_shape_manual(values = c(19, 3))
     },
     reps = 3L
   ),

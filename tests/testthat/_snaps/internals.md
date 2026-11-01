@@ -7719,3 +7719,224 @@
           })
       }
 
+# upstream sf drawing matches what the sf line and point drawer mirrors
+
+    Code
+      print(body_of(ggplot2::GeomSf, "use_defaults"))
+    Output
+      {
+          data <- ggproto_parent(Geom, self)$use_defaults(data, params, 
+              modifiers, default_aes, theme = theme, ...)
+          if (!"geometry" %in% names(data)) {
+              return(data)
+          }
+          type <- if (is.character(data$geometry)) {
+              data$geometry
+          }
+          else {
+              sf_types[sf::st_geometry_type(data$geometry)]
+          }
+          type <- factor(type, c("point", "line", "other", "collection"))
+          index <- split(seq_len(nrow(data)), type)
+          points <- lines <- others <- collections <- NULL
+          if (length(index$point) > 0) {
+              points <- GeomPoint$use_defaults(vec_slice(data, index$point), 
+                  params, modifiers, theme = theme)
+          }
+          if (length(index$line) > 0) {
+              lines <- GeomLine$use_defaults(vec_slice(data, index$line), 
+                  params, modifiers, theme = theme)
+          }
+          other_default <- modify_list(GeomPolygon$default_aes, aes(fill = from_theme(fill %||% 
+              col_mix(ink, paper, 0.899)), colour = from_theme(colour %||% 
+              col_mix(ink, paper, 0.35)), linewidth = from_theme(0.4 * 
+              borderwidth)))
+          if (length(index$other) > 0) {
+              others <- GeomPolygon$use_defaults(vec_slice(data, index$other), 
+                  params, modifiers, default_aes = other_default, theme = theme)
+          }
+          if (length(index$collection) > 0) {
+              modified <- rename(GeomPoint$default_aes, c(fill = "point_fill"))
+              modified <- modify_list(other_default, modified)
+              collections <- Geom$use_defaults(vec_slice(data, index$collection), 
+                  params, modifiers, default_aes = modified, theme = theme)
+          }
+          data <- vec_c(points, lines, others, collections)
+          vec_slice(data, order(unlist(index)))
+      }
+
+---
+
+    Code
+      print(ggplot2::GeomSf$default_aes)
+    Output
+      Aesthetic mapping: 
+      * `shape`     -> NULL
+      * `colour`    -> NULL
+      * `fill`      -> NULL
+      * `size`      -> NULL
+      * `linewidth` -> NULL
+      * `linetype`  -> `from_theme(linetype)`
+      * `alpha`     -> NA
+      * `stroke`    -> 0.5
+
+---
+
+    Code
+      print(c(ggplot2::GeomPoint$required_aes, ggplot2::GeomPoint$non_missing_aes))
+    Output
+      [1] "x"      "y"      "size"   "shape"  "colour"
+
+---
+
+    Code
+      print(c(ggplot2::GeomPath$required_aes, ggplot2::GeomPath$non_missing_aes))
+    Output
+      [1] "x"         "y"         "linewidth" "colour"    "linetype" 
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (any(is_e <- st_is_empty(x))) {
+              gp = gp[!is_e]
+              x = x[!is_e]
+          }
+          if (length(x)) {
+              x <- matrix(unlist(x, use.names = FALSE), ncol = length(x))
+              pointsGrob(x[1, ], x[2, ], pch = pch, size = size, default.units = default.units, 
+                  name = name, gp = gp, vp = vp)
+          }
+          else nullGrob()
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (any(is_e <- st_is_empty(x))) {
+              gp = gp[!is_e]
+              x = x[!is_e]
+          }
+          if (length(x)) {
+              x <- unclass(x)
+              n_points <- vapply(x, nrow, integer(1))
+              gp <- expand_gp(gp, n_points)
+              if (length(pch) != 1) 
+                  pch <- rep(rep(pch, length.out = length(x)), n_points)
+              if (length(size) != 1) 
+                  size <- rep(rep(size, length.out = length(x)), n_points)
+              x <- do.call(rbind, x)
+              pointsGrob(x[, 1], x[, 2], pch = pch, size = size, default.units = default.units, 
+                  name = name, gp = gp, vp = vp)
+          }
+          else nullGrob()
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (any(is_e <- st_is_empty(x))) {
+              gp = gp[!is_e]
+              x = x[!is_e]
+          }
+          if (length(x)) {
+              x <- unclass(x)
+              n_points <- vapply(x, nrow, integer(1))
+              x <- do.call(rbind, x)
+              polylineGrob(x[, 1], x[, 2], id.lengths = n_points, arrow = arrow, 
+                  default.units = default.units, name = name, gp = gp, 
+                  vp = vp)
+          }
+          else nullGrob()
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (any(is_e <- st_is_empty(x))) {
+              gp = gp[!is_e]
+              x = x[!is_e]
+          }
+          if (length(x)) {
+              x <- unclass(x)
+              n_lines <- vapply(x, length, integer(1))
+              gp <- expand_gp(gp, n_lines)
+              if (!is.null(arrow) && length(arrow) != 1) 
+                  arrow <- rep(rep(arrow, length.out = length(x)), 
+                      n_lines)
+              x <- unlist(x, recursive = FALSE)
+              n_points <- vapply(x, nrow, integer(1))
+              x <- do.call(rbind, x)
+              polylineGrob(x[, 1], x[, 2], id.lengths = n_points, arrow = arrow, 
+                  default.units = default.units, name = name, gp = gp, 
+                  vp = vp)
+          }
+          else nullGrob()
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (anyNA(x)) 
+              nullGrob()
+          else pointsGrob(x[1], x[2], pch = pch, size = size, default.units = default.units, 
+              name = name, gp = gp, vp = vp)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (nrow(x) == 0) 
+              nullGrob()
+          else pointsGrob(x[, 1], x[, 2], pch = pch, size = size, default.units = default.units, 
+              name = name, gp = gp, vp = vp)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (nrow(x) == 0) 
+              nullGrob()
+          else linesGrob(x[, 1], x[, 2], arrow = NULL, default.units = default.units, 
+              name = name, gp = gp, vp = vp)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (length(x) == 0) 
+              nullGrob()
+          else {
+              get_x = function(x) unlist(sapply(x, function(y) y[, 
+                  1]))
+              get_y = function(x) unlist(sapply(x, function(y) y[, 
+                  2]))
+              polylineGrob(get_x(x), get_y(x), id.lengths = vapply(x, 
+                  nrow, 0L), arrow = NULL, default.units = default.units, 
+                  name = name, gp = gp, vp = vp)
+          }
+      }
+

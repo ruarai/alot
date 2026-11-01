@@ -34,6 +34,49 @@ const TRC2: f64 = 0.77756015077810708036;
 /// grid's default `linemitre`.
 const MITRE: f64 = 10.0;
 
+/// How a symbol's lines are stroked: the gc's `lineend`, `linejoin` and
+/// `linemitre`, which ragg's `drawLine()` (lend), `drawRect()` and
+/// `drawPolygon()` (lend, ljoin, lmitre) and `drawCircle()` (lend, with a
+/// round join) use for the symbol's primitives (ragg 1.5.2
+/// src/AggDevice.h). The default is grid's (round, round, 10), which
+/// `geom_point()` inherits; `geom_sf()` sets its own (GeomSf$draw_panel,
+/// ggplot2 R/geom-sf.R).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SymbolStyle {
+    pub cap: Cap,
+    pub join: Join,
+    pub mitre: f64,
+}
+
+impl Default for SymbolStyle {
+    fn default() -> Self {
+        SymbolStyle { cap: Cap::Round, join: Join::Round, mitre: MITRE }
+    }
+}
+
+impl SymbolStyle {
+    /// The style as a cache-key word: cap and join codes and the mitre's bits.
+    fn key(&self) -> (u8, u64) {
+        let cap = match self.cap {
+            Cap::Round => 0,
+            Cap::Butt => 1,
+            Cap::Square => 2,
+        };
+        let join = match self.join {
+            Join::Round => 0,
+            Join::Miter => 1,
+            Join::Bevel => 2,
+        };
+        (cap | join << 2, self.mitre.to_bits())
+    }
+
+    fn from_key(code: u8, mitre: u64) -> Self {
+        let cap = [Cap::Round, Cap::Butt, Cap::Square][(code & 3) as usize];
+        let join = [Join::Round, Join::Miter, Join::Bevel][(code >> 2) as usize];
+        SymbolStyle { cap, join, mitre: f64::from_bits(mitre) }
+    }
+}
+
 /// Subpixel positions per axis.
 const SUB: usize = 32;
 
@@ -116,6 +159,7 @@ fn snap_edges(half: f64, code: usize) -> (f64, f64) {
 /// Builds the layers of one symbol, in drawing order.
 struct Symbol {
     lwd: f64,
+    style: SymbolStyle,
     layers: Vec<Layer>,
 }
 
@@ -125,8 +169,12 @@ impl Symbol {
     }
 
     fn stroke(&mut self, path: &[[f64; 2]], closed: bool) {
+        self.stroke_joined(path, closed, self.style.join);
+    }
+
+    fn stroke_joined(&mut self, path: &[[f64; 2]], closed: bool, join: Join) {
         if self.lwd > 0.0 {
-            let contours = agg::stroke(path, closed, self.lwd, Join::Round, Cap::Round, MITRE);
+            let contours = agg::stroke(path, closed, self.lwd, join, self.style.cap, self.style.mitre);
             self.layers.push(Layer { contours, role: Role::Col, snap: false });
         }
     }
@@ -142,13 +190,22 @@ impl Symbol {
         }
         self.stroke(&poly, true);
     }
+
+    /// A circle: `drawCircle()` strokes with a round join whatever the gc's.
+    fn circle(&mut self, r: f64, fill: Option<Role>) {
+        let poly = circle(r);
+        if let Some(role) = fill {
+            self.fill(poly.clone(), role);
+        }
+        self.stroke_joined(&poly, true, Join::Round);
+    }
 }
 
 /// The layers of `shape` centred on the origin, device y pointing down. As
 /// in `GESymbol()`, heights are negated (`toDeviceHeight()` is negative
 /// when device y points down).
-fn layers(shape: i32, size: f64, lwd: f64) -> Vec<Layer> {
-    let mut s = Symbol { lwd, layers: Vec::new() };
+fn layers(shape: i32, size: f64, lwd: f64, style: SymbolStyle) -> Vec<Layer> {
+    let mut s = Symbol { lwd, style, layers: Vec::new() };
     let r = RADIUS * size;
     let sq2 = std::f64::consts::SQRT_2;
     let square = |xc: f64, yc: f64| rect(-xc, -yc, xc, yc);
@@ -167,7 +224,7 @@ fn layers(shape: i32, size: f64, lwd: f64) -> Vec<Layer> {
     let down = vec![[0.0, -tr], [txc, tyc], [-txc, tyc]];
     match shape {
         0 => s.shape(square(r, -r), None),
-        1 => s.shape(circle(r), None),
+        1 => s.circle(r, None),
         2 => s.shape(up, None),
         3 => plus(&mut s, sq2 * r, -sq2 * r),
         4 => times(&mut s, r, -r),
@@ -186,7 +243,7 @@ fn layers(shape: i32, size: f64, lwd: f64) -> Vec<Layer> {
             s.shape(diamond(sq2 * r, -sq2 * r), None);
         }
         10 => {
-            s.shape(circle(r), None);
+            s.circle(r, None);
             plus(&mut s, r, -r);
         }
         11 => {
@@ -199,7 +256,7 @@ fn layers(shape: i32, size: f64, lwd: f64) -> Vec<Layer> {
             s.shape(square(r, -r), None);
         }
         13 => {
-            s.shape(circle(r), None);
+            s.circle(r, None);
             times(&mut s, r, -r);
         }
         14 => {
@@ -210,9 +267,9 @@ fn layers(shape: i32, size: f64, lwd: f64) -> Vec<Layer> {
         16 => s.fill(circle(r), Role::Col),
         17 => s.fill(up, Role::Col),
         18 => s.fill(diamond(r, -r), Role::Col),
-        19 => s.shape(circle(r), Some(Role::Col)),
-        20 => s.shape(circle(SMALL * size), Some(Role::Col)),
-        21 => s.shape(circle(r), Some(Role::Fill)),
+        19 => s.circle(r, Some(Role::Col)),
+        20 => s.circle(SMALL * size, Some(Role::Col)),
+        21 => s.circle(r, Some(Role::Fill)),
         22 => s.shape(square(r * SQRC, -r * SQRC), Some(Role::Fill)),
         SQUARE_SNAPPED => {
             s.layers.push(Layer { contours: vec![square(r * SQRC, -r * SQRC)], role: Role::Fill, snap: true });
@@ -241,7 +298,7 @@ struct Mask {
     layer: usize,
 }
 
-/// One (shape, size, lwd): its layers and the masks built so far, one slot
+/// One (shape, size, lwd, style): its layers and the masks built so far, one slot
 /// per subpixel offset.
 struct SpriteSet {
     layers: Vec<Layer>,
@@ -254,8 +311,8 @@ struct SpriteSet {
 }
 
 impl SpriteSet {
-    fn new(shape: i32, size: f64, lwd: f64) -> Self {
-        let layers = layers(shape, size, lwd);
+    fn new(shape: i32, size: f64, lwd: f64, style: SymbolStyle) -> Self {
+        let layers = layers(shape, size, lwd, style);
         let ext = layers.iter().flat_map(|l| l.contours.iter().flatten()).fold(0.0f64, |m, p| m.max(p[0].abs()).max(p[1].abs()));
         let e = ext.ceil() as i32 + 1;
         SpriteSet { layers, slots: (0..SUB).map(|_| OnceLock::new()).collect(), reach: (-e, e + 2) }
@@ -299,7 +356,8 @@ impl SpriteSet {
     }
 }
 
-type Key = (i32, u64, u64);
+/// (shape, size bits, lwd bits, style code, mitre bits).
+type Key = (i32, u64, u64, u8, u64);
 
 /// Sprite sets built so far in this process, shared across panels and
 /// draws. Cleared when it grows past `CACHE_MAX` sets (plots mapping size
@@ -313,7 +371,7 @@ fn sprite_set(key: Key) -> Arc<SpriteSet> {
     }
     // Built outside the lock so workers placing different sizes don't wait
     // on each other; a set built twice by two workers is identical.
-    let set = Arc::new(SpriteSet::new(key.0, f64::from_bits(key.1), f64::from_bits(key.2)));
+    let set = Arc::new(SpriteSet::new(key.0, f64::from_bits(key.1), f64::from_bits(key.2), SymbolStyle::from_key(key.3, key.4)));
     let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
     let cache = cache.get_or_insert_with(HashMap::new);
     if cache.len() >= CACHE_MAX {
@@ -328,18 +386,22 @@ const NONE: u32 = u32::MAX;
 /// seen for each shape is checked first, so a batch with constant size and
 /// stroke never hashes; other keys go through a local map.
 struct Lookup {
+    /// The batch's style code and mitre bits, the same for every point.
+    style: (u8, u64),
     sets: Vec<Arc<SpriteSet>>,
     recent: [(u64, u64, u32); 128],
     index: HashMap<Key, u32>,
 }
 
 impl Lookup {
-    fn new() -> Self {
-        Lookup { sets: Vec::new(), recent: [(0, 0, NONE); 128], index: HashMap::new() }
+    fn new(style: SymbolStyle) -> Self {
+        Lookup { style: style.key(), sets: Vec::new(), recent: [(0, 0, NONE); 128], index: HashMap::new() }
     }
 
-    /// Shapes 0-25 and 122 have distinct slots in `recent`.
-    fn get(&mut self, key: Key) -> u32 {
+    /// The set of (`shape`, `size`, `lwd`) in the batch's style. Shapes 0-25
+    /// and 122 have distinct slots in `recent`.
+    fn get(&mut self, shape: i32, size: u64, lwd: u64) -> u32 {
+        let key = (shape, size, lwd, self.style.0, self.style.1);
         let slot = key.0 as usize & 127;
         let (size, lwd, i) = self.recent[slot];
         if i != NONE && (size, lwd) == (key.1, key.2) {
@@ -391,7 +453,7 @@ fn place(p: &Point, lookup: &mut Lookup) -> Placed {
     let snapped = p.shape == 22 && (p.lwd <= 0.0 || p.col[3] == 0);
     let shape = if snapped { SQUARE_SNAPPED } else { p.shape };
     let lwd = if p.lwd > 0.0 { p.lwd } else { 0.0 };
-    let set = lookup.get((shape, p.size.to_bits(), lwd.to_bits()));
+    let set = lookup.get(shape, p.size.to_bits(), lwd.to_bits());
     if snapped {
         let half = RADIUS * SQRC * p.size;
         sx = snap_code(p.x, half);
@@ -432,6 +494,11 @@ impl PointBatch {
     /// nothing) inside the parallel placement, so callers need not
     /// materialise them.
     pub fn from_fn(n: usize, threads: usize, point: impl Fn(usize) -> Option<Point> + Sync) -> Self {
+        Self::from_fn_styled(n, threads, SymbolStyle::default(), point)
+    }
+
+    /// Like `from_fn()`, with every symbol's lines stroked in `style`.
+    pub fn from_fn_styled(n: usize, threads: usize, style: SymbolStyle, point: impl Fn(usize) -> Option<Point> + Sync) -> Self {
         let threads = if threads == 0 { raster::default_threads() } else { threads };
         let mut placed = PLACED_POOL.lock().unwrap_or_else(|e| e.into_inner()).pop().unwrap_or_default();
         placed.clear();
@@ -443,7 +510,7 @@ impl PointBatch {
         // pages are first touched in parallel: faulting in a million
         // placements on one thread takes longer than placing them.
         let lookups: Vec<(Lookup, i64, i64)> = raster::par_map(placed.spare_capacity_mut()[..n].chunks_mut(chunk).enumerate(), |(c, dst)| {
-            let mut lookup = Lookup::new();
+            let mut lookup = Lookup::new(style);
             let (mut lo, mut hi) = (i64::MAX, i64::MIN);
             for (k, d) in dst.iter_mut().enumerate() {
                 let p = match point(c * chunk + k) {
@@ -621,6 +688,34 @@ mod tests {
 
     fn alpha_at(img: &[u32], w: usize, x: usize, y: usize) -> u32 {
         img[y * w + x] >> 24
+    }
+
+    fn styled(points: &[Point], style: SymbolStyle) -> Vec<u32> {
+        let mut out = vec![0u32; 120 * 120];
+        let batch = PointBatch::from_fn_styled(points.len(), 2, style, |i| Some(points[i]));
+        render_batch(120, 120, batch, &raster::Options::default(), None, &mut out);
+        out
+    }
+
+    #[test]
+    fn symbol_styles_follow_ragg_primitives() {
+        let round = SymbolStyle::default();
+        let butt = SymbolStyle { cap: Cap::Butt, ..round };
+        let mitre = SymbolStyle { join: Join::Miter, ..round };
+        // The default is what every other caller gets.
+        let p = [point(60.3, 60.7, 4)];
+        assert_eq!(styled(&p, round), render(120, 120, &p));
+        // drawLine() takes the gc's lineend: butt ends stop at the vertex.
+        let (r, b) = (styled(&p, round), styled(&p, butt));
+        let tip = |img: &[u32]| alpha_at(img, 120, 60 + 41, 60 + 41);
+        assert!(tip(&r) > 0 && tip(&b) == 0, "round {} butt {}", tip(&r), tip(&b));
+        // drawRect() takes the gc's linejoin: mitred corners are square.
+        let sq = [point(60.3, 60.7, 0)];
+        let corner = |img: &[u32]| alpha_at(img, 120, 60 + 41, 60 + 41);
+        assert!(corner(&styled(&sq, mitre)) > corner(&styled(&sq, round)));
+        // drawCircle() always joins round, and a closed path has no ends.
+        let c = [point(60.3, 60.7, 1)];
+        assert_eq!(styled(&c, round), styled(&c, SymbolStyle { cap: Cap::Butt, join: Join::Miter, mitre: 4.0 }));
     }
 
     #[test]
