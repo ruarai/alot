@@ -1,5 +1,5 @@
 # geom_raster() in the full tier and, through the "marks" drawer, the
-# hybrid tier (TASKS.md S1.1; SPATIAL.md, Architecture "Raster").
+# hybrid tier (task S1.1; SPATIAL.md, Architecture "Raster").
 # Mirrors GeomRaster$draw_panel() (ggplot2 R/geom-raster.R): the cell
 # positions from resolution(x, FALSE), the colour matrix of
 # alpha(fill, alpha) with NA (transparent) for absent cells, and the

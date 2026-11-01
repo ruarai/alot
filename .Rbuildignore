@@ -3,7 +3,7 @@
 ^AGENTS\.md$
 ^PLAN\.md$
 ^PHASE2\.md$
-^TASKS\.md$
+^backlog$
 ^src/\.cargo$
 ^src/vendor$
 ^src/rust/vendor$

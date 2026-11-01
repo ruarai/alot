@@ -5,7 +5,7 @@ Phase 2 takes a built plot (a `ggplot_built` from `alot_build()` or
 rasterisation in Rust. It replaces `ggplot2::ggplot_gtable()`, grid drawing
 and the graphics device. Its only input is a built plot, so it doesn't
 depend on Phase 1 ([PLAN.md](PLAN.md)) being finished and can run alongside
-it. Tasks are in [TASKS.md](TASKS.md) under "Phase 2: rendering".
+it. Tasks are in the backlog (`backlog/`), milestone "Phase 2".
 
 The output is **PNG files only**. Interactive devices, PDF and SVG keep
 ggplot2's normal drawing (`alot_print()` builds with alot and draws with

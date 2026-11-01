@@ -1,5 +1,5 @@
 # The full tier's page for plots of blank layers (PHASE2.md, Architecture;
-# TASKS.md R4.2): everything ggplot_gtable() draws around the panel, drawn
+# task R4.2): everything ggplot_gtable() draws around the panel, drawn
 # in Rust. page_spec() resolves the theme elements the drawers need once
 # per plot into plain lists (colours packed, widths in pixels), on top of
 # the layout spec of R/render-layout.R; rs_render_page()

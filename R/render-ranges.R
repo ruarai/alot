@@ -1,4 +1,4 @@
-# Boxplots, violins and the range geoms in the full tier (TASKS.md R6.5b):
+# Boxplots, violins and the range geoms in the full tier (task R6.5b):
 # geom_boxplot(), geom_violin(), geom_crossbar(), geom_errorbar(),
 # geom_linerange() and geom_pointrange(). ggplot2 draws them as
 # GeomPolygon, GeomSegment, GeomPath and GeomPoint grobs; here they become

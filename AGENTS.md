@@ -4,9 +4,12 @@ alot is an R package that reimplements `ggplot2::ggplot_build()` with the
 hot paths in Rust. **Its output must equal ggplot2's** under
 `expect_equal(..., tolerance = 1e-8)`. Speed only matters once that holds.
 
-- [PLAN.md](PLAN.md) explains the strategy and why. [TASKS.md](TASKS.md) holds
-  the work items. Before starting a task, read its entry and the shared
-  completion criteria at the top of TASKS.md.
+- [PLAN.md](PLAN.md) explains the strategy and why. The work items are in
+  the Backlog.md task manager under `backlog/` (`backlog task list --plain`,
+  `backlog task <id> --plain`); task titles carry the plans' IDs (`T5.6`,
+  `S2.1`). The run order and each phase's shared completion criteria are
+  backlog docs (`backlog doc list --plain`). Before starting a task, read
+  its entry and its phase's criteria.
 - [PHASE2.md](PHASE2.md) covers rendering. It is out of scope unless a task
   says otherwise.
 - The reference source is ggplot2 4.0.3 at `../ggplot2` (relative to the repo
@@ -157,7 +160,9 @@ Work happens on local branches; there is no GitHub PR step.
   Review focus: <where exactness is most at risk; any judgement calls>
   ```
 
-- When a task is done, update its status in TASKS.md in the same commit.
+- When a task is done, in the same commit set its backlog status to Done,
+  check its acceptance criteria and write what shipped as its final summary
+  (`backlog task edit <id> -s Done --check-ac 1 --final-summary ...`).
 - Commit as Claude Code, not as the machine's default git user (`Ubuntu`):
   run `git -c user.name="Claude Code" -c user.email=noreply@anthropic.com
   commit ...`, which sets both author and committer.

@@ -1,4 +1,4 @@
-# The legend boxes of the full tier (TASKS.md R5.3, R6.4): what the Rust legend
+# The legend boxes of the full tier (tasks R5.3, R6.4): what the Rust legend
 # module (alot-core/src/render/legend.rs) needs to measure, lay out and draw
 # the guides of a plot, resolved once per guide from the theme in O(breaks)
 # R work. Rust assembles the gtables.

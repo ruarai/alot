@@ -1,4 +1,4 @@
-# Segments, reference lines and rugs in the full tier (TASKS.md R6.5c):
+# Segments, reference lines and rugs in the full tier (task R6.5c):
 # geom_segment(), geom_abline(), geom_hline(), geom_vline() and
 # geom_rug(). ggplot2 draws each as segmentsGrob()s; here they become
 # two-vertex path marks in ggplot2's drawing order, handed to

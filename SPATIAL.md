@@ -10,7 +10,7 @@ faster:
 - **High-resolution `geom_sf()`**, e.g. sub-region boundary polygons:
   hundreds to thousands of features and about 1e6 vertices in total.
 
-Tasks are in [TASKS.md](TASKS.md) under "Spatial", with IDs `S<milestone>.<n>`
+Tasks are in the backlog (`backlog/`), milestone "Spatial", with IDs `S<milestone>.<n>`
 and branches named `task/S1.1-raster-drawer` as before. The phases' rules
 still apply. Build output must equal ggplot2's under
 `expect_equal(..., tolerance = 1e-8)`. Rendering is visually equivalent to

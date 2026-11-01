@@ -1,4 +1,4 @@
-# Labels and polygons in the full tier (TASKS.md R6.5d): geom_label() and
+# Labels and polygons in the full tier (task R6.5d): geom_label() and
 # geom_polygon(). Mirrors GeomLabel$draw_panel() and labelGrob() (ggplot2
 # R/geom-label.R), with titleGrob() (R/margins.R) placing the text and
 # grid's roundrectGrob() (rrpoints(), R src/library/grid/R/roundRect.R)
