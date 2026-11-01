@@ -775,6 +775,8 @@ man-stat_manual.R	stat_manual.Rd #5
 man-stat_manual.R	stat_manual.Rd #6
 man-stat_manual.R	stat_manual.Rd #7
 man-stat_manual.R	stat_manual.Rd #8
+man-stat_sf_coordinates.R	stat_sf_coordinates.Rd #1
+man-stat_sf_coordinates.R	stat_sf_coordinates.Rd #2
 man-stat_summary_2d.R	stat_summary_2d.Rd #1
 man-stat_summary_2d.R	stat_summary_2d.Rd #2
 man-stat_summary_2d.R	stat_summary_2d.Rd #3
@@ -1126,6 +1128,9 @@ test-geom-rule.R	test-geom-rule.R: setting aesthetics generates one row for each
 test-geom-rule.R	test-geom-rule.R: setting aesthetics generates one row for each input row #3
 test-geom-rule.R	test-geom-rule.R: setting aesthetics generates one row for each input row #4
 test-geom-rule.R	test-geom-rule.R: setting aesthetics generates one row for each input row #5
+test-geom-sf.R	test-geom-sf.R: geom_sf() removes rows containing missing aes #1
+test-geom-sf.R	test-geom-sf.R: geom_sf_text() and geom_sf_label() draws correctly #1
+test-geom-sf.R	test-geom-sf.R: geom_sf_text() and geom_sf_label() draws correctly #2
 test-geom-smooth.R	test-geom-smooth.R: data is ordered by x #1
 test-geom-smooth.R	test-geom-smooth.R: geom_smooth works in both directions #1
 test-geom-smooth.R	test-geom-smooth.R: geom_smooth works in both directions #2

@@ -49,11 +49,14 @@ corpus_block("test-guides.R: get_guide_data retrieves keys appropriately", {
 })
 
 corpus_block("test-guides.R: get_guide_data retrieves keys from exotic coords", {
+  skip_if_not_installed("sf")
   skip_on_cran()
   .plot("test-guides.R: get_guide_data retrieves keys from exotic coords #1", p <- ggplot(mtcars, aes(mpg, disp)) + geom_point())
   .plot("test-guides.R: get_guide_data retrieves keys from exotic coords #2", p + coord_cartesian())
   test <- get_guide_data(p + coord_cartesian(), "x")
-  .plot("test-guides.R: get_guide_data retrieves keys from exotic coords #3", p + coord_polar())
+  .plot("test-guides.R: get_guide_data retrieves keys from exotic coords #3", p + coord_sf(crs = 3347))
+  test <- get_guide_data(p + coord_sf(crs = 3347), "y")
+  .plot("test-guides.R: get_guide_data retrieves keys from exotic coords #4", p + coord_polar())
   test <- get_guide_data(p + coord_polar(), "theta")
 })
 

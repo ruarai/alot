@@ -25,6 +25,11 @@ hot paths in Rust. **Its output must equal ggplot2's** under
 ```sh
 export PATH="$PATH:$HOME/.cargo/bin"
 
+# sf (Suggests) for the spatial tests and corpus files; once per machine.
+# udunits is needed by sf's `units` dependency.
+sudo apt-get install -y libgdal-dev libgeos-dev libproj-dev libudunits2-dev
+Rscript -e 'install.packages("sf")'
+
 # Rust unit tests (alot-core)
 (cd src/rust && cargo test)
 

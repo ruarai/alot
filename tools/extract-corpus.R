@@ -101,7 +101,13 @@ consumer_args <- function(expr) {
   out
 }
 
-is_plot <- function(x) inherits(x, "ggplot") && !inherits(x, "ggplot_built")
+# Whether a block's code uses sf.
+uses_sf <- function(lines) {
+  any(grepl("(^|[^A-Za-z0-9_.])sf::|library\\(sf\\)|\\b(coord|geom|stat)_sf\\b|\\b(geom|stat)_sf_|\\bsf_transform_xy\\b",
+            lines, perl = TRUE))
+}
+
+is_plot <- function(x)inherits(x, "ggplot") && !inherits(x, "ggplot_built")
 
 dropped <- list()
 log_drop <- function(block, expr, reason) {
@@ -263,6 +269,12 @@ extract_block <- function(name, stmts) {
   set.seed(1)
   lines <- runner(stmts, name)
   if (is.null(lines)) return(NULL)
+  # sf is in Suggests (SPATIAL.md): a block that uses it skips without it.
+  # Upstream tests guard themselves; Rd examples use `if (requireNamespace())`,
+  # which the extraction unrolls, and some tests call coord_sf() unguarded.
+  if (uses_sf(lines) && !any(grepl("skip_if_not_installed\\([\"']sf[\"']\\)", lines))) {
+    lines <- c('skip_if_not_installed("sf")', lines)
+  }
   body <- paste0("  ", gsub("\n", "\n  ", lines))
   c(sprintf("corpus_block(%s, {", deparse(name)), body, "})", "")
 }
