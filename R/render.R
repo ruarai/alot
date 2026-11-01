@@ -790,16 +790,24 @@ path_grobs <- function(kind, shared, data, layout, prefix) {
 
 # Stairsteps for GeomStep$draw_panel (ggplot2 R/geom-path.R): the data as
 # GeomPath$draw_panel gets it. Mirrors the dapply() of stairstep() by group,
-# with the orientation flipped as the geom does.
+# with the orientation flipped as the geom does. draw_panel() runs once per
+# panel, and facets reuse group IDs, so each panel is expanded on its own.
 step_data <- function(data, params) {
   flipped <- isTRUE(params$flipped_aes)
   direction <- params$direction %||% "hv"
-  data <- gg_flip_data(data, flipped)
   if (flipped) {
     direction <- switch(direction, hv = "vh", vh = "hv", direction)
   }
-  data <- gg_dapply(data, "group", gg_stairstep, direction = direction)
-  gg_flip_data(data, flipped)
+  if (nrow(data) == 0) {
+    return(data)
+  }
+  panels <- split(data, data$PANEL, drop = TRUE)
+  panels <- lapply(panels, function(d) {
+    d <- gg_flip_data(d, flipped)
+    d <- gg_dapply(d, "group", gg_stairstep, direction = direction)
+    gg_flip_data(d, flipped)
+  })
+  vctrs::vec_rbind(!!!unname(panels))
 }
 
 # GeomPath$draw_panel()'s message for groups of one row, once per panel as

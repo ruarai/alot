@@ -1,10 +1,10 @@
 ---
 id: TASK-36
-title: R6.3 Keep faceted step and ECDF expansion within each panel
-status: To Do
+title: B1 - Keep faceted step and ECDF expansion within each panel
+status: Done
 assignee: []
 created_date: '2026-11-01T02:56:00Z'
-updated_date: '2026-11-01T02:56:00Z'
+updated_date: '2026-11-01T03:17:00Z'
 labels:
   - breadth
 milestone: m-1
@@ -46,5 +46,11 @@ ordinal: 100
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 the reproducer and targeted build/layout/image checks pass at the existing tolerances in both tiers; add faceted step and ECDF plots to the rendering corpus. Run the shared Phase 2 checks, Rust and R suites, a relevant build-corpus subset and the full render corpus.
+- [x] #1 the reproducer and targeted build/layout/image checks pass at the existing tolerances in both tiers; add faceted step and ECDF plots to the rendering corpus. Run the shared Phase 2 checks, Rust and R suites, a relevant build-corpus subset and the full render corpus.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+step_data() now expands stairsteps per panel (split by PANEL, then dapply by group), mirroring the per-panel GeomStep$draw_panel() call; fixes faceted geom_step()/stat_ecdf() in both full and hybrid tiers. Added data-level and image regression tests in test-render-geoms.R and a hand-written corpus file alot-facet-steps.R (7 plots, added to render-corpus.tsv); extract-corpus.R now keeps alot-*.R files.
+<!-- SECTION:FINAL_SUMMARY:END -->

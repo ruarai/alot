@@ -13,6 +13,7 @@
 # plots can be rebuilt. Everything else is dropped. Each source becomes one
 # file in tests/testthat/corpus/ made of corpus_block() calls; skipped and
 # failed statements are logged to tests/testthat/corpus/_dropped.tsv.
+# Hand-written alot-*.R files in the same format are kept.
 
 args <- commandArgs(trailingOnly = TRUE)
 ggplot2_src <- normalizePath(if (length(args)) args[[1]] else "../ggplot2", mustWork = TRUE)
@@ -292,9 +293,13 @@ write_corpus_file <- function(file, source, blocks) {
   sum(lengths(regmatches(unlist(blocks), gregexpr("^  \\.plot\\(", unlist(blocks)))))
 }
 
-# Start from a clean directory.
+# Start from a clean directory, keeping the hand-written alot-*.R files
+# (plots alot adds to the corpus itself).
+kept <- list.files(out_dir, "^alot-.*\\.R$", full.names = TRUE)
+kept <- stats::setNames(lapply(kept, readLines), basename(kept))
 unlink(out_dir, recursive = TRUE)
 dir.create(out_dir)
+for (file in names(kept)) writeLines(kept[[file]], file.path(out_dir, file))
 helper_files <- file.path(ggplot2_src, "tests", "testthat", c("helper-plot-data.R", "helper-facet.R"))
 writeLines(c(
   "# Copied by tools/extract-corpus.R from ggplot2's tests/testthat helpers.",

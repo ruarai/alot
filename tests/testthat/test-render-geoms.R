@@ -66,6 +66,74 @@ test_that("steps draw as ggplot2 draws them, in both tiers", {
   check_geom(ggplot(walk, aes(x, y, colour = g)) + geom_step(direction = "mid"), "hybrid steps by group", tier = "hybrid")
 })
 
+# The data GeomStep$draw_panel() hands GeomPath$draw_panel(), one panel at a
+# time as ggplot2 calls it, bound in panel order.
+ggplot2_step_data <- function(b, i = 1) {
+  layer <- b$plot$layers[[i]]
+  params <- layer$computed_geom_params[c("direction", "flipped_aes")]
+  params <- params[!vapply(params, is.null, logical(1))]
+  panels <- split(b$data[[i]], b$data[[i]]$PANEL, drop = TRUE)
+  out <- testthat::with_mocked_bindings(
+    lapply(panels, function(d) do.call(layer$geom$draw_panel, c(list(d, NULL, NULL), params))),
+    GeomPath = ggproto(NULL, GeomPath, draw_panel = function(self, data, ...) data),
+    .package = "ggplot2"
+  )
+  vctrs::vec_rbind(!!!unname(out))
+}
+
+# Facets reuse group IDs; each panel's y range is far from the others' so a
+# step carried across panels shows.
+steps <- data.frame(
+  x = rep(c(1, 2, 4, 5, 7, 8), 4),
+  y = c(1:6, 3:8, 101:106, 104:109) + rep(c(0, 0, 50, 50), each = 6),
+  g = rep(c("a", "b"), each = 6, times = 2),
+  f = rep(c("p", "q"), each = 12),
+  h = rep(c("u", "v", "u", "v"), each = 6)
+)
+
+test_that("faceted steps expand within each panel, as ggplot2 does", {
+  gap <- steps
+  gap$y[c(3, 20)] <- NA
+  single <- rbind(steps, data.frame(x = 3, y = 150, g = "c", f = "q", h = "u"))
+  plots <- list(
+    hv = ggplot(steps, aes(x, y, colour = g)) + geom_step() + facet_wrap(vars(f)),
+    vh = ggplot(steps, aes(x, y, colour = g)) + geom_step(direction = "vh") + facet_wrap(vars(f), scales = "free_y"),
+    mid = ggplot(steps, aes(x, y, colour = g)) + geom_step(direction = "mid") + facet_grid(rows = vars(f)),
+    flipped = ggplot(steps, aes(y, x, colour = g)) + geom_step(orientation = "y") + facet_wrap(vars(f), scales = "free"),
+    grid = ggplot(steps, aes(x, y)) + geom_step() + facet_grid(vars(f), vars(h)),
+    na = ggplot(gap, aes(x, y, colour = g)) + geom_step() + facet_wrap(vars(f)),
+    single = ggplot(single, aes(x, y, colour = g)) + geom_step() + facet_wrap(vars(f)),
+    ecdf = ggplot(steps, aes(y, colour = g)) + stat_ecdf() + facet_wrap(vars(f), scales = "free_x")
+  )
+  for (name in names(plots)) {
+    b <- suppressWarnings(ggplot_build(plots[[name]]))
+    params <- b$plot$layers[[1]]$computed_geom_params
+    expect_equal(step_data(b$data[[1]], params), ggplot2_step_data(b), label = name)
+  }
+})
+
+test_that("faceted steps and ECDFs draw as ggplot2 draws them, in both tiers", {
+  gap <- steps
+  gap$y[c(3, 20)] <- NA
+  wrap <- ggplot(steps, aes(x, y, colour = g)) + facet_wrap(vars(f))
+  for (dir in c("hv", "vh", "mid")) {
+    check_geom(wrap + geom_step(direction = dir, show.legend = FALSE), paste("faceted step", dir))
+  }
+  check_geom(ggplot(steps, aes(y, x, colour = g)) + geom_step(orientation = "y", show.legend = FALSE) +
+    facet_wrap(vars(f), scales = "free"), "faceted step, y orientation, free scales")
+  check_geom(ggplot(steps, aes(x, y)) + geom_step() + facet_grid(vars(f), vars(h)), "step grid")
+  suppressWarnings(check_geom(ggplot(gap, aes(x, y, colour = g)) + geom_step(show.legend = FALSE) +
+    facet_wrap(vars(f), scales = "free_y"), "faceted step with NA"))
+  check_geom(ggplot(steps, aes(y, colour = g)) + stat_ecdf(show.legend = FALSE) +
+    facet_wrap(vars(f), scales = "free_x"), "faceted ecdf")
+  check_geom(ggplot(steps, aes(y)) + stat_ecdf() + facet_grid(rows = vars(f)), "ecdf grid")
+  withr::local_options(alot.full_tier = FALSE)
+  check_geom(wrap + geom_step(show.legend = FALSE), "hybrid faceted step", tier = "hybrid")
+  check_geom(wrap + geom_step(direction = "mid", show.legend = FALSE), "hybrid faceted step mid", tier = "hybrid")
+  check_geom(ggplot(steps, aes(y, colour = g)) + stat_ecdf(show.legend = FALSE) +
+    facet_wrap(vars(f), scales = "free_x"), "hybrid faceted ecdf", tier = "hybrid")
+})
+
 test_that("bars, columns, rects and tiles draw as ggplot2 draws them", {
   check_geom(base + geom_col(), "col")
   check_geom(base + geom_col(fill = "steelblue", colour = "black"), "outlined col")
