@@ -16,8 +16,8 @@ layout_setup <- function(layout, data, plot_data, plot_env) {
   data <- facet$setup_data(data, layout$facet_params)
 
   # Setup coords
-  layout$coord_params <- layout$coord$setup_params(data)
-  data <- layout$coord$setup_data(data, layout$coord_params)
+  layout$coord_params <- coord_setup_params(layout$coord, data)
+  data <- coord_setup_data(layout$coord, data, layout$coord_params)
 
   # Generate panel layout
   params <- layout$facet_params
@@ -37,6 +37,28 @@ layout_setup <- function(layout, data, plot_data, plot_env) {
       function() facet$map_data(layer_data, layout = panels, params = params)
     )
   })
+}
+
+# Coord$setup_params and Coord$setup_data. Only CoordSf's are mirrored
+# (R/sf.R).
+coord_setup_params <- function(coord, data) {
+  if (!inherits(coord, "CoordSf")) {
+    return(coord$setup_params(data))
+  }
+  dispatch(
+    "coord_setup_params", coord, list(coord = coord, data = data),
+    function() coord$setup_params(data)
+  )
+}
+
+coord_setup_data <- function(coord, data, params) {
+  if (!inherits(coord, "CoordSf")) {
+    return(coord$setup_data(data, params))
+  }
+  dispatch(
+    "coord_setup_data", coord, list(coord = coord, data = data, params = params),
+    function() coord$setup_data(data, params)
+  )
 }
 
 # Mirrors Layout$train_position (ggplot2 R/layout.R).

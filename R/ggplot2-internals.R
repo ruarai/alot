@@ -64,3 +64,11 @@ gg_flip_data         <- function(...) gg("flip_data")(...)
 gg_compute_just      <- function(...) gg("compute_just")(...)
 gg_resolve_text_unit <- function(...) gg("resolve_text_unit")(...)
 gg_validate_labels   <- function(...) gg("validate_labels")(...)
+
+# sf layer, stat and coord helpers (ggplot2 R/layer-sf.R, R/coord-sf.R).
+gg_is_sf             <- function(...) gg("is_sf")(...)
+gg_geom_column       <- function(...) gg("geom_column")(...)
+gg_calc_limits_bbox  <- function(...) gg("calc_limits_bbox")(...)
+gg_expand_limits_continuous <- function(...) gg("expand_limits_continuous")(...)
+gg_sf_breaks         <- function(...) gg("sf_breaks")(...)
+gg_view_scales_from_graticule <- function(...) gg("view_scales_from_graticule")(...)

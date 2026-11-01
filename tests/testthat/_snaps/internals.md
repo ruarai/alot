@@ -6871,3 +6871,405 @@
           ggname("grill", inject(grobTree(background, !!!grill)))
       }
 
+# upstream sf layer, stat and coord steps match the versions alot mirrors
+
+    Code
+      print(body_of(LayerSf, m))
+    Output
+      {
+          data <- ggproto_parent(Layer, self)$setup_layer(data, plot)
+          if (is.null(self$computed_mapping$geometry) && is_sf(data)) {
+              geometry_col <- attr(data, "sf_column")
+              self$computed_mapping$geometry <- sym(geometry_col)
+          }
+          data
+      }
+
+---
+
+    Code
+      print(body_of(LayerSf, m))
+    Output
+      {
+          data <- ggproto_parent(Layer, self)$compute_geom_1(data)
+          legend_type <- self$legend_key_type
+          if (is.null(legend_type)) {
+              legend_type <- switch(detect_sf_type(data$geometry), 
+                  point = "point", line = "line", "other")
+          }
+          self$computed_geom_params$legend <- legend_type
+          data
+      }
+
+---
+
+    Code
+      print(body_of(LayerSf, m))
+    Output
+      {
+          if (empty(data)) 
+              return(data)
+          data$geometry <- data$geometry %||% self$computed_geom_params$legend
+          ggproto_parent(Layer, self)$compute_geom_2(data, params, 
+              ...)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("detect_sf_type", "ggplot2")))
+    Output
+      {
+          if (is.null(sf)) {
+              return("other")
+          }
+          geometry_type <- unique0(as.character(sf::st_geometry_type(sf)))
+          if (length(geometry_type) != 1) 
+              geometry_type <- "GEOMETRY"
+          sf_types[geometry_type]
+      }
+
+---
+
+    Code
+      print(utils::getFromNamespace("sf_types", "ggplot2"))
+    Output
+                GEOMETRY              POINT         LINESTRING            POLYGON 
+                 "other"            "point"             "line"            "other" 
+              MULTIPOINT    MULTILINESTRING       MULTIPOLYGON GEOMETRYCOLLECTION 
+                 "point"             "line"            "other"       "collection" 
+          CIRCULARSTRING      COMPOUNDCURVE       CURVEPOLYGON         MULTICURVE 
+                  "line"             "line"            "other"             "line" 
+            MULTISURFACE              CURVE            SURFACE  POLYHEDRALSURFACE 
+                 "other"             "line"            "other"            "other" 
+                     TIN           TRIANGLE 
+                 "other"            "other" 
+
+---
+
+    Code
+      print(body_of(ggplot2::StatSf, "compute_layer"))
+    Output
+      {
+          params$coord <- layout$coord
+          ggproto_parent(Stat, self)$compute_layer(data, params, layout)
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::StatSf, "compute_panel"))
+    Output
+      {
+          geometry_data <- data[[geom_column(data)]]
+          geometry_crs <- sf::st_crs(geometry_data)
+          bbox <- sf::st_bbox(geometry_data)
+          if (inherits(coord, "CoordSf")) {
+              coord$record_bbox(xmin = bbox[["xmin"]], xmax = bbox[["xmax"]], 
+                  ymin = bbox[["ymin"]], ymax = bbox[["ymax"]])
+              bbox_trans <- sf_transform_xy(list(x = c(rep(0.5 * (bbox[["xmin"]] + 
+                  bbox[["xmax"]]), 2), bbox[["xmin"]], bbox[["xmax"]]), 
+                  y = c(bbox[["ymin"]], bbox[["ymax"]], rep(0.5 * (bbox[["ymin"]] + 
+                      bbox[["ymax"]]), 2))), coord$get_default_crs(), 
+                  geometry_crs)
+              data$xmin <- min(bbox_trans$x)
+              data$xmax <- max(bbox_trans$x)
+              data$ymin <- min(bbox_trans$y)
+              data$ymax <- max(bbox_trans$y)
+          }
+          else {
+              data$xmin <- bbox[["xmin"]]
+              data$xmax <- bbox[["xmax"]]
+              data$ymin <- bbox[["ymin"]]
+              data$ymax <- bbox[["ymax"]]
+          }
+          data
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::CoordSf, m))
+    Output
+      {
+          params <- ggproto_parent(Coord, self)$setup_params(data)
+          params$crs <- self$determine_crs(data)
+          params$default_crs <- self$default_crs
+          self$params <- params
+          params
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::CoordSf, m))
+    Output
+      {
+          if (!is.null(self$crs)) {
+              return(self$crs)
+          }
+          for (layer_data in data) {
+              if (is_sf(layer_data)) {
+                  geometry <- sf::st_geometry(layer_data)
+              }
+              else next
+              crs <- sf::st_crs(geometry)
+              if (is.na(crs)) 
+                  next
+              return(crs)
+          }
+          NULL
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::CoordSf, m))
+    Output
+      {
+          if (is.null(params$crs)) 
+              return(data)
+          lapply(data, function(layer_data) {
+              if (!is_sf(layer_data)) {
+                  return(layer_data)
+              }
+              idx <- vapply(layer_data, inherits, what = "sfc", FUN.VALUE = logical(1L))
+              layer_data[idx] <- lapply(layer_data[idx], sf::st_transform, 
+                  crs = params$crs)
+              layer_data
+          })
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::CoordSf, m))
+    Output
+      {
+          bbox <- self$params$bbox
+          bbox$xmin <- min(bbox$xmin, xmin)
+          bbox$xmax <- max(bbox$xmax, xmax)
+          bbox$ymin <- min(bbox$ymin, ymin)
+          bbox$ymax <- max(bbox$ymax, ymax)
+          self$params$bbox <- bbox
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::CoordSf, m))
+    Output
+      {
+          expansion_x <- default_expansion(scale_x, expand = params$expand[c(4, 
+              2)])
+          expansion_y <- default_expansion(scale_y, expand = params$expand[c(3, 
+              1)])
+          scale_xlim <- scale_x$get_limits()
+          scale_ylim <- scale_y$get_limits()
+          coord_xlim <- self$limits$x %||% c(NA_real_, NA_real_)
+          coord_ylim <- self$limits$y %||% c(NA_real_, NA_real_)
+          scale_xlim <- ifelse(is.na(coord_xlim), scale_xlim, coord_xlim)
+          scale_ylim <- ifelse(is.na(coord_ylim), scale_ylim, coord_ylim)
+          scales_bbox <- calc_limits_bbox(self$lims_method, scale_xlim, 
+              scale_ylim, params$crs, params$default_crs)
+          if (is.null(self$limits$x) && is.null(self$limits$y) && is.null(scale_x$limits) && 
+              is.null(scale_y$limits)) {
+              coord_bbox <- self$params$bbox
+              scales_xrange <- range(scales_bbox$x, coord_bbox$xmin, 
+                  coord_bbox$xmax, na.rm = TRUE)
+              scales_yrange <- range(scales_bbox$y, coord_bbox$ymin, 
+                  coord_bbox$ymax, na.rm = TRUE)
+          }
+          else if (any(!is.finite(scales_bbox$x) | !is.finite(scales_bbox$y))) {
+              if (self$lims_method != "geometry_bbox") {
+                  cli::cli_warn(c("Projection of {.field x} or {.field y} limits failed in {.fn coord_sf}.", 
+                      i = "Consider setting {.code lims_method = {.val geometry_bbox}} or {.code default_crs = NULL}."))
+              }
+              coord_bbox <- self$params$bbox
+              scales_xrange <- c(coord_bbox$xmin, coord_bbox$xmax) %||% 
+                  c(0, 0)
+              scales_yrange <- c(coord_bbox$ymin, coord_bbox$ymax) %||% 
+                  c(0, 0)
+          }
+          else {
+              scales_xrange <- range(scales_bbox$x, na.rm = TRUE)
+              scales_yrange <- range(scales_bbox$y, na.rm = TRUE)
+          }
+          x_range <- expand_limits_continuous(scales_xrange, expansion_x)
+          y_range <- expand_limits_continuous(scales_yrange, expansion_y)
+          bbox <- c(x_range[1], y_range[1], x_range[2], y_range[2])
+          breaks <- sf_breaks(scale_x, scale_y, bbox, params$crs)
+          graticule <- sf::st_graticule(bbox, crs = params$crs, lat = breaks$y %|W|% 
+              NULL, lon = breaks$x %|W|% NULL, datum = self$datum, 
+              ndiscr = self$ndiscr)
+          if (is.null(breaks$x)) {
+              graticule <- vec_slice(graticule, graticule$type != "E")
+          }
+          if (is.null(breaks$y)) {
+              graticule <- vec_slice(graticule, graticule$type != "N")
+          }
+          graticule <- self$fixup_graticule_labels(graticule, scale_x, 
+              scale_y, params)
+          viewscales <- Map(view_scales_from_graticule, scale = list(x = scale_x, 
+              y = scale_y, x.sec = scale_x, y.sec = scale_y), aesthetic = c("x", 
+              "y", "x.sec", "y.sec"), label = self$label_axes[c("bottom", 
+              "left", "top", "right")], MoreArgs = list(graticule = graticule, 
+              bbox = bbox, label_graticule = self$label_graticule))
+          panel_params <- list2(x_range = x_range, y_range = y_range, 
+              crs = params$crs, default_crs = params$default_crs, !!!viewscales, 
+              reverse = self$reverse %||% "none")
+          panel_params$graticule <- self$transform(graticule, panel_params)
+          panel_params
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::Coord, "setup_params"))
+    Output
+      {
+          list(expand = parse_coord_expand(self$expand %||% TRUE))
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::Layout, "setup_panel_params"))
+    Output
+      {
+          self$coord$modify_scales(self$panel_scales_x, self$panel_scales_y)
+          index <- vec_unique_loc(self$layout$COORD)
+          order <- vec_match(self$layout$COORD, self$layout$COORD[index])
+          scales_x <- self$panel_scales_x[self$layout$SCALE_X[index]]
+          scales_y <- self$panel_scales_y[self$layout$SCALE_Y[index]]
+          panel_params <- Map(self$coord$setup_panel_params, scales_x, 
+              scales_y, MoreArgs = list(params = self$coord_params))[order]
+          self$panel_params <- self$facet$setup_panel_params(panel_params, 
+              self$coord)
+          invisible()
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("st_transform.sfc", "sf")))
+    Output
+      {
+          stopifnot(is.character(pipeline), length(pipeline) %in% 0:1)
+          crs_missing = missing(crs)
+          if (length(pipeline) == 0) {
+              if (is.na(st_crs(x))) 
+                  stop("cannot transform sfc object with missing crs")
+              if (missing(crs)) 
+                  stop("argument crs cannot be missing")
+          }
+          else stopifnot(length(pipeline) == 1)
+          crs_input = crs
+          crs = make_crs(crs)
+          if (crs_parameters(crs)$is_geocentric && length(x) && Dimension(x[[1]]) == 
+              "XY") 
+              x = st_zm(x, drop = FALSE, what = "Z")
+          if (partial) {
+              orig = Sys.getenv("OGR_ENABLE_PARTIAL_REPROJECTION")
+              if (orig != "") 
+                  on.exit(Sys.setenv(OGR_ENABLE_PARTIAL_REPROJECTION = orig))
+              Sys.setenv(OGR_ENABLE_PARTIAL_REPROJECTION = "TRUE")
+          }
+          if (length(pipeline)) {
+              if (!crs_missing) {
+                  if (!(pipeline %in% sf_proj_pipelines(st_crs(x), 
+                      crs)$definition)) {
+                      warning("pipeline not found in PROJ-suggested candidate transformations; setting crs = NA")
+                      crs = NA_crs_
+                  }
+              }
+              else crs = NA_crs_
+          }
+          ret = st_sfc(structure(CPL_transform(x, crs, aoi, pipeline, 
+              reverse, desired_accuracy, allow_ballpark), single_type = NULL, 
+              crs = crs))
+          if (check) 
+              sanity_check(ret)
+          else ret
+      }
+
+---
+
+    Code
+      print(body(sf::st_sfc))
+    Output
+      {
+          lst = list(...)
+          if (length(lst) && inherits(lst[[1]], "sf")) 
+              stop("use st_as_sfc() to extract geometries from an sf object")
+          if (length(lst) == 1 && is.list(lst[[1]]) && !inherits(lst[[1]], 
+              "sfg") && (length(lst[[1]]) == 0 || inherits(lst[[1]][[1]], 
+              "sfg") || is.null(lst[[1]][[1]]))) 
+              lst = lst[[1]]
+          stopifnot(is.numeric(crs) || is.character(crs) || inherits(crs, 
+              "crs"))
+          a = attributes(lst)
+          is_null = sfc_is_null(lst)
+          lst = unclass(lst)
+          lst = lst[!is_null]
+          attributes(lst) = a
+          dims_and_types = sfc_unique_sfg_dims_and_types(lst)
+          cls = if (length(lst) == 0) 
+              fall_back_class
+          else {
+              single = if (!is.null(attr(lst, "single_type"))) 
+                  attr(lst, "single_type")
+              else length(dims_and_types[[2]]) == 1L
+              attr(lst, "single_type") = NULL
+              if (single) 
+                  c(paste0("sfc_", dims_and_types[[2]][1]), "sfc")
+              else c("sfc_GEOMETRY", "sfc")
+          }
+          if (any(is_null)) {
+              if (missing(dim)) {
+                  dim = if (length(lst) == 0) 
+                      "XY"
+                  else dims_and_types[[1]][1]
+              }
+              ret = vector("list", length(is_null))
+              ret[!is_null] = lst
+              ret[is_null] = list(typed_empty(cls, nchar(dim), dim = dim))
+              attributes(ret) = attributes(lst)
+              lst = ret
+              dims_and_types = sfc_unique_sfg_dims_and_types(lst)
+          }
+          class(lst) = cls
+          if (!missing(precision) || is.null(attr(lst, "precision"))) 
+              attr(lst, "precision") = precision
+          bb = attr(lst, "bbox")
+          if (is.null(bb) || anyNA(bb) || recompute_bbox) 
+              attr(lst, "bbox") = compute_bbox(lst)
+          zr = attr(lst, "z_range")
+          if (is.null(zr) || anyNA(zr)) {
+              u <- dims_and_types[[1]]
+              if ("XYZM" %in% u) {
+                  attr(lst, "z_range") = compute_z_range(lst)
+                  attr(lst, "m_range") = compute_m_range(lst)
+              }
+              else if ("XYZ" %in% u) {
+                  attr(lst, "z_range") = compute_z_range(lst)
+              }
+              else if ("XYM" %in% u) {
+                  attr(lst, "m_range") = compute_m_range(lst)
+              }
+          }
+          if (check_ring_dir) 
+              lst = check_ring_dir(lst)
+          if (is.na(crs) && !is.null(attr(lst, "crs"))) 
+              crs = attr(lst, "crs")
+          st_crs(lst) = crs
+          attr(lst, "classes") = if (inherits(lst, "sfc_GEOMETRY")) 
+              vapply(lst, class, rep(NA_character_, 3))[2L, ]
+          if (is.null(attr(lst, "n_empty")) || any(is_null)) {
+              attr(lst, "n_empty") = sum(sfc_is_empty(lst))
+          }
+          if (isTRUE(oriented)) 
+              attr(lst, "oriented") = TRUE
+          lst
+      }
+

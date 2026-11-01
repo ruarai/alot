@@ -3,6 +3,7 @@ pub mod grouped;
 pub mod layout;
 pub mod page;
 pub mod render;
+pub mod sf;
 pub mod text;
 
 use alot_core::colour::ramp::{self, Approx, Ramp};
@@ -773,6 +774,7 @@ extendr_module! {
     use layout;
     use page;
     use render;
+    use sf;
     use text;
     fn build_profile;
     fn facet_panels;

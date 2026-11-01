@@ -426,3 +426,26 @@ test_that("upstream coords match what the full tier mirrors", {
   expect_snapshot(print(body(utils::getFromNamespace("transform_value", "ggplot2"))))
   expect_snapshot(print(body(utils::getFromNamespace("guide_grid", "ggplot2"))))
 })
+
+test_that("upstream sf layer, stat and coord steps match the versions alot mirrors", {
+  # Mirrored by R/sf.R. The same-CRS skip in the CoordSf$setup_data mirror
+  # relies on what sf's st_transform.sfc and st_sfc rebuild. If these fail,
+  # update the mirrors to match, then update the snapshots.
+  skip_if_not_installed("sf")
+  body_of <- function(obj, name) body(environment(obj[[name]])$f)
+  LayerSf <- utils::getFromNamespace("LayerSf", "ggplot2")
+  for (m in c("setup_layer", "compute_geom_1", "compute_geom_2")) {
+    expect_snapshot(print(body_of(LayerSf, m)))
+  }
+  expect_snapshot(print(body(utils::getFromNamespace("detect_sf_type", "ggplot2"))))
+  expect_snapshot(print(utils::getFromNamespace("sf_types", "ggplot2")))
+  expect_snapshot(print(body_of(ggplot2::StatSf, "compute_layer")))
+  expect_snapshot(print(body_of(ggplot2::StatSf, "compute_panel")))
+  for (m in c("setup_params", "determine_crs", "setup_data", "record_bbox", "setup_panel_params")) {
+    expect_snapshot(print(body_of(ggplot2::CoordSf, m)))
+  }
+  expect_snapshot(print(body_of(ggplot2::Coord, "setup_params")))
+  expect_snapshot(print(body_of(ggplot2::Layout, "setup_panel_params")))
+  expect_snapshot(print(body(utils::getFromNamespace("st_transform.sfc", "sf"))))
+  expect_snapshot(print(body(sf::st_sfc)))
+})

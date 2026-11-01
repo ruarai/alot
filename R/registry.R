@@ -3,8 +3,10 @@
 # Kernels are keyed by pipeline step and ggproto class name, e.g.
 # register_kernel("stat", "StatBin", fn). A kernel is used only when the
 # object's first class is exactly the registered class, so user subclasses
-# that override methods always fall back to ggplot2. A kernel may return
-# NULL to decline (e.g. unsupported params), which also falls back.
+# that override methods always fall back to ggplot2. Layers, whose first
+# class is always "LayerInstance", dispatch on the class they derive from
+# instead (`cls`). A kernel may return NULL to decline (e.g. unsupported
+# params), which also falls back.
 
 kernels <- new.env(parent = emptyenv())
 trace_env <- new.env(parent = emptyenv())
@@ -15,8 +17,7 @@ register_kernel <- function(step, class, fn) {
   invisible(fn)
 }
 
-find_kernel <- function(step, obj) {
-  cls <- class(obj)[1]
+find_kernel <- function(step, obj, cls = class(obj)[1]) {
   kernels[[paste0(step, ":", cls)]]
 }
 
@@ -28,9 +29,8 @@ record_trace <- function(step, class, path) {
 }
 
 # Run `kernel` for `obj` at `step`, else `fallback()`.
-dispatch <- function(step, obj, args, fallback) {
-  cls <- class(obj)[1]
-  kernel <- find_kernel(step, obj)
+dispatch <- function(step, obj, args, fallback, cls = class(obj)[1]) {
+  kernel <- find_kernel(step, obj, cls)
   # options(alot.kernels = FALSE) forces every component onto ggplot2's
   # path; the benchmarks use it to time each step both ways.
   if (!is.null(kernel) && !isFALSE(getOption("alot.kernels"))) {

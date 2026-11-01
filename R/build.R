@@ -41,7 +41,7 @@ build_plot <- function(plot) {
   scales <- plot@scales
 
   data <- timed("layer_data", gg_by_layer(function(l, d) l$layer_data(plot@data), layers, data, "computing layer data"))
-  data <- timed("setup_layer", gg_by_layer(function(l, d) l$setup_layer(d, plot), layers, data, "setting up layer"))
+  data <- timed("setup_layer", gg_by_layer(function(l, d) layer_setup_layer(l, d, plot), layers, data, "setting up layer"))
 
   layout <- timed("create_layout", gg_create_layout(plot@facet, plot@coordinates, plot@layout))
   data <- timed("layout_setup", layout_setup(layout, data, plot@data, plot@plot_env))
@@ -64,7 +64,7 @@ build_plot <- function(plot) {
 
   timed("add_missing", plot@scales$add_missing(c("x", "y"), plot@plot_env))
 
-  data <- timed("compute_geom_1", gg_by_layer(function(l, d) l$compute_geom_1(d), layers, data, "setting up geom"))
+  data <- timed("compute_geom_1", gg_by_layer(function(l, d) layer_compute_geom_1(l, d), layers, data, "setting up geom"))
   data <- timed("compute_position", gg_by_layer(function(l, d) layer_compute_position(l, d, layout), layers, data, "computing position"))
 
   data <- timed("ignore_data_2", gg_ignore_data(data))
@@ -88,7 +88,7 @@ build_plot <- function(plot) {
   }
   data <- timed("expose_data_2", gg_expose_data(data))
 
-  data <- timed("compute_geom_2", gg_by_layer(function(l, d) l$compute_geom_2(d, theme = plot@theme), layers, data, "setting up geom aesthetics"))
+  data <- timed("compute_geom_2", gg_by_layer(function(l, d) layer_compute_geom_2(l, d, plot@theme), layers, data, "setting up geom aesthetics"))
   data <- timed("finish_statistics", gg_by_layer(function(l, d) l$finish_statistics(d), layers, data, "finishing layer stat"))
 
   data <- timed("finish_data", layout$finish_data(data))
@@ -98,6 +98,36 @@ build_plot <- function(plot) {
   build <- gg_class_ggplot_built(data = data, layout = layout, plot = plot)
   class(build) <- union(c("ggplot2::ggplot_built", "ggplot_built"), class(build))
   build
+}
+
+# Layer$setup_layer, Layer$compute_geom_1 and Layer$compute_geom_2, as
+# build_ggplot calls them. Only LayerSf's are mirrored (R/sf.R).
+layer_setup_layer <- function(layer, data, plot) {
+  dispatch_layer(
+    "setup_layer", layer, list(layer = layer, data = data, plot = plot),
+    function() layer$setup_layer(data, plot)
+  )
+}
+
+layer_compute_geom_1 <- function(layer, data) {
+  dispatch_layer(
+    "compute_geom_1", layer, list(layer = layer, data = data),
+    function() layer$compute_geom_1(data)
+  )
+}
+
+layer_compute_geom_2 <- function(layer, data, theme) {
+  dispatch_layer(
+    "compute_geom_2", layer, list(layer = layer, data = data, theme = theme),
+    function() layer$compute_geom_2(data, theme = theme)
+  )
+}
+
+dispatch_layer <- function(step, layer, args, fallback) {
+  if (!inherits(layer, "LayerSf")) {
+    return(fallback())
+  }
+  dispatch(step, layer, args, fallback, cls = "LayerSf")
 }
 
 # Mirrors Layer$compute_statistic, dispatching stat$compute_layer.

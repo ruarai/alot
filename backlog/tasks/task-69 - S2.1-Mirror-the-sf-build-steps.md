@@ -1,10 +1,10 @@
 ---
 id: TASK-69
 title: S2.1 Mirror the sf build steps
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-01T02:56:00Z'
-updated_date: '2026-11-01T02:56:00Z'
+updated_date: '2026-11-01T03:47:00Z'
 labels:
   - sf-build
 milestone: m-2
@@ -39,5 +39,11 @@ ordinal: 400
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `expect_build_equal()` passes on the sf corpus plots and on the targeted cases in SPATIAL.md's Verification section, and each mirrored method has a snapshot.
+- [x] #1 `expect_build_equal()` passes on the sf corpus plots and on the targeted cases in SPATIAL.md's Verification section, and each mirrored method has a snapshot.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+R/sf.R mirrors LayerSf's setup_layer/compute_geom_1/compute_geom_2, StatSf's compute_layer/compute_panel and CoordSf's setup_params/determine_crs/setup_data/record_bbox/setup_panel_params as kernels, so alot_coverage() reports each one (dispatch() gained a cls argument for layers). CoordSf$setup_data skips st_transform() when sfc_transform_is_noop() proves the result would be identical: crs identical to the target (a crs or a finite EPSG code; not NA or geocentric), only the attributes st_sfc() rebuilds (precision 0, n_empty 0L, correct class/classes/bbox), and every feature a plain finite XY POINT/LINESTRING/POLYGON/MULTI* as CPL_transform() writes it (checked by rs_sfc_plain_xy() in alot-r, bbox via alot-core sf::Bbox). Anything else calls sf. In-CRS sf builds are 1.7–2.5x faster than ggplot2 (layout_setup 120–380 ms → 7–22 ms; RESULTS.md, S2.1).
+<!-- SECTION:FINAL_SUMMARY:END -->

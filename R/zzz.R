@@ -22,5 +22,13 @@
                   "ScaleBinned", "ScaleBinnedPosition")) {
     register_kernel("scale_transform", class, kernel_transform)
   }
+  register_kernel("setup_layer", "LayerSf", kernel_layer_sf_setup_layer)
+  register_kernel("compute_geom_1", "LayerSf", kernel_layer_sf_compute_geom_1)
+  register_kernel("compute_geom_2", "LayerSf", kernel_layer_sf_compute_geom_2)
+  register_kernel("stat", "StatSf", kernel_stat_sf)
+  register_kernel("coord_setup_params", "CoordSf", kernel_coord_sf_setup_params)
+  register_kernel("coord_setup_data", "CoordSf", kernel_coord_sf_setup_data)
+  register_kernel("coord_record_bbox", "CoordSf", kernel_coord_sf_record_bbox)
+  register_kernel("setup_panel_params", "CoordSf", kernel_coord_sf_panel_params)
   install_autoprint()
 }

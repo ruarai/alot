@@ -1760,3 +1760,24 @@ The end-to-end raster_2000 total is now 5.5×, with alot's build (≈480 ms)
 as 87% of it. The build overheads listed under S0.2's verdict for S1.2
 are the next lever.
 
+
+## S2.1: sf build mirrors and the same-CRS skip (2026-11-01)
+
+Release build, same machine as S0.2. Build only (`ggplot_build()` vs
+`alot_build()`), medians of 5 interleaved reps, on S0.2's `sf_regions()`
+layers (1e6 vertices) with `geom_sf(aes(fill = value), colour = "grey20")`
+and the default `coord_sf()`. `layout_setup` is one `step_times()` run
+with kernels off (ggplot2's `CoordSf$setup_data`, i.e. `st_transform()`)
+and on (the mirror, which skips it):
+
+| case | gg build | alot build | speedup | layout_setup off → on |
+|---|---:|---:|---:|---:|
+| sf_1e2_3577 | 190 | 86 | 2.21× | 132 → 10 |
+| sf_1e4_3577 | 338 | 160 | 2.11× | 383 → 15 |
+| sf_1e2_4326 | 172 | 69 | 2.49× | 123 → 7 |
+| sf_1e4_4326 | 336 | 197 | 1.71× | 213 → 22 |
+
+What is left of `layout_setup` is `rs_sfc_plain_xy()` (the walk that
+proves the skip exact, about 2 ms at 1e6 vertices) and sf's `[<-.sf`,
+which the mirror keeps as upstream has it. Layers in another CRS still
+call `st_transform()`, so `sf_1e3_reproject` is unchanged.

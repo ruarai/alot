@@ -300,6 +300,16 @@ rs_render_rects <- function(xmin, xmax, ymin, ymax, rows, x_range, y_range, rect
 #' @noRd
 rs_render_paths <- function(x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads) .Call(wrap__render_paths, x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads)
 
+#' Walks the features of an sfc. Returns `list(bbox = c(xmin, ymin, xmax,
+#' ymax), types = <1-based code per feature into TYPES>)`, or NULL unless
+#' every feature is a non-empty XY POINT, MULTIPOINT, LINESTRING,
+#' MULTILINESTRING, POLYGON or MULTIPOLYGON stored the way
+#' `sf:::CPL_transform()` returns it: double coordinates, all finite; a
+#' class of exactly `c("XY", <type>, "sfg")` on the feature; `dim`
+#' (`n x 2`, n >= 1) on each matrix and no other attribute anywhere.
+#' @noRd
+rs_sfc_plain_xy <- function(sfc) .Call(wrap__sfc_plain_xy, sfc)
+
 #' Draws strings `text` (UTF-8) as grid's text on a ragg device does:
 #' anchors (`x`, `y`, device pixels from the top left), `hjust`, `vjust` and
 #' `rot` (degrees) recycled per string, in one font (file `path`, face
