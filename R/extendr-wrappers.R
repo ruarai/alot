@@ -301,7 +301,7 @@ rs_render_rects <- function(xmin, xmax, ymin, ymax, rows, x_range, y_range, rect
 rs_render_paths <- function(x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads) .Call(wrap__render_paths, x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads)
 
 #' Walks the features of an sfc. Returns `list(bbox = c(xmin, ymin, xmax,
-#' ymax), types = <1-based code per feature into TYPES>)`, or NULL unless
+#' ymax), types = <1-based code per feature into Kind::ALL>)`, or NULL unless
 #' every feature is a non-empty XY POINT, MULTIPOINT, LINESTRING,
 #' MULTILINESTRING, POLYGON or MULTIPOLYGON stored the way
 #' `sf:::CPL_transform()` returns it: double coordinates, all finite; a
@@ -309,6 +309,13 @@ rs_render_paths <- function(x, y, rows, path, ring, colour, fill, lwd, lty, styl
 #' (`n x 2`, n >= 1) on each matrix and no other attribute anywhere.
 #' @noRd
 rs_sfc_plain_xy <- function(sfc) .Call(wrap__sfc_plain_xy, sfc)
+
+#' Test hook: the coordinates of `sfc` after `sf_rescale01(sfc, x_range,
+#' y_range)` (ggplot2 R/coord-sf.R), as the `n x 2` matrix of the X and Y
+#' columns of `sf::st_coordinates()`, or NULL if sfc_geometry() or
+#' rescale01() declines.
+#' @noRd
+rs_sf_rescale01 <- function(sfc, x_range, y_range) .Call(wrap__sf_rescale01, sfc, x_range, y_range)
 
 #' Draws strings `text` (UTF-8) as grid's text on a ragg device does:
 #' anchors (`x`, `y`, device pixels from the top left), `hjust`, `vjust` and

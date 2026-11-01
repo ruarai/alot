@@ -1,5 +1,8 @@
 //! Simple features (sf) geometry, on coordinates already read from an sfc.
 
+mod geometry;
+pub use geometry::{rescale01, to_device, Builder, Geometry, Kind};
+
 /// Bounding box `[xmin, ymin, xmax, ymax]` of XY coordinates, as sf's
 /// `compute_bbox()` gives it for finite coordinates. `None` until the first
 /// coordinate is added.

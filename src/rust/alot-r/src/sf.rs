@@ -1,5 +1,5 @@
 //! Reads sf geometry columns (sfc lists) for R/sf.R.
-use alot_core::sf::Bbox;
+use alot_core::sf::{rescale01, Bbox, Builder, Geometry, Kind};
 use extendr_api::prelude::*;
 use extendr_api::SEXP;
 use std::ffi::CStr;
@@ -38,11 +38,9 @@ const REALSXP: c_int = 14;
 const STRSXP: c_int = 16;
 const VECSXP: c_int = 19;
 
-/// The sfg types read, in the order of their 1-based codes.
-const TYPES: [&str; 6] = ["POINT", "MULTIPOINT", "LINESTRING", "MULTILINESTRING", "POLYGON", "MULTIPOLYGON"];
 
 /// Walks the features of an sfc. Returns `list(bbox = c(xmin, ymin, xmax,
-/// ymax), types = <1-based code per feature into TYPES>)`, or NULL unless
+/// ymax), types = <1-based code per feature into Kind::ALL>)`, or NULL unless
 /// every feature is a non-empty XY POINT, MULTIPOINT, LINESTRING,
 /// MULTILINESTRING, POLYGON or MULTIPOLYGON stored the way
 /// `sf:::CPL_transform()` returns it: double coordinates, all finite; a
@@ -59,7 +57,7 @@ fn sfc_plain_xy(sfc: Robj) -> Robj {
         if TYPEOF(x) != VECSXP || XLENGTH(x) == 0 {
             return ().into();
         }
-        let mut walk = Walk::new();
+        let mut walk = Walk::new(false);
         let ok = (0..XLENGTH(x)).all(|i| walk.feature(VECTOR_ELT(x, i)));
         let n_protected = walk.n_protected;
         let out = match (ok, walk.bbox.0) {
@@ -71,8 +69,50 @@ fn sfc_plain_xy(sfc: Robj) -> Robj {
     }
 }
 
+/// Reads an sfc in one pass, borrowing each coordinate matrix. None (decline)
+/// unless every feature is a non-empty XY POINT/MULTIPOINT/LINESTRING/
+/// MULTILINESTRING/POLYGON/MULTIPOLYGON stored as the existing
+/// `rs_sfc_plain_xy()` walker accepts (GEOMETRYCOLLECTION, empty features,
+/// XYZ/XYM/XYZM all decline). An empty sfc (length 0) also gives None.
+pub(crate) fn sfc_geometry(sfc: &Robj) -> Option<Geometry> {
+    // SAFETY: as in sfc_plain_xy().
+    unsafe {
+        let x = sfc.get();
+        if TYPEOF(x) != VECSXP || XLENGTH(x) == 0 {
+            return None;
+        }
+        let mut walk = Walk::new(true);
+        let ok = (0..XLENGTH(x)).all(|i| walk.feature(VECTOR_ELT(x, i)));
+        Rf_unprotect(walk.n_protected);
+        if !ok {
+            return None;
+        }
+        walk.build.take()?.finish()
+    }
+}
+
+/// Test hook: the coordinates of `sfc` after `sf_rescale01(sfc, x_range,
+/// y_range)` (ggplot2 R/coord-sf.R), as the `n x 2` matrix of the X and Y
+/// columns of `sf::st_coordinates()`, or NULL if sfc_geometry() or
+/// rescale01() declines.
+/// @noRd
+#[extendr(r_name = "rs_sf_rescale01")]
+fn sf_rescale01(sfc: Robj, x_range: &[f64], y_range: &[f64]) -> Robj {
+    let (Ok(xr), Ok(yr)) = (<[f64; 2]>::try_from(x_range), <[f64; 2]>::try_from(y_range)) else {
+        return ().into();
+    };
+    let Some(mut g) = sfc_geometry(&sfc) else { return ().into() };
+    if !rescale01(&mut g, xr, yr) {
+        return ().into();
+    }
+    let n = g.coords.len();
+    RMatrix::new_matrix(n, 2, |i, j| g.coords[i][j]).into()
+}
+
 struct Walk {
     bbox: Bbox,
+    // The flat geometry, when sfc_geometry() reads the sfc.
+    build: Option<Builder>,
     types: Vec<i32>,
     // An empty double vector that receives a value's attributes (except
     // names, dim and dimnames) to compare them with `plain` or `classed`;
@@ -84,7 +124,7 @@ struct Walk {
 }
 
 impl Walk {
-    unsafe fn new() -> Walk {
+    unsafe fn new(build: bool) -> Walk {
         let mut n_protected = 0;
         let mut protect = |s: SEXP| {
             n_protected += 1;
@@ -92,17 +132,18 @@ impl Walk {
         };
         let scratch = protect(Rf_allocVector(REALSXP, 0));
         let plain = protect(Rf_allocVector(REALSXP, 0));
-        let classed = TYPES.map(|t| {
+        let classed = Kind::ALL.map(|k| {
             let v = protect(Rf_allocVector(REALSXP, 0));
             let cls = protect(Rf_allocVector(STRSXP, 3));
-            for (i, s) in ["XY", t, "sfg"].iter().enumerate() {
+            for (i, s) in ["XY", k.name(), "sfg"].iter().enumerate() {
                 let c = std::ffi::CString::new(*s).unwrap();
                 SET_STRING_ELT(cls, i as isize, Rf_mkChar(c.as_ptr()));
             }
             Rf_setAttrib(v, R_ClassSymbol, cls);
             v
         });
-        Walk { bbox: Bbox::default(), types: Vec::new(), scratch, plain, classed, n_protected }
+        let build = build.then(Builder::new);
+        Walk { bbox: Bbox::default(), build, types: Vec::new(), scratch, plain, classed, n_protected }
     }
 
     /// True if the attributes of `x` other than names, dim and dimnames are
@@ -117,16 +158,44 @@ impl Walk {
     }
 
     unsafe fn feature(&mut self, f: SEXP) -> bool {
-        let Some(code) = sfg_type(f) else { return false };
+        let Some(kind) = sfg_type(f) else { return false };
+        let code = Kind::ALL.iter().position(|&k| k == kind).unwrap();
         if !self.most_attributes_are(f, self.classed[code]) || has_names(f) {
             return false;
         }
         self.types.push(code as i32 + 1);
-        match TYPES[code] {
-            "POINT" => TYPEOF(f) == REALSXP && XLENGTH(f) == 2 && is_null(Rf_getAttrib(f, R_DimSymbol)) && self.coords(f),
-            "MULTIPOINT" | "LINESTRING" => self.matrix(f),
-            "MULTILINESTRING" | "POLYGON" => self.list(f, |w, m| w.ring(m)),
-            _ => self.list(f, |w, p| w.most_attributes_are(p, w.plain) && !has_names(p) && w.list(p, |w, m| w.ring(m))),
+        if let Some(b) = &mut self.build {
+            b.feature(kind);
+        }
+        match kind {
+            Kind::Point => {
+                self.part();
+                TYPEOF(f) == REALSXP && XLENGTH(f) == 2 && is_null(Rf_getAttrib(f, R_DimSymbol)) && self.coords(f, Add::Ring)
+            }
+            Kind::MultiPoint => self.matrix(f, Add::Points),
+            Kind::LineString => {
+                self.part();
+                self.matrix(f, Add::Ring)
+            }
+            Kind::MultiLineString => self.list(f, |w, m| {
+                w.part();
+                w.ring(m)
+            }),
+            Kind::Polygon => {
+                self.part();
+                self.list(f, |w, m| w.ring(m))
+            }
+            Kind::MultiPolygon => self.list(f, |w, p| {
+                w.part();
+                w.most_attributes_are(p, w.plain) && !has_names(p) && w.list(p, |w, m| w.ring(m))
+            }),
+        }
+    }
+
+    /// Starts a part of the feature being built.
+    fn part(&mut self) {
+        if let Some(b) = &mut self.build {
+            b.part();
         }
     }
 
@@ -140,11 +209,11 @@ impl Walk {
 
     /// A matrix inside a feature: no attributes but dim.
     unsafe fn ring(&mut self, m: SEXP) -> bool {
-        self.most_attributes_are(m, self.plain) && self.matrix(m)
+        self.most_attributes_are(m, self.plain) && self.matrix(m, Add::Ring)
     }
 
     /// An `n x 2` double matrix, n >= 1, without names or dimnames.
-    unsafe fn matrix(&mut self, m: SEXP) -> bool {
+    unsafe fn matrix(&mut self, m: SEXP, add: Add) -> bool {
         if TYPEOF(m) != REALSXP || has_names(m) {
             return false;
         }
@@ -153,13 +222,28 @@ impl Walk {
             return false;
         }
         let (nrow, ncol) = (*INTEGER(dim), *INTEGER(dim).add(1));
-        nrow >= 1 && ncol == 2 && XLENGTH(m) == 2 * nrow as isize && self.coords(m)
+        nrow >= 1 && ncol == 2 && XLENGTH(m) == 2 * nrow as isize && self.coords(m, add)
     }
 
-    unsafe fn coords(&mut self, v: SEXP) -> bool {
+    /// Extends the bbox over the coordinates of `v` (borrowed, not copied
+    /// out of R) and, when building, adds them to the current part.
+    unsafe fn coords(&mut self, v: SEXP, add: Add) -> bool {
         let xy = std::slice::from_raw_parts(REAL(v), XLENGTH(v) as usize);
         self.bbox.extend(xy)
+            && match (&mut self.build, add) {
+                (None, _) => true,
+                (Some(b), Add::Ring) => b.ring(xy),
+                (Some(b), Add::Points) => b.points(xy),
+            }
     }
+}
+
+/// How a matrix joins the geometry being built: as one ring of the current
+/// part, or (a MULTIPOINT) as one part per row.
+#[derive(Clone, Copy)]
+enum Add {
+    Ring,
+    Points,
 }
 
 unsafe fn is_null(x: SEXP) -> bool {
@@ -170,20 +254,21 @@ unsafe fn has_names(x: SEXP) -> bool {
     !is_null(Rf_getAttrib(x, R_NamesSymbol)) || !is_null(Rf_getAttrib(x, R_DimNamesSymbol))
 }
 
-/// The index into TYPES of an sfg whose class is `c("XY", <type>, "sfg")`.
-unsafe fn sfg_type(f: SEXP) -> Option<usize> {
+/// The kind of an sfg whose class is `c("XY", <type>, "sfg")`.
+unsafe fn sfg_type(f: SEXP) -> Option<Kind> {
     let cls = Rf_getAttrib(f, R_ClassSymbol);
     if TYPEOF(cls) != STRSXP || XLENGTH(cls) != 3 {
         return None;
     }
     let s = |i| CStr::from_ptr(R_CHAR(STRING_ELT(cls, i))).to_bytes();
-    if s(0) != b"XY" || s(2) != b"sfg" {
+    if s(2) != b"sfg" {
         return None;
     }
-    TYPES.iter().position(|t| t.as_bytes() == s(1))
+    Kind::from_class(s(0), s(1))
 }
 
 extendr_module! {
     mod sf;
     fn sfc_plain_xy;
+    fn sf_rescale01;
 }
