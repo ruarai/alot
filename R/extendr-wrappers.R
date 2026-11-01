@@ -214,6 +214,14 @@ rs_write_png <- function(raster, path, bg, dpi) .Call(wrap__write_png, raster, p
 #' @noRd
 rs_point_colours <- function(colour, alpha) .Call(wrap__point_colours, colour, alpha)
 
+#' Why the full tier can't draw a `geom_raster()` layer's rows, or NULL
+#' (see `raster_decline()` in R/render-raster.R): a non-finite position
+#' among `pos` (a list of double or integer columns), a fill colour
+#' `rs_point_colours()` declines, or a colour whose alpha after `alpha`
+#' is neither 0 nor 1.
+#' @noRd
+rs_raster_check <- function(pos, fill, alpha) .Call(wrap__raster_check, pos, fill, alpha)
+
 #' Whether every shape is one the renderer draws (double or integer
 #' codes, no NA).
 #' @noRd

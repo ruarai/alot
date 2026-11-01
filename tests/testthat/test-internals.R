@@ -273,6 +273,16 @@ test_that("upstream label drawing matches what the full tier mirrors", {
   expect_snapshot(print(body(utils::getFromNamespace("roundCorner", "grid"))))
 })
 
+test_that("upstream raster drawing matches what the full tier mirrors", {
+  # full_raster() (R/render-raster.R) and CellImage / RasterLayer
+  # (alot-core/src/render/raster.rs, layers.rs) mirror
+  # GeomRaster$draw_panel(); raster::resolution() mirrors resolution(). If
+  # these fail, update the mirror and recheck test-render-raster.R, then
+  # the snapshots.
+  expect_snapshot(print(body(environment(ggplot2::GeomRaster$draw_panel)$f)))
+  expect_snapshot(print(body(ggplot2::resolution)))
+})
+
 test_that("upstream theme and label resolution match what the render IR mirrors", {
   # resolve_theme() (R/render-ir.R) mirrors calc_element() and
   # combine_elements(); ir_labels() mirrors Layout$render()'s axis titles.

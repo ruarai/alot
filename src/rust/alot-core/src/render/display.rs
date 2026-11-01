@@ -4,6 +4,7 @@
 
 use crate::render::paths::PathBatch;
 use crate::render::points::PointBatch;
+use crate::render::raster::RasterDraw;
 use crate::render::rects::RectBatch;
 use crate::render::text::Image;
 
@@ -52,6 +53,9 @@ pub enum Item {
     /// Premultiplied pixels blended over the page as they are, not clipped
     /// by the display clip (text is clipped when drawn, as ragg clips it).
     Image(Image),
+    /// `geom_raster()`'s image, drawn as ragg's `drawRaster()` draws it and
+    /// clipped by the display clip.
+    Raster(RasterDraw),
 }
 
 impl Item {
@@ -64,6 +68,7 @@ impl Item {
             Item::Rects(b) => Some(b.rows()),
             Item::Paths(b) => Some(b.rows()),
             Item::Image(i) => Some((i.y0 as i64, i.y0 as i64 + i.h as i64)),
+            Item::Raster(r) => Some(r.rows()),
         }
     }
 }

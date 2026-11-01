@@ -3413,6 +3413,63 @@
           list(x = xc + (cost * r)[subset], y = yc + (sint * r)[subset])
       }
 
+# upstream raster drawing matches what the full tier mirrors
+
+    Code
+      print(body(environment(ggplot2::GeomRaster$draw_panel)$f))
+    Output
+      {
+          if (!coord$is_linear()) {
+              cli::cli_inform(c("{.fn {snake_class(self)}} only works with linear coordinate systems, \\\n        not {.fn {snake_class(coord)}}.", 
+                  i = "Falling back to drawing as {.fn {snake_class(GeomRect)}}."))
+              data$linewidth <- 0.3
+              data$colour <- data$fill
+              grob <- GeomRect$draw_panel(data, panel_params, coord)
+              return(grob)
+          }
+          x_pos <- as.integer((data$x - min(data$x))/resolution(data$x, 
+              FALSE))
+          y_pos <- as.integer((data$y - min(data$y))/resolution(data$y, 
+              FALSE))
+          data <- coord$transform(data, panel_params)
+          nrow <- max(y_pos) + 1
+          ncol <- max(x_pos) + 1
+          if (is.list(data$fill) && is_pattern(data$fill[[1]])) {
+              cli::cli_abort("{.fn {snake_class(self)}} cannot render pattern fills.")
+          }
+          raster <- matrix(NA_character_, nrow = nrow, ncol = ncol)
+          raster[cbind(nrow - y_pos, x_pos + 1)] <- alpha(data$fill, 
+              data$alpha)
+          x_rng <- c(min(data$xmin, na.rm = TRUE), max(data$xmax, na.rm = TRUE))
+          y_rng <- c(min(data$ymin, na.rm = TRUE), max(data$ymax, na.rm = TRUE))
+          rasterGrob(raster, x = mean(x_rng), y = mean(y_rng), width = diff(x_rng), 
+              height = diff(y_rng), default.units = "native", interpolate = interpolate)
+      }
+
+---
+
+    Code
+      print(body(ggplot2::resolution))
+    Output
+      {
+          if (is.integer(x) || zero_range(range(x, na.rm = TRUE))) {
+              return(1)
+          }
+          if (discrete && is_mapped_discrete(x)) {
+              return(1)
+          }
+          x <- unique0(as.numeric(x))
+          if (zero) {
+              x <- unique0(c(0, x))
+          }
+          d <- diff(sort(x))
+          tolerance <- sqrt(.Machine$double.eps)
+          if (all(d < tolerance)) {
+              return(1)
+          }
+          min(d[d > tolerance])
+      }
+
 # upstream theme and label resolution match what the render IR mirrors
 
     Code

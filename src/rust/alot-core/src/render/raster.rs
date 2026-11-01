@@ -325,6 +325,7 @@ fn draw_band(page: &Page, b: usize, buf: &mut [[f32; 4]]) {
                 batch.draw(buf, top, width, buckets.band(b), &shares);
             }
             (Item::Image(img), _) => blend_image(img, buf, top, width),
+            (Item::Raster(r), _) => r.draw(buf, top, width, &shares.rect),
             _ => {}
         }
     }
@@ -374,6 +375,450 @@ pub fn unpremultiply(r: f32, g: f32, b: f32, a: f32) -> u32 {
         return byte(r) | byte(g) << 8 | byte(b) << 16 | 255 << 24;
     }
     byte(r / a) | byte(g / a) << 8 | byte(b / a) << 16 | byte(a) << 24
+}
+
+// geom_raster() ---------------------------------------------------------
+
+/// `resolution(x, zero = FALSE)` (ggplot2 R/utilities-resolution.R) of the
+/// finite doubles `x[rows]` (all of `x` without `rows`): see `Spread`.
+pub fn resolution(x: &[f64], rows: Option<&[usize]>) -> f64 {
+    let n = rows.map_or(x.len(), |r| r.len());
+    let get = |k: usize| rows.map_or(x[k], |r| x[r[k]]);
+    let chunk = n.div_ceil(default_threads()).max(1 << 16);
+    let parts = par_map((0..n).step_by(chunk), |a| {
+        let mut s = Spread::default();
+        for k in a..(a + chunk).min(n) {
+            s.add(get(k));
+        }
+        s
+    });
+    Spread::merge(parts).resolution()
+}
+
+/// What `resolution()` needs of a column, gathered in chunks and merged:
+/// the range and the distinct values (-0 as 0, as `vctrs::vec_unique()`
+/// finds them).
+struct Spread {
+    lo: f64,
+    hi: f64,
+    seen: BitsSet,
+    last: u64,
+}
+
+impl Default for Spread {
+    fn default() -> Self {
+        Spread { lo: f64::INFINITY, hi: f64::NEG_INFINITY, seen: BitsSet::default(), last: u64::MAX }
+    }
+}
+
+impl Spread {
+    fn add(&mut self, v: f64) {
+        self.lo = self.lo.min(v);
+        self.hi = self.hi.max(v);
+        let bits = if v == 0.0 { 0 } else { v.to_bits() };
+        // Rasters repeat values in runs (a row's y); skip the set for them.
+        if bits != self.last {
+            self.seen.insert(bits);
+            self.last = bits;
+        }
+    }
+
+    fn merge(parts: Vec<Spread>) -> Spread {
+        let mut out = Spread::default();
+        for p in parts {
+            out.lo = out.lo.min(p.lo);
+            out.hi = out.hi.max(p.hi);
+            if out.seen.len() < p.seen.len() {
+                let small = std::mem::replace(&mut out.seen, p.seen);
+                out.seen.extend(small);
+            } else {
+                out.seen.extend(p.seen);
+            }
+        }
+        out
+    }
+
+    /// 1 for no values or a zero range (`scales::zero_range()` of
+    /// `range(x)`), otherwise the smallest gap above
+    /// `sqrt(.Machine$double.eps)` between distinct sorted values (1 if
+    /// there is none).
+    fn resolution(&self) -> f64 {
+        if self.seen.is_empty() || zero_range(self.lo, self.hi) {
+            return 1.0;
+        }
+        let mut u: Vec<f64> = self.seen.iter().map(|&b| f64::from_bits(b)).collect();
+        u.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+        let tol = f64::EPSILON.sqrt();
+        let min = u.windows(2).map(|w| w[1] - w[0]).filter(|&d| d > tol).fold(f64::INFINITY, f64::min);
+        if min.is_finite() { min } else { 1.0 }
+    }
+}
+
+/// `scales::zero_range(c(lo, hi))` (scales R/bounds.R) for finite values.
+fn zero_range(lo: f64, hi: f64) -> bool {
+    if lo == hi {
+        return true;
+    }
+    let m = lo.abs().min(hi.abs());
+    m != 0.0 && ((lo - hi) / m).abs() < 1000.0 * f64::EPSILON
+}
+
+/// A hasher for f64 bits: multiplicative, spread.
+#[derive(Default)]
+pub struct BitsHash(u64);
+
+impl std::hash::Hasher for BitsHash {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.0 = (self.0.rotate_left(5) ^ b as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        }
+    }
+    fn write_u64(&mut self, v: u64) {
+        let h = (v ^ (v >> 29)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        self.0 = h ^ (h >> 32);
+    }
+}
+
+type BitsSet = std::collections::HashSet<u64, std::hash::BuildHasherDefault<BitsHash>>;
+
+/// The colour matrix of `GeomRaster$draw_panel()` (ggplot2
+/// R/geom-raster.R) as `rasterGrob()` hands it to the device: `w` columns
+/// by `h` rows, the top row first, packed as nativeRaster ints
+/// (`R | G << 8 | B << 16 | A << 24`). Absent cells are 0 (`NA`, which
+/// R's `RGBpar3()` reads as transparent white; premultiplied it is 0).
+pub struct CellImage {
+    pub w: usize,
+    pub h: usize,
+    pub px: Vec<u32>,
+}
+
+/// Buffers of finished `CellImage`s and of their cell indices, kept
+/// between calls: as for the band buffers, fresh multi-megabyte buffers
+/// cost more in page faults than filling them. At most `KEPT` are kept.
+static CELL_POOL: Mutex<Vec<Vec<u32>>> = Mutex::new(Vec::new());
+const KEPT: usize = 4;
+
+/// A buffer of `len` zeros, from the pool if it has one; zeroed in
+/// parallel.
+fn pooled_zeros(len: usize) -> Vec<u32> {
+    let mut v = {
+        let mut pool = CELL_POOL.lock().unwrap_or_else(|e| e.into_inner());
+        match pool.iter().position(|b| b.capacity() >= len) {
+            Some(k) => pool.swap_remove(k),
+            None => Vec::new(),
+        }
+    };
+    if v.len() > len {
+        v.truncate(len);
+    } else {
+        v.resize(len, 0);
+    }
+    par_map(v.chunks_mut(len.div_ceil(default_threads()).max(1 << 16)), |c| c.fill(0));
+    v
+}
+
+fn give_back(v: Vec<u32>) {
+    if v.capacity() == 0 {
+        return;
+    }
+    let mut pool = CELL_POOL.lock().unwrap_or_else(|e| e.into_inner());
+    if pool.len() >= KEPT {
+        // Keep the larger buffers.
+        let (k, _) = pool.iter().enumerate().min_by_key(|(_, b)| b.capacity()).unwrap();
+        if pool[k].capacity() >= v.capacity() {
+            return;
+        }
+        pool.swap_remove(k);
+    }
+    pool.push(v);
+}
+
+impl Drop for CellImage {
+    fn drop(&mut self) {
+        give_back(std::mem::take(&mut self.px));
+    }
+}
+
+/// Cells above this many decline: ggplot2 would allocate a character
+/// matrix of them.
+const MAX_CELLS: usize = 1 << 27;
+
+impl CellImage {
+    /// Mirrors `draw_panel()`'s matrix for the rows `rows` (all without):
+    /// `x_pos <- as.integer((x - min(x)) / resolution(x, FALSE))`, the same
+    /// for y, then `raster[cbind(nrow - y_pos, x_pos + 1)] <- colour`, so a
+    /// later row wins a shared cell. `colour` is each row's packed colour
+    /// with alpha 0 or 255 (other alphas are not mirrored). `unit` marks x
+    /// or y as integer columns, whose resolution() is 1. `None` for
+    /// non-finite positions, other alphas or a matrix over `MAX_CELLS`.
+    pub fn from_cells(x: &[f64], y: &[f64], colour: &[u32], rows: Option<&[usize]>, unit: [bool; 2]) -> Option<CellImage> {
+        let n = rows.map_or(x.len(), |r| r.len());
+        if n == 0 || y.len() != x.len() || colour.len() != x.len() {
+            return None;
+        }
+        let row = |k: usize| rows.map_or(k, |r| r[k]);
+        let chunk = n.div_ceil(default_threads()).max(1 << 15);
+        // One pass for both columns' ranges and distinct values.
+        let parts: Vec<Option<(Spread, Spread)>> = par_map((0..n).step_by(chunk), |a| {
+            let (mut sx, mut sy) = (Spread::default(), Spread::default());
+            for k in a..(a + chunk).min(n) {
+                let i = row(k);
+                if !x[i].is_finite() || !y[i].is_finite() || !matches!(colour[i] >> 24, 0 | 255) {
+                    return None;
+                }
+                sx.add(x[i]);
+                sy.add(y[i]);
+            }
+            Some((sx, sy))
+        });
+        let (px, py): (Vec<Spread>, Vec<Spread>) = parts.into_iter().collect::<Option<Vec<_>>>()?.into_iter().unzip();
+        let (sx, sy) = (Spread::merge(px), Spread::merge(py));
+        let rx = if unit[0] { 1.0 } else { sx.resolution() };
+        let ry = if unit[1] { 1.0 } else { sy.resolution() };
+        // as.integer() truncates; positions are >= 0 here, and the largest
+        // is the largest value's (the mapping is monotone).
+        let pos = |v: f64, min: f64, res: f64| ((v - min) / res).trunc();
+        let (wf, hf) = (pos(sx.hi, sx.lo, rx) + 1.0, pos(sy.hi, sy.lo, ry) + 1.0);
+        if !(wf * hf <= MAX_CELLS as f64) {
+            return None;
+        }
+        let (w, h) = (wf as usize, hf as usize);
+        // Each row's cell, then the rows written in order.
+        let mut cell = pooled_zeros(n);
+        par_map(cell.chunks_mut(chunk).enumerate(), |(c, dst)| {
+            for (k, d) in dst.iter_mut().enumerate() {
+                let i = row(c * chunk + k);
+                let (cx, cy) = (pos(x[i], sx.lo, rx) as usize, pos(y[i], sy.lo, ry) as usize);
+                *d = ((h - 1 - cy) * w + cx) as u32;
+            }
+        });
+        let mut px = pooled_zeros(w * h);
+        for (k, &d) in cell.iter().enumerate() {
+            let c = colour[row(k)];
+            px[d as usize] = if c >> 24 == 0 { 0 } else { c };
+        }
+        give_back(cell);
+        Some(CellImage { w, h, px })
+    }
+}
+
+/// `agg::trans_affine` (agg_trans_affine.h/.cpp): `x' = x * sx + y * shx +
+/// tx`, `y' = x * shy + y * sy + ty`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Affine {
+    sx: f64,
+    shy: f64,
+    shx: f64,
+    sy: f64,
+    tx: f64,
+    ty: f64,
+}
+
+impl Affine {
+    fn new(sx: f64, shy: f64, shx: f64, sy: f64, tx: f64, ty: f64) -> Self {
+        Affine { sx, shy, shx, sy, tx, ty }
+    }
+
+    fn translation(x: f64, y: f64) -> Self {
+        Self::new(1.0, 0.0, 0.0, 1.0, x, y)
+    }
+
+    /// `trans_affine::multiply()`: `self` then `m`.
+    fn then(self, m: Affine) -> Self {
+        let t0 = self.sx * m.sx + self.shy * m.shx;
+        let t2 = self.shx * m.sx + self.sy * m.shx;
+        let t4 = self.tx * m.sx + self.ty * m.shx + m.tx;
+        Affine {
+            shy: self.sx * m.shy + self.shy * m.sy,
+            sy: self.shx * m.shy + self.sy * m.sy,
+            ty: self.tx * m.shy + self.ty * m.sy + m.ty,
+            sx: t0,
+            shx: t2,
+            tx: t4,
+        }
+    }
+
+    /// `trans_affine::invert()`.
+    fn invert(self) -> Self {
+        let d = 1.0 / (self.sx * self.sy - self.shy * self.shx);
+        let t0 = self.sy * d;
+        let sy = self.sx * d;
+        let shy = -self.shy * d;
+        let shx = -self.shx * d;
+        let t4 = -self.tx * t0 - self.ty * shx;
+        let ty = -self.tx * shy - self.ty * sy;
+        Affine { sx: t0, shy, shx, sy, tx: t4, ty }
+    }
+
+    fn apply(&self, x: f64, y: f64) -> (f64, f64) {
+        (x * self.sx + y * self.shx + self.tx, x * self.shy + y * self.sy + self.ty)
+    }
+}
+
+/// `agg::dda2_line_interpolator`, forward-adjusted (agg_dda_line.h).
+struct Dda2 {
+    cnt: i32,
+    lft: i32,
+    rem: i32,
+    m: i32,
+    y: i32,
+}
+
+impl Dda2 {
+    fn new(y1: i32, y2: i32, count: i32) -> Self {
+        let cnt = if count <= 0 { 1 } else { count };
+        let (mut lft, mut rem) = ((y2 - y1) / cnt, (y2 - y1) % cnt);
+        let mut m = rem;
+        if m <= 0 {
+            m += count;
+            rem += count;
+            lft -= 1;
+        }
+        m -= count;
+        Dda2 { cnt, lft, rem, m, y: y1 }
+    }
+
+    fn step(&mut self) {
+        self.m += self.rem;
+        self.y += self.lft;
+        if self.m > 0 {
+            self.m -= self.cnt;
+            self.y += 1;
+        }
+    }
+}
+
+/// `agg::iround()`.
+fn iround(v: f64) -> i64 {
+    (if v < 0.0 { v - 0.5 } else { v + 0.5 }) as i64
+}
+
+/// An image drawn as ragg's `drawRaster()` draws it with `interpolate =
+/// FALSE` and no rotation (ragg 1.5.2 src/AggDevice.h, `render_raster()`
+/// in src/rendering.h), given the arguments R's `GERaster()` passes
+/// (R src/main/engine.c; grid's `L_raster()` in
+/// src/library/grid/src/grid.c): the bottom-left corner (`x`, `y`) and the
+/// size in device pixels, `height` negative as grid gives it on a device
+/// whose y runs down.
+///
+/// The image's rectangle, mapped by the image matrix, is rasterised with
+/// AGG's exact-area coverage and clipped to the fractional clip box; each
+/// row's covered pixels form one span (`scanline_u8` merges the edge cells
+/// with the run between them) that `span_image_filter_rgba_nn` fills: the
+/// span's start and end pixel centres mapped back into the image in
+/// 1/256ths, interpolated across it by `dda2_line_interpolator`, and the
+/// image pixel under each sample (edges cloned).
+pub struct RasterDraw {
+    pub image: std::sync::Arc<CellImage>,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl RasterDraw {
+    /// The image-to-device matrix and its inverse, as `drawRaster()` builds
+    /// them: reflect, shift down by the height, scale, rotate (by -0
+    /// degrees), translate.
+    fn matrices(&self) -> (Affine, Affine) {
+        let (w, h) = (self.image.w as f64, self.image.h as f64);
+        let rot = -0.0f64 * std::f64::consts::PI / 180.0;
+        let src = Affine::new(1.0, 0.0, 0.0, -1.0, 0.0, 0.0)
+            .then(Affine::translation(0.0, h))
+            .then(Affine::new(self.width / w, 0.0, 0.0, self.height / h, 0.0, 0.0))
+            .then(Affine::new(rot.cos(), rot.sin(), -rot.sin(), rot.cos(), 0.0, 0.0))
+            .then(Affine::translation(self.x, self.y));
+        (src, src.invert())
+    }
+
+    /// The device rectangle in AGG's 1/256 pixel units (x0, y0, x1, y1):
+    /// the image's corners through the matrix, as the rasteriser upscales
+    /// them. `None` for a size GERaster() skips or a non-finite one.
+    fn subpixel_rect(&self) -> Option<[i64; 4]> {
+        if self.width == 0.0 || self.height == 0.0 || self.image.w == 0 || self.image.h == 0 {
+            return None;
+        }
+        let (src, _) = self.matrices();
+        let (w, h) = (self.image.w as f64, self.image.h as f64);
+        let mut r = [i64::MAX, i64::MAX, i64::MIN, i64::MIN];
+        for (u, v) in [(0.0, 0.0), (0.0, h), (w, h), (w, 0.0)] {
+            let (x, y) = src.apply(u, v);
+            if !x.is_finite() || !y.is_finite() {
+                return None;
+            }
+            let (x, y) = (iround(x * 256.0), iround(y * 256.0));
+            r = [r[0].min(x), r[1].min(y), r[2].max(x), r[3].max(y)];
+        }
+        Some(r)
+    }
+
+    /// Pixel rows `[top, bottom)` the image can touch.
+    pub fn rows(&self) -> (i64, i64) {
+        match self.subpixel_rect() {
+            Some(r) => (r[1] >> 8, (r[3] + 255) >> 8),
+            None => (0, 0),
+        }
+    }
+
+    /// Draws the image's pixels in a band's rows (`top`, `width` wide),
+    /// clipped to `clip` (the current clip box in page pixels).
+    fn draw(&self, buf: &mut [[f32; 4]], top: usize, width: usize, clip: &Rect) {
+        let Some(r) = self.subpixel_rect() else { return };
+        let up = |v: f64| iround(v * 256.0);
+        let (fx0, fy0) = (r[0].max(up(clip.x0)), r[1].max(up(clip.y0)));
+        let (fx1, fy1) = (r[2].min(up(clip.x1)), r[3].min(up(clip.y1)));
+        if fx0 >= fx1 || fy0 >= fy1 {
+            return;
+        }
+        let h = buf.len() / width;
+        let overlap = |i: i64, lo: i64, hi: i64| (hi.min((i + 1) * 256) - lo.max(i * 256)).clamp(0, 256);
+        let (i0, i1) = ((fx0 >> 8).max(0), ((fx1 + 255) >> 8).min(width as i64));
+        let (j0, j1) = ((fy0 >> 8).max(top as i64), ((fy1 + 255) >> 8).min((top + h) as i64));
+        if i0 >= i1 || j0 >= j1 {
+            return;
+        }
+        let ox: Vec<i64> = (i0..i1).map(|i| overlap(i, fx0, fx1)).collect();
+        let (_, inv) = self.matrices();
+        let img = &*self.image;
+        let (iw, ih) = (img.w as i64, img.h as i64);
+        let unit: [f32; 256] = std::array::from_fn(|k| k as f32 / 255.0);
+        for j in j0..j1 {
+            let oy = overlap(j, fy0, fy1);
+            // AGG's cell coverage: the area share, at most 255.
+            let cover = |i: i64| ((ox[(i - i0) as usize] * oy) >> 8).min(255);
+            let Some(s) = (i0..i1).find(|&i| cover(i) > 0) else { continue };
+            let e = (s..i1).rev().find(|&i| cover(i) > 0).unwrap() + 1;
+            let len = (e - s) as i32;
+            let (xa, ya) = inv.apply(s as f64 + 0.5, j as f64 + 0.5);
+            let (xb, yb) = inv.apply(s as f64 + 0.5 + len as f64, j as f64 + 0.5);
+            let mut dx = Dda2::new(iround(xa * 256.0) as i32, iround(xb * 256.0) as i32, len);
+            let mut dy = Dda2::new(iround(ya * 256.0) as i32, iround(yb * 256.0) as i32, len);
+            let row = &mut buf[(j as usize - top) * width..][..width];
+            for i in s..e {
+                let (u, v) = ((dx.y >> 8) as i64, (dy.y >> 8) as i64);
+                dx.step();
+                dy.step();
+                let c = cover(i);
+                let p = img.px[(v.clamp(0, ih - 1) * iw + u.clamp(0, iw - 1)) as usize];
+                if p >> 24 == 0 || c == 0 {
+                    continue;
+                }
+                let sp = [unit[(p & 255) as usize], unit[(p >> 8 & 255) as usize], unit[(p >> 16 & 255) as usize], 1.0];
+                let d = &mut row[i as usize];
+                if c == 255 {
+                    *d = sp;
+                } else {
+                    let a = unit[c as usize];
+                    for k in 0..4 {
+                        d[k] = sp[k] * a + d[k] * (1.0 - a);
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -534,5 +979,119 @@ mod tests {
         // only this page's band buffers.
         let held: usize = POOL.lock().unwrap().iter().filter(|b| b.capacity() >= w * 64).map(|b| b.capacity() * 16).sum();
         assert!(held <= bound, "{held} > {bound}");
+    }
+
+    #[test]
+    fn resolution_is_the_smallest_gap_as_ggplot2_finds_it() {
+        assert_eq!(resolution(&[3.0, 1.0, 2.0, 2.0], None), 1.0);
+        assert_eq!(resolution(&[0.0, 1.5, 0.5], None), 0.5);
+        // zero_range(): one value, equal values, or a tiny relative range.
+        assert_eq!(resolution(&[4.0], None), 1.0);
+        assert_eq!(resolution(&[4.0, 4.0], None), 1.0);
+        assert_eq!(resolution(&[1e6, 1e6 + 1e-10], None), 1.0);
+        // Gaps under sqrt(eps) don't count; with no other gap it's 1.
+        assert_eq!(resolution(&[1.0, 1.0 + 1e-10, 3.0], None), 2.0 - 1e-10);
+        assert_eq!(resolution(&[1e-9, 2e-9], None), 1.0);
+        // -0 and 0 are one value; `rows` picks the values.
+        assert_eq!(resolution(&[-0.0, 0.0, 0.25], None), 0.25);
+        assert_eq!(resolution(&[0.0, 0.1, 5.0, 7.0], Some(&[2, 3, 0])), 2.0);
+        // Chunks merge: more values than one chunk.
+        let v: Vec<f64> = (0..300_000).map(|i| (i % 1000) as f64 * 0.75 + (i / 1000) as f64 * 1e-3).collect();
+        let mut u = v.clone();
+        u.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        u.dedup();
+        let min = u.windows(2).map(|w| w[1] - w[0]).filter(|&d| d > f64::EPSILON.sqrt()).fold(f64::INFINITY, f64::min);
+        assert_eq!(resolution(&v, None), min);
+    }
+
+    const RED: u32 = 0xFF00_00FF;
+    const BLUE: u32 = 0xFFFF_0000;
+
+    #[test]
+    fn cell_images_put_the_top_row_first_and_the_last_row_wins() {
+        // A 3 x 2 grid with one cell absent and one written twice.
+        let x = [0.0, 2.0, 4.0, 0.0, 4.0, 4.0];
+        let y = [10.0, 10.0, 10.0, 11.0, 11.0, 11.0];
+        let col = [RED, BLUE, RED, BLUE, RED, 0x00FF_FFFF];
+        let img = CellImage::from_cells(&x, &y, &col, None, [false, false]).unwrap();
+        assert_eq!((img.w, img.h), (3, 2));
+        // Top row is y = 11: (0, 11) blue, (2, 11) absent, (4, 11) written
+        // red then transparent.
+        assert_eq!(img.px, vec![BLUE, 0, 0, RED, BLUE, RED]);
+        // Rows of one panel only, and integer columns' resolution of 1.
+        let img = CellImage::from_cells(&x, &y, &col, Some(&[0, 2]), [false, false]).unwrap();
+        assert_eq!((img.w, img.h, img.px.clone()), (2, 1, vec![RED, RED]));
+        let img = CellImage::from_cells(&x, &y, &col, Some(&[0, 2]), [true, false]).unwrap();
+        assert_eq!((img.w, img.px.clone()), (5, vec![RED, 0, 0, 0, RED]));
+        // as.integer() truncates uneven positions.
+        let img = CellImage::from_cells(&[0.0, 1.0, 2.9], &[0.0; 3], &[RED, BLUE, RED], None, [false, false]).unwrap();
+        assert_eq!(img.px, vec![RED, BLUE, RED]);
+        // Partial alpha and non-finite positions decline.
+        assert!(CellImage::from_cells(&[0.0], &[0.0], &[0x8000_00FF], None, [false, false]).is_none());
+        assert!(CellImage::from_cells(&[f64::INFINITY], &[0.0], &[RED], None, [false, false]).is_none());
+    }
+
+    #[test]
+    fn dda2_spreads_the_remainder_as_agg_does() {
+        let walk = |a: i32, b: i32, n: i32| {
+            let mut d = Dda2::new(a, b, n);
+            (0..n).map(|_| {
+                let y = d.y;
+                d.step();
+                y
+            }).collect::<Vec<_>>()
+        };
+        assert_eq!(walk(0, 1000, 10), (0..10).map(|k| k * 100).collect::<Vec<_>>());
+        assert_eq!(walk(0, 10, 4), vec![0, 2, 5, 7]);
+        assert_eq!(walk(10, 0, 4), vec![10, 7, 5, 2]);
+    }
+
+    fn draw_one(img: CellImage, x: f64, y: f64, w: f64, h: f64, clip: Rect, size: usize) -> Vec<u32> {
+        let mut list = DisplayList::new();
+        list.push(Item::Clear([255, 255, 255, 255]));
+        list.push(Item::PushClip(clip));
+        list.push(Item::Raster(RasterDraw { image: std::sync::Arc::new(img), x, y, width: w, height: h }));
+        render(&list, size, size, &opts(2, 3))
+    }
+
+    fn page(size: usize) -> Rect {
+        Rect { x0: 0.0, y0: 0.0, x1: size as f64, y1: size as f64 }
+    }
+
+    #[test]
+    fn rasters_map_their_rows_top_down_and_sample_nearest() {
+        const W: u32 = 0xFFFF_FFFF;
+        // 2 x 2: top row red, blue; bottom blue, red; drawn 1:1 at (1, 1)
+        // (bottom-left (1, 3)), then stretched to 4 x 4 pixels.
+        let img = || CellImage { w: 2, h: 2, px: vec![RED, BLUE, BLUE, RED] };
+        let out = draw_one(img(), 1.0, 3.0, 2.0, -2.0, page(4), 4);
+        assert_eq!(&out[4..8], &[W, RED, BLUE, W]);
+        assert_eq!(&out[8..12], &[W, BLUE, RED, W]);
+        let out = draw_one(img(), 0.0, 4.0, 4.0, -4.0, page(4), 4);
+        assert_eq!(&out[0..4], &[RED, RED, BLUE, BLUE]);
+        assert_eq!(&out[12..16], &[BLUE, BLUE, RED, RED]);
+        // Transparent cells leave the page as it was.
+        let out = draw_one(CellImage { w: 2, h: 1, px: vec![0, RED] }, 0.0, 1.0, 2.0, -1.0, page(2), 2);
+        assert_eq!(&out[0..2], &[W, RED]);
+    }
+
+    #[test]
+    fn raster_edges_have_partial_coverage_and_clip_cuts_them() {
+        let img = || CellImage { w: 1, h: 1, px: vec![RED] };
+        // Left edge at 0.5: half coverage there.
+        let out = draw_one(img(), 0.5, 2.0, 1.5, -2.0, page(2), 2);
+        let ch = |p: u32, k: u32| (p >> (8 * k)) & 255;
+        assert_eq!((ch(out[0], 0), ch(out[0], 1)), (255, 127));
+        assert_eq!(out[1], RED);
+        // A clip at x = 1 removes the right pixel; at 0.75 halves the
+        // left pixel's share again.
+        let out = draw_one(img(), 0.5, 2.0, 1.5, -2.0, Rect { x0: 0.75, y0: 0.0, x1: 1.0, y1: 2.0 }, 2);
+        assert_eq!(out[1], 0xFFFF_FFFF);
+        assert_eq!(ch(out[0], 1), 191);
+        // Zero size draws nothing; rows() covers the pixels touched.
+        let out = draw_one(img(), 0.5, 2.0, 0.0, -2.0, page(2), 2);
+        assert!(out.iter().all(|&p| p == 0xFFFF_FFFF));
+        let r = RasterDraw { image: std::sync::Arc::new(img()), x: 0.0, y: 5.5, width: 3.0, height: -2.25 };
+        assert_eq!(r.rows(), (3, 6));
     }
 }

@@ -397,7 +397,8 @@ full_kind <- function(layer) {
   # Boxplots, violins and the range geoms (R6.5b, R/render-ranges.R);
   # segments, reference lines and rugs (R6.5c, R/render-segments.R).
   # Labels (R6.5d, R/render-labels.R).
-  range_kind(geom) %||% segment_kind(geom) %||% label_kind(geom)
+  # Rasters (S1.1, R/render-raster.R).
+  range_kind(geom) %||% segment_kind(geom) %||% label_kind(geom) %||% raster_kind(geom)
 }
 
 # A layer's data as its geom draws it: Layer$draw_geom() removes missing
@@ -456,7 +457,11 @@ hybrid_decline <- function(layer, data, layout, kind = hybrid_kind(layer), full 
     return("a rug with coord_flip()")
   }
   # coord_transform(): points and text are placed by coord$transform()
-  # alone; the other geoms are munched (coord_munch()), not mirrored.
+  # alone; the other geoms are munched (coord_munch()), not mirrored, and
+  # GeomRaster$draw_panel() draws rects for a non-linear coord.
+  if (trans && identical(kind, "raster")) {
+    return("geom_raster() draws rects in coord_transform()")
+  }
   if (trans && !kind %in% c("points", "text")) {
     return("coord_transform() munches this geom")
   }
@@ -475,6 +480,7 @@ hybrid_decline <- function(layer, data, layout, kind = hybrid_kind(layer), full 
     ribbons = ribbons_decline(data, layer$computed_geom_params, FALSE),
     smooth = ribbons_decline(data, layer$computed_geom_params, TRUE),
     label = label_decline(data, layer$computed_geom_params),
+    raster = raster_decline(data, layer$computed_geom_params),
     if (kind %in% names(segment_kinds())) {
       segment_decline(kind, data, layer$computed_geom_params)
     } else {

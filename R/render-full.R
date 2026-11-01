@@ -162,6 +162,9 @@ full_layer_specs <- function(layer, kind, data, layout, res, n_panels, scales) {
     smooth = one(full_ribbons(layer, data, ranges, n_panels, res, TRUE), "paths"),
     label = Filter(Negate(is.null), list(full_labels(layer, data, layout$coord, pps, scales, n_panels, res, ranges))),
     polygons = full_polygons(layer, data, ranges, n_panels, res),
+    # The matrix is built from the unflipped x and y and only its
+    # placement flips (in Rust), so full_flip() leaves it alone.
+    raster = one(full_raster(data, ranges, n_panels, flip)),
     {
       draw <- if (kind %in% names(segment_kinds())) full_segments else full_range
       draw(kind, layer, data, ranges, n_panels, res)
@@ -209,7 +212,7 @@ full_transform_check <- function(layout, layers) {
 # and ranges. Text is placed through coord$transform() already
 # (full_text()); a label layer's boxes swap, their pixel offsets don't.
 full_flip <- function(spec) {
-  if (identical(spec$kind, "text")) {
+  if (identical(spec$kind, "text") || identical(spec$kind, "raster")) {
     return(spec)
   }
   if (identical(spec$kind, "labels")) {
@@ -499,7 +502,8 @@ full_geoms <- function() {
     ggplot2::GeomRibbon, ggplot2::GeomArea, ggplot2::GeomDensity, ggplot2::GeomSmooth,
     ggplot2::GeomBoxplot, ggplot2::GeomViolin, ggplot2::GeomCrossbar, ggplot2::GeomErrorbar,
     ggplot2::GeomLinerange, ggplot2::GeomPointrange, ggplot2::GeomSegment, ggplot2::GeomAbline,
-    ggplot2::GeomHline, ggplot2::GeomVline, ggplot2::GeomRug, ggplot2::GeomLabel, ggplot2::GeomPolygon
+    ggplot2::GeomHline, ggplot2::GeomVline, ggplot2::GeomRug, ggplot2::GeomLabel, ggplot2::GeomPolygon,
+    ggplot2::GeomRaster
   )
 }
 

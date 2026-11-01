@@ -1322,7 +1322,7 @@ ones. sf is in Suggests: every sf test and corpus file uses
 
 ## S1 Raster
 
-### S1.1 `geom_raster()` drawer
+### S1.1 `geom_raster()` drawer — done
 - **Depends:** S0.2
 - **Touches:** `R/render-raster.R` (new), `alot-core/src/render/raster.rs`,
   `alot-r/src/render.rs`, `tests/testthat/test-render-raster.R` (new),
@@ -1342,6 +1342,16 @@ ones. sf is in Suggests: every sf test and corpus file uses
 - **Done when:** the raster render-corpus plots draw in full and match
   ragg. The 1000² and 2000² cases draw faster than ragg, and the 2000²
   case's draw step is at least 5× faster than ragg's.
+- **Result:** full tier and hybrid ("marks" lazy grob). The matrix is
+  built per panel in Rust from the fill strings (CHARSXP-cached parse,
+  `resolution()` ported to Rust, last row wins a shared cell) and sampled
+  as AGG's `span_image_filter_rgba_nn` + `dda2_line_interpolator` over a
+  `scanline_u8` span with exact-area edge coverage. Under `coord_flip()`
+  the matrix stays unflipped and only its placement flips, as upstream.
+  All 11 raster render-corpus plots draw in full (max channel diff 1 in
+  spot checks); `coord_cartesian(reverse = )` and `clip = "off"` decline
+  too. Draw step (release, 7 × 7 in at 300 dpi): 1000² 14 vs 135 ms
+  (9.6×), 2000² 20–29 vs 170 ms (5.9–8.5×; RESULTS.md "S1.1").
 
 ### S1.2 Raster build steps (conditional)
 - **Depends:** S0.2

@@ -71,6 +71,43 @@ impl RectLayer {
     }
 }
 
+/// One panel of a `geom_raster()` layer (`GeomRaster$draw_panel()`): the
+/// colour matrix and the `rasterGrob()` placing it over the range of the
+/// cells' `xmin`-`xmax` and `ymin`-`ymax`, in data units of the panel's
+/// horizontal and vertical scales. Under `coord_flip()` the matrix is
+/// built from the unflipped x and y, as upstream builds it before
+/// `coord$transform()`, so its columns stretch across the data's y range.
+pub struct RasterLayer {
+    pub image: std::sync::Arc<raster::CellImage>,
+    /// `c(min(xmin), max(xmax))` and `c(min(ymin), max(ymax))` of the
+    /// horizontal and vertical axes, before rescaling.
+    pub h_extent: [f64; 2],
+    pub v_extent: [f64; 2],
+    pub x_range: [f64; 2],
+    pub y_range: [f64; 2],
+}
+
+impl RasterLayer {
+    /// The image placed in panel cell `c`: `rasterGrob(x = mean(x_rng),
+    /// width = diff(x_rng), default.units = "native")` centred (grid's
+    /// `L_raster()` justifies it to its bottom-left corner), with `x_rng`
+    /// the extent rescaled to npc as `coord$transform()` does.
+    pub(crate) fn draw(&self, c: &Rect) -> raster::RasterDraw {
+        let (pw, ph) = (c.x1 - c.x0, c.y1 - c.y0);
+        let (x0, x1) = (npc(self.h_extent[0], &self.x_range), npc(self.h_extent[1], &self.x_range));
+        let (y0, y1) = (npc(self.v_extent[0], &self.y_range), npc(self.v_extent[1], &self.y_range));
+        let (cx, wd) = ((x0 + x1) / 2.0, x1 - x0);
+        let (cy, ht) = ((y0 + y1) / 2.0, y1 - y0);
+        raster::RasterDraw {
+            image: self.image.clone(),
+            x: c.x0 + (cx - wd * 0.5) * pw,
+            y: c.y1 - (cy - ht * 0.5) * ph,
+            width: wd * pw,
+            height: -(ht * ph),
+        }
+    }
+}
+
 /// A `geom_path()`, `geom_line()` or `geom_step()` layer
 /// (`GeomPath$draw_panel()`): one polyline per group, in the rows' order.
 /// Rows `0..x.len()` are in drawing order; `path` gives each row's path

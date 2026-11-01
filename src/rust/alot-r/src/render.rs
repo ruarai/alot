@@ -48,18 +48,36 @@ fn at(v: &[f64], i: usize) -> f64 {
 /// @noRd
 #[extendr(r_name = "rs_point_colours")]
 fn point_colours(colour: Strings, alpha: Robj) -> Robj {
+    let mut out = Integers::new(colour.len());
+    // SAFETY: `out` holds `colour.len()` ints, viewed as u32.
+    let dst = unsafe { std::slice::from_raw_parts_mut(out.as_mut_ptr() as *mut u32, colour.len()) };
+    match packed_colours_into(&colour, &alpha, dst) {
+        Some(()) => out.into(),
+        None => Robj::from(()),
+    }
+}
+
+/// `rs_point_colours()` into a new vector: `None` where it declines.
+pub(crate) fn packed_colours(colour: &Strings, alpha: &Robj) -> Option<Vec<u32>> {
+    let mut out = vec![0u32; colour.len()];
+    packed_colours_into(colour, alpha, &mut out)?;
+    Some(out)
+}
+
+/// `rs_point_colours()` into `dst` (of `colour.len()`).
+fn packed_colours_into(colour: &Strings, alpha: &Robj, dst: &mut [u32]) -> Option<()> {
     let n = colour.len();
     const NO_ALPHA: [f64; 1] = [f64::NAN];
-    let alpha_col = Column::new(&alpha);
+    let alpha_col = Column::new(alpha);
     let alpha: &[f64] = match alpha_col.data {
         ColumnData::Double(v) if v.len() == 1 || v.len() == n => v,
         ColumnData::Logical(v) if (v.len() == 1 || v.len() == n) && v.iter().all(|v| v.is_none()) => &NO_ALPHA,
-        _ => return Robj::from(()),
+        _ => return None,
     };
     // R caches CHARSXPs, so each distinct pointer is parsed once: the
     // distinct ones are found in parallel, parsed here (reading R's
     // strings), and the rows mapped in parallel. Pointers travel as usize.
-    let ptrs = convert::str_ptrs(&colour);
+    let ptrs = convert::str_ptrs(colour);
     let ptrs: &[usize] = unsafe { std::slice::from_raw_parts(ptrs.as_ptr() as *const usize, ptrs.len()) };
     let chunk = n.div_ceil(raster::default_threads()).max(1 << 15);
     let found: Vec<PtrMap<usize>> = raster::par_map((0..n).step_by(chunk), |a| {
@@ -83,40 +101,64 @@ fn point_colours(colour: Strings, alpha: Robj) -> Robj {
         let rgba = match if p == na { Some(Colour::Na) } else { parse_colour(colour.elt(i).as_bytes()) } {
             Some(Colour::Rgba(v)) => Some(v),
             Some(Colour::Na) => None,
-            None => return Robj::from(()),
+            None => return None,
         };
         parsed.insert(p, rgba);
     }
     // col2rgb(NA): transparent white.
-    const NA: i32 = 0x00FF_FFFF;
-    let mut out = Integers::new(n);
-    struct Dst(*mut i32);
-    unsafe impl Sync for Dst {}
-    let dst = Dst(out.as_mut_ptr() as *mut i32);
-    let (dst, parsed) = (&dst, &parsed);
-    raster::par_map((0..n).step_by(chunk), |a| {
+    const NA: u32 = 0x00FF_FFFF;
+    let parsed = &parsed;
+    raster::par_map(dst.chunks_mut(chunk).enumerate(), |(c, rows)| {
+        let a = c * chunk;
         // Runs of one colour skip the map.
         let mut last = (usize::MAX, None);
-        for i in a..(a + chunk).min(n) {
+        for (k, d) in rows.iter_mut().enumerate() {
+            let i = a + k;
             let p = ptrs[i];
             if p != last.0 {
                 last = (p, parsed[&p]);
             }
-            let v = match last.1 {
+            *d = match last.1 {
                 Some([r, g, b, mut a]) => {
                     let al = at(alpha, i);
                     if !al.is_nan() {
                         a = hex::double2int(al * 255.0).clamp(0, 255) as u8;
                     }
-                    (r as u32 | (g as u32) << 8 | (b as u32) << 16 | (a as u32) << 24) as i32
+                    r as u32 | (g as u32) << 8 | (b as u32) << 16 | (a as u32) << 24
                 }
                 None => NA,
             };
-            // SAFETY: chunks write disjoint rows of `out`, which has `n`.
-            unsafe { dst.0.add(i).write(v) };
         }
     });
-    out.into()
+    Some(())
+}
+
+/// Why the full tier can't draw a `geom_raster()` layer's rows, or NULL
+/// (see `raster_decline()` in R/render-raster.R): a non-finite position
+/// among `pos` (a list of double or integer columns), a fill colour
+/// `rs_point_colours()` declines, or a colour whose alpha after `alpha`
+/// is neither 0 nor 1.
+/// @noRd
+#[extendr(r_name = "rs_raster_check")]
+fn raster_check(pos: List, fill: Strings, alpha: Robj) -> Robj {
+    for (_, col) in pos.iter() {
+        let finite = match Column::new(&col).data {
+            ColumnData::Double(v) => {
+                let chunk = v.len().div_ceil(raster::default_threads()).max(1 << 16);
+                raster::par_map(v.chunks(chunk), |c| c.iter().all(|x| x.is_finite())).into_iter().all(|ok| ok)
+            }
+            ColumnData::Integer(v) => v.iter().all(|x| x.is_some()),
+            _ => false,
+        };
+        if !finite {
+            return Robj::from("a non-finite raster position");
+        }
+    }
+    match packed_colours(&fill, &alpha) {
+        None => Robj::from("a fill colour alot doesn't parse"),
+        Some(c) if c.iter().any(|&p| !matches!(p >> 24, 0 | 255)) => Robj::from("a partial alpha"),
+        Some(_) => Robj::from(()),
+    }
 }
 
 /// A hasher for pointers (CHARSXPs as usize): their bits, spread.
@@ -649,6 +691,7 @@ extendr_module! {
     mod render;
     fn write_png;
     fn point_colours;
+    fn raster_check;
     fn point_shapes_supported;
     fn all_na_logical;
     fn columns_complete;

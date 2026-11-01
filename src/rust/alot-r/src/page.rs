@@ -8,7 +8,7 @@ use alot_core::render::legend::{Bar, BarTicks, Bins, Body, Glyph, Guide, Keys, L
 use alot_core::render::display::{DisplayList, Rect};
 use alot_core::render::png::{render_png, PngOptions};
 use alot_core::render::page::{draw_page, FacetDraw, LineStyle, PageSpec, Painter, RectEl, StripDraw, TextStyle};
-use alot_core::render::layers::{Label, LabelLayer, PathLayer, RectLayer, TextLayer};
+use alot_core::render::layers::{Label, LabelLayer, PathLayer, RasterLayer, RectLayer, TextLayer};
 use alot_core::render::panel::{GridLines, Layer, Panel, PointLayer};
 use alot_core::render::raster;
 use alot_core::render::text::Font;
@@ -462,9 +462,91 @@ fn label_layers(l: &List, n_panels: usize, fonts: &mut Fonts) -> Option<Vec<Opti
         .collect()
 }
 
+/// A raster layer dealt out to the panels: see `full_raster()` in
+/// R/render-raster.R. Each panel's colour matrix is built here from its
+/// rows (`GeomRaster$draw_panel()` runs per panel), only for panel `only`
+/// (0-based) when given. Rows are dealt by `panel` (1-based codes), absent
+/// for a single panel.
+fn raster_layers(l: &List, n_panels: usize, only: Option<usize>) -> Option<Vec<Option<Layer>>> {
+    let robjs = fields(l, &["x", "y", "xmin", "xmax", "ymin", "ymax"])?;
+    let cols: Vec<&[f64]> = robjs.iter().map(|r| r.as_real_slice()).collect::<Option<_>>()?;
+    let n = cols[0].len();
+    if cols.iter().any(|c| c.len() != n) {
+        return None;
+    }
+    let fill = Strings::try_from(field(l, "fill")?).ok()?;
+    if fill.len() != n {
+        return None;
+    }
+    let colour = crate::render::packed_colours(&fill, &field(l, "alpha")?)?;
+    let (xr, yr) = (ranges(l, "x_range", n_panels)?, ranges(l, "y_range", n_panels)?);
+    let flip = flag(l, "flip")?;
+    let unit = match nums(l, "integer")?[..] {
+        [a, b] => [a != 0.0, b != 0.0],
+        _ => return None,
+    };
+    let rows: Vec<Option<Vec<usize>>> = match field(l, "panel") {
+        Some(p) if !p.is_null() => {
+            let p = p.as_integer_slice()?;
+            if p.len() != n {
+                return None;
+            }
+            let mut rows: Vec<Vec<usize>> = vec![Vec::new(); n_panels];
+            for (i, &k) in p.iter().enumerate() {
+                if k < 1 || k as usize > n_panels {
+                    return None;
+                }
+                if only.is_none_or(|o| o == k as usize - 1) {
+                    rows[k as usize - 1].push(i);
+                }
+            }
+            rows.into_iter().map(|r| (!r.is_empty()).then_some(r)).collect()
+        }
+        _ if n_panels == 1 => vec![None],
+        _ => return None,
+    };
+    // c(min(xmin), max(xmax), min(ymin), max(ymax)) of a panel's rows, in
+    // parallel chunks.
+    let extent = |rows: Option<&[usize]>| {
+        let len = rows.map_or(n, |r| r.len());
+        let chunk = len.div_ceil(raster::default_threads()).max(1 << 16);
+        let parts = raster::par_map((0..len).step_by(chunk), |a| {
+            let mut e = [f64::INFINITY, f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY];
+            for k in a..(a + chunk).min(len) {
+                let i = rows.map_or(k, |r| r[k]);
+                e = [e[0].min(cols[2][i]), e[1].max(cols[3][i]), e[2].min(cols[4][i]), e[3].max(cols[5][i])];
+            }
+            e
+        });
+        parts.into_iter().fold([f64::INFINITY, f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY], |e, p| {
+            [e[0].min(p[0]), e[1].max(p[1]), e[2].min(p[2]), e[3].max(p[3])]
+        })
+    };
+    rows.iter()
+        .enumerate()
+        .map(|(k, r)| {
+            if only.is_some_and(|o| o != k) || (r.is_none() && n_panels > 1) || n == 0 {
+                return Some(None);
+            }
+            let r = r.as_deref();
+            let image = alot_core::render::raster::CellImage::from_cells(cols[0], cols[1], &colour, r, unit)?;
+            let e = extent(r);
+            let (x_ext, y_ext) = ([e[0], e[1]], [e[2], e[3]]);
+            if x_ext.iter().chain(&y_ext).any(|v| !v.is_finite()) {
+                return None;
+            }
+            // coord_flip(): the matrix stays as built from x and y; its
+            // placement takes the flipped ranges.
+            let (h_extent, v_extent, x_range, y_range) =
+                if flip { (y_ext, x_ext, yr[k], xr[k]) } else { (x_ext, y_ext, xr[k], yr[k]) };
+            Some(Some(Layer::Raster(RasterLayer { image: std::sync::Arc::new(image), h_extent, v_extent, x_range, y_range })))
+        })
+        .collect()
+}
+
 /// One layer of the spec dealt out to the panels: `None` for a panel with
-/// nothing to draw.
-fn layers(l: &List, n_panels: usize, fonts: &mut Fonts) -> Option<Vec<Option<Layer>>> {
+/// nothing to draw. Only panel `only` (0-based) needs drawing when given.
+fn layers(l: &List, n_panels: usize, fonts: &mut Fonts, only: Option<usize>) -> Option<Vec<Option<Layer>>> {
     match field(l, "kind")?.as_str()? {
         "points" => Some(
             point_layers(l, n_panels)?.into_iter().map(|p| (!p.x.is_empty()).then_some(Layer::Points(p))).collect(),
@@ -473,6 +555,7 @@ fn layers(l: &List, n_panels: usize, fonts: &mut Fonts) -> Option<Vec<Option<Lay
         "paths" => path_layers(l, n_panels),
         "text" => text_layers(l, n_panels, fonts),
         "labels" => label_layers(l, n_panels, fonts),
+        "raster" => raster_layers(l, n_panels, only),
         _ => None,
     }
 }
@@ -758,7 +841,7 @@ fn page_list(spec: &List, threads: i32) -> Option<(DisplayList, usize, usize)> {
     let n_panels = list_of(spec, "panels")?.len();
     let mut layers: Vec<std::vec::IntoIter<Option<Layer>>> = Vec::new();
     for (_, l) in list_of(spec, "layers")?.iter() {
-        layers.push(self::layers(&List::try_from(l).ok()?, n_panels, &mut fonts)?.into_iter());
+        layers.push(self::layers(&List::try_from(l).ok()?, n_panels, &mut fonts, None)?.into_iter());
     }
     for (i, (_, pl)) in list_of(spec, "panels")?.iter().enumerate() {
         let name = match &facet_spec {
@@ -841,7 +924,7 @@ fn panel_layers(specs: &List, n_panels: i32, panel: i32, rect: &[f64], dims: &[i
     let mut fonts = Fonts::new();
     let mut drawn = Vec::new();
     for (_, l) in specs.iter() {
-        let one = layers(&List::try_from(l).ok()?, n_panels as usize, &mut fonts)?;
+        let one = layers(&List::try_from(l).ok()?, n_panels as usize, &mut fonts, Some(panel as usize - 1))?;
         if let Some(layer) = one.into_iter().nth(panel as usize - 1)? {
             drawn.push(layer);
         }

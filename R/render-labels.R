@@ -5,8 +5,7 @@
 # drawing the box as a polygon; and GeomPolygon$draw_panel() (ggplot2
 # R/geom-polygon.R) without subgroups. annotate() layers need nothing of
 # their own: they are layers of these geoms with inherit.aes = FALSE and
-# no legend. geom_raster() is not drawn (its rasterGrob() is interpolated
-# and scaled by the device; not mirrored).
+# no legend. geom_raster() is drawn by R/render-raster.R.
 
 label_kind <- function(geom) {
   if (identical(geom, ggplot2::GeomLabel) &&

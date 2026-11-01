@@ -9,11 +9,11 @@
 # 300 dpi (the north star's page):
 #   ggplot2  ggplot_build(); then on ragg::agg_png(): ggplot_gtable(), grid
 #            drawing, and dev.off(), which writes the PNG (encode).
-#   alot     what alot_png() does today: alot_build(); "decide", the tier
-#            choice (render_raster(): the full tier's attempt and
-#            render_coverage()); then whichever tier it picks. At S0.2 every
-#            case here goes to the ggplot2 tier, so the rest is
-#            ggplot_gtable(), drawing and dev.off() on ragg, as above.
+#   hybrid   alot_build(), then the hybrid tier (run_hybrid()), for cases
+#            where it draws a layer in Rust (S1.1: the rasters).
+#   alot     what alot_png() does: alot_build(), then the tier it picks
+#            (run_alot()): the full tier for the rasters since S1.1; the
+#            ggplot2 tier, after the full tier's attempt, for the rest.
 # The device is opened before the gtable is built, as print.ggplot() does.
 #
 # Each case also gets, unless ALOT_BENCH_PROFILE=false:
@@ -258,11 +258,34 @@ run_ggplot2 <- function(p, file, prof = NULL, keep = NULL) {
   c(build = t_build, decide = 0, gtable = t_gtable, draw = t_draw, encode = t_encode)
 }
 
+# The tier alot_png() picks for a built plot (untimed).
+alot_tier <- function(b) quiet(alot_ns$alot_render_coverage(b))$tier
+
+# What alot_png() does, per stage, in the tier it picks. Full tier (S1.1):
+# "decide" is the render IR and page spec (render_ir() and page_spec(),
+# what render_full() builds before Rust draws; the tier choice is part of
+# it), "draw" rs_render_page() (layout, display list and band rasterising
+# to a nativeRaster) and "encode" write_png(). render_full() with a file
+# streams the bands to the PNG instead, with the same work. Hybrid tier:
+# run_hybrid(). ggplot2 tier: the full tier's attempt and render_coverage()
+# ("decide"), then ggplot2's render on ragg as run_ggplot2().
 run_alot <- function(p, file, keep = NULL) {
   t_build <- secs(b <- quiet(alot_build(p)))
+  if (!is.null(keep)) keep$built <- b
   size <- c(page, list(bg = alot_ns$plot_background(b)))
+  tier <- alot_tier(b)
+  if (tier == "full") {
+    t_decide <- secs(spec <- quiet(alot_ns$page_spec(b, alot_ns$render_ir(b), size)))
+    t_draw <- secs(img <- alot_ns$rs_render_page(spec, alot_ns$render_threads()))
+    if (is.null(img)) stop("the full tier declined the page spec")
+    t_encode <- secs(alot_ns$write_png(img, file, size$bg, page$res))
+    return(c(build = t_build, decide = t_decide, gtable = 0, draw = t_draw, encode = t_encode))
+  }
+  if (tier == "hybrid") {
+    return(c(build = t_build, run_hybrid_render(b, file)))
+  }
   t_decide <- secs(out <- quiet(alot_ns$render_raster(b, size, file)))
-  if (out$tier != "ggplot2") stop("alot's tier for this case is ", out$tier, "; update spatial.R to time it.")
+  if (out$tier != "ggplot2") stop("alot's tier for this case is ", out$tier, " but alot_render_coverage() says ggplot2")
   do.call(ragg::agg_png, c(list(file), page))
   t_gtable <- secs(g <- quiet(ggplot_gtable(b)))
   t_draw <- secs({
@@ -270,8 +293,33 @@ run_alot <- function(p, file, keep = NULL) {
     grid::grid.draw(g)
   })
   t_encode <- secs(grDevices::dev.off())
-  if (!is.null(keep)) keep$built <- b
   c(build = t_build, decide = t_decide, gtable = t_gtable, draw = t_draw, encode = t_encode)
+}
+
+# The hybrid tier (options(alot.full_tier = FALSE)), as render_hybrid()
+# draws it: hybrid_gtable() on ragg::agg_capture() ("gtable"; layers with a
+# Rust drawer become lazy grobs), grid drawing, where those grobs render in
+# Rust ("draw"), then capturing the page and write_png() ("encode").
+run_hybrid_render <- function(b, file) {
+  size <- c(page, list(bg = alot_ns$plot_background(b)))
+  old <- grDevices::dev.cur()
+  cap <- do.call(ragg::agg_capture, page)
+  dev <- grDevices::dev.cur()
+  on.exit(alot_ns$close_device(dev, old))
+  t_gtable <- secs(g <- quiet(alot_ns$hybrid_gtable(b)))
+  t_draw <- secs({
+    grid::grid.newpage()
+    grid::grid.draw(g)
+  })
+  t_encode <- secs(alot_ns$write_png(cap(native = TRUE), file, size$bg, page$res))
+  c(decide = 0, gtable = t_gtable, draw = t_draw, encode = t_encode)
+}
+
+run_hybrid <- function(p, file) {
+  withr::local_options(alot.full_tier = FALSE)
+  t_build <- secs(b <- quiet(alot_build(p)))
+  if (alot_tier(b) != "hybrid") stop("the hybrid tier doesn't draw this case")
+  c(build = t_build, run_hybrid_render(b, file))
 }
 
 # ---- Profile summaries -----------------------------------------------------
@@ -347,9 +395,11 @@ local({
     geom_sf(data = sf_regions(10, 1e3, 3577), fill = NA, inherit.aes = FALSE) + coord_sf(crs = 3577)
   run_ggplot2(p, file)
   run_alot(p, file)
+  p <- ggplot(raster_grid(50), aes(x, y, fill = suitability)) + geom_raster() + coord_fixed()
+  run_hybrid(p, file)
+  run_alot(p, file)
 })
 
-paths <- c("ggplot2", "alot")
 stages <- c("build", "decide", "gtable", "draw", "encode")
 summary <- list()
 proj_rows <- list()
@@ -359,13 +409,17 @@ for (name in names(cases)) {
   progress(name, ": generating")
   set.seed(42)
   p <- case$plot()
+  # The hybrid path runs where the hybrid tier draws a layer in Rust.
+  set.seed(1)
+  hybrid <- withr::with_options(list(alot.full_tier = FALSE), alot_tier(quiet(alot_build(p))) == "hybrid")
+  paths <- c("ggplot2", if (hybrid) "hybrid", "alot")
   times <- list()
   for (i in seq_len(reps)) {
     for (path in paths) {
       progress(name, " rep ", i, ": ", path)
       file <- file.path(out_dir, paste0("spatial-", name, "-", path, ".png"))
       gc(FALSE)
-      t <- if (path == "ggplot2") run_ggplot2(p, file) else run_alot(p, file)
+      t <- switch(path, ggplot2 = run_ggplot2(p, file), hybrid = run_hybrid(p, file), alot = run_alot(p, file))
       times[[path]] <- rbind(times[[path]], t)
     }
   }
@@ -374,15 +428,19 @@ for (name in names(cases)) {
     t <- cbind(t, total = t[, "build"] + t[, "render"])
     1000 * apply(t, 2, stats::median)
   })
-  cat(sprintf("### %s (%d rep%s)\n\n", name, reps, if (reps > 1) "s" else ""))
+  set.seed(1)
+  tier <- alot_tier(quiet(alot_build(p)))
+  cat(sprintf("### %s (%d rep%s; alot's tier: %s)\n\n", name, reps, if (reps > 1) "s" else "", tier))
+  hyb <- med$hybrid %||% stats::setNames(rep(NA_real_, length(med$ggplot2)), names(med$ggplot2))
   md_table(data.frame(
-    stage = names(med$ggplot2), ggplot2 = unname(med$ggplot2), alot = unname(med$alot),
-    speedup = paste0(formatC(med$ggplot2 / pmax(med$alot, 1e-3), format = "f", digits = 2), "x")
+    stage = names(med$ggplot2), ggplot2 = unname(med$ggplot2), hybrid = unname(hyb), alot = unname(med$alot),
+    speedup = ifelse(med$alot > 0, paste0(formatC(med$ggplot2 / pmax(med$alot, 1e-3), format = "f", digits = 2), "x"), "-")
   ))
   summary[[name]] <- data.frame(
-    case = name,
+    case = name, tier = tier,
     ggplot2_build = med$ggplot2[["build"]], ggplot2_render = med$ggplot2[["render"]],
     ggplot2_total = med$ggplot2[["total"]],
+    hybrid_render = hyb[["render"]], hybrid_total = hyb[["total"]],
     alot_build = med$alot[["build"]], alot_render = med$alot[["render"]], alot_total = med$alot[["total"]],
     speedup = paste0(formatC(med$ggplot2[["total"]] / med$alot[["total"]], format = "f", digits = 2), "x")
   )

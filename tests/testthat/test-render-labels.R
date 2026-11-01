@@ -3,7 +3,8 @@
 # and annotate() layers of the geoms the full tier draws, drawn by
 # alot-core's page drawers against ggplot2 on ragg. They have no hybrid
 # drawer for labels: in the hybrid tier ggplot2 draws them.
-# geom_raster(), polygon subgroups and unusual label options decline.
+# Polygon subgroups and unusual label options decline (geom_raster() is in
+# test-render-raster.R).
 
 skip_on_cran()
 library(ggplot2)
@@ -90,7 +91,7 @@ test_that("labels, polygons and rasters the full tier doesn't draw decline to an
   na <- poly
   na$x[2] <- NA
   expect_match(reason(ggplot(na, aes(x, y, group = g)) + geom_polygon()), "NA in x or y")
-  expect_match(reason(ggplot(faithfuld, aes(waiting, eruptions, fill = density)) + geom_raster()), "layers other than")
+  expect_match(reason(ggplot(faithfuld, aes(waiting, eruptions, fill = density)) + geom_raster(interpolate = TRUE)), "interpolate")
   cov <- alot_render_coverage(lp + geom_label())
   expect_identical(cov$tier, "full")
   cov <- alot_render_coverage(pp + geom_polygon())

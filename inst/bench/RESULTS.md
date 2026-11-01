@@ -1698,3 +1698,65 @@ reprojecting workloads.**
   the S1.1 render; ≥5× (≤ 680 ms) again depends on the build overheads.
   SPATIAL.md doesn't set a raster-only end-to-end target; S1.1 keeps its
   draw-step target.
+
+## S1.1: geom_raster() drawer (2026-11-01)
+
+`inst/bench/spatial.R` (`ALOT_BENCH_CASES=raster_500,raster_1000,raster_2000
+ALOT_BENCH_PROFILE=false`; raster_2000 rerun with `ALOT_BENCH_REPS=3`),
+release build, same machine and page (7 × 7 in at 300 dpi) as S0.2. The
+raster cases now go to the **full tier**. `run_alot()` times the tier
+`alot_png()` picks: for the full tier "decide" is `render_ir()` +
+`page_spec()`, "draw" is `rs_render_page()` (layout, display list,
+building the colour matrix, band rasterising into a nativeRaster) and
+"encode" is `write_png()`. The new hybrid path (`run_hybrid()`,
+`options(alot.full_tier = FALSE)`) times `hybrid_gtable()`, grid drawing
+(the raster as a lazy Rust grob) and capture + `write_png()`. Medians of 3
+interleaved reps, ms:
+
+| case | stage | ggplot2 + ragg | hybrid | full |
+|---|---|---:|---:|---:|
+| raster_500 | build | 102 | 58 | 58 |
+| | gtable / decide | 86 | 57 | 21 |
+| | draw | 126 | 44 | **20** |
+| | encode | 122 | 27 | 17 |
+| | **total** | **437** | 186 | **118** (3.7×) |
+| raster_1000 | build | 677 | 149 | 139 |
+| | gtable / decide | 376 | 54 | 22 |
+| | draw | 135 | 52 | **14** (9.6×) |
+| | encode | 247 | 22 | 19 |
+| | **total** | **1,420** | 280 | **193** (7.4×) |
+| raster_2000 | build | 1,938 | 467 | 479 |
+| | gtable / decide | 836 | 63 | 29 |
+| | draw | 170 | 65 | **29** (5.9×) |
+| | encode | 217 | 24 | 22 |
+| | **total** | **3,031** | 620 | **552** (5.5×) |
+
+A single-rep run of raster_2000 gave draw 20 ms (8.5×) and total 555 ms.
+**Targets met:** 1000² and 2000² draw faster than ragg, and the 2000²
+draw step is ≥5× faster than ragg's (5.9–8.5×). The margin over 5× is
+mostly not raster work. Timed inside `rs_render_page()` at 2000², reading
+the spec and building the display list, including the 2.0e6-row colour
+matrix, takes about 3.5 ms. Rasterising the page takes about 6 ms. The
+2100² nativeRaster R allocates for the result takes 1–14 ms, because
+garbage collection often lands there. `alot_png()` streams the bands to
+the PNG (`rs_render_page_png()`) and allocates no nativeRaster:
+`render_full(file)` takes 88–94 ms for the whole render at 2000²
+(decide + draw + encode, plus `render_full()`'s missing-row check).
+
+Where the matrix time went: building it took 18–28 ms at first (two
+`resolution()` hash passes, sequential min/max, fresh 16 MB buffers). The
+current version takes about 8 ms in Rust. It uses one parallel pass for
+both columns' ranges and distinct values, computes the matrix size from
+the range (the position mapping is monotone), and reuses the matrix and
+cell-index buffers from a pool, because a fresh buffer's page faults cost
+more than filling it. The scatter stays sequential, so a later row wins a
+shared cell as in R. R's `resolution()` on x and y alone takes 80 ms at
+2e6 rows, which is why it is ported (checked against upstream through the
+render tests, including integer, uneven and shared positions). The
+decide stage includes `rs_raster_check()` (finite positions, colours that
+parse, alpha 0 or 1): about 7 ms at 2e6 rows.
+
+The end-to-end raster_2000 total is now 5.5×, with alot's build (≈480 ms)
+as 87% of it. The build overheads listed under S0.2's verdict for S1.2
+are the next lever.
+
