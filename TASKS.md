@@ -18,7 +18,8 @@ deferred (in their heading or their section's) or "ignore for later" are not
 in it. Each task still follows its own entry and its phase's shared
 criteria.
 
-1. **Phase 1:** T0.7 → T5.4 → T5.5 → T6.2 → T6.1 → T6.3 (opened by T6.1).
+1. **Phase 1:** T0.7 → T5.4 → T5.5 → T6.2 → T6.1 → T6.3 (opened by T6.1)
+   → T5.6.
 2. **Phase 2:** in "Suggested order (Phase 2)": R0.1, R0.2 → R0.3, R0.4 →
    R1.1 → R1.2–R1.5 → R2.1, R3.1 → R3.2, R2.2, R4.1 → R4.2 → R5.1 → R5.2 →
    R5.3 → R6.1–R6.6 → R7.1 → R7.2 → R7.3.
@@ -415,6 +416,40 @@ All stat kernels use the grouped driver (T0.4) and register under
   don't treat them as a target.
 - **Done when:** the point cases meet the targets above, recorded in
   `RESULTS.md`.
+
+### T5.6 Facet variables without per-row `factor()`
+- **Depends:** T5.1
+- **Touches:** `R/kernels-facet.R`, `tests/testthat/test-facet-map.R` (or
+  the existing facet test file), `inst/bench/RESULTS.md`
+- **Why:** `kernel_facet_map_data` turns each non-factor facet column into
+  a factor with `gg_as_unordered_factor()` (ggplot2's
+  `as_unordered_factor()`, R/utilities.R), i.e. `factor()` over every row.
+  `factor()` calls `as.character()` on all n values to match them to the
+  levels. On a 9.8e6-row `geom_raster()` + `facet_wrap(~c)` (10 distinct
+  doubles in `c`), that is 4.3 s of `layout_setup`'s 4.6 s. The Rust panel
+  assignment (`rs_facet_panels`) takes about 0.2 s.
+- **Do:** Build the same factor while formatting only the unique values
+  (O(k) work stays in R; AGENTS.md):
+  `u <- unique(x); lab <- as.character(u); lev <- unique(lab[order(u)])`
+  (levels as `factor()` picks them: sorted values, `NA` dropped), then
+  codes `match(lab, lev)[match(x, u)]`, with `NA` where `factor()` gives
+  `NA`. Set the levels and class as `as_unordered_factor()` does. Apply it
+  to the data columns and the layout columns at
+  `R/kernels-facet.R:228-242`. `match(x, u)` on doubles is hashed. If
+  profiling shows it matters, it can move to Rust. Check whether
+  `facet_combine_vars` / `rs_facet_distinct_rows` or the grid layout
+  kernel have the same per-row `factor()` pattern, and fix them the same
+  way.
+- **Exactness:** the result must be `identical()` to `factor(x)` with the
+  ordered class dropped. Cover `NA`, `NaN`, `-0` vs `0`, values that differ
+  but format the same (e.g. `0.1 + 0.2` and `0.3` under `as.character()`),
+  `Inf`, integer, double, character (locale sort stays in R), logical and
+  Date columns, and a factor input (which must pass through untouched).
+  Fall back to `gg_as_unordered_factor()` for any other class.
+- **Done when:** `expect_build_equal()` passes on facet_wrap and facet_grid
+  plots with those columns, the facet corpus files pass, and the
+  9.8e6-row case above drops `layout_setup` to well under 0.5 s (record it
+  in `RESULTS.md`).
 
 ---
 
