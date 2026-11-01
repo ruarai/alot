@@ -85,7 +85,10 @@ Settled on 2026-10-31:
   `st_graticule()` run in R through sf, as ggplot2 calls them. Rust only
   does work after projection: bounding boxes, rescaling to the panel,
   flattening to device coordinates, drawing. alot never ports a PROJ
-  projection.
+  projection. One exception, decided 2026-11-01 after S0.2: the
+  `CoordSf$setup_data` mirror skips `st_transform()` when the layer is
+  already in the coord's crs, because that call is a 100–200 ms no-op
+  (S2.1).
 - **Geometry input:** `alot-r` walks the sfc list directly, borrowing each
   coordinate matrix as `&[f64]`, and builds a flat struct in `alot-core`
   (coordinates plus ring, part and feature offsets, and the geometry

@@ -1353,7 +1353,7 @@ ones. sf is in Suggests: every sf test and corpus file uses
   too. Draw step (release, 7 × 7 in at 300 dpi): 1000² 14 vs 135 ms
   (9.6×), 2000² 20–29 vs 170 ms (5.9–8.5×; RESULTS.md "S1.1").
 
-### S1.2 Raster build steps (conditional)
+### S1.2 Raster build steps (conditional) — dropped
 - **Depends:** S0.2
 - **Touches:** `R/kernels-geom.R` (new), `alot-core/src/geom/` (new)
 - **Do:** Only if S0.2's profile shows a build step of the raster cases
@@ -1367,6 +1367,11 @@ ones. sf is in Suggests: every sf test and corpus file uses
   1e6 rows, about 1% end to end. Re-scoping to the existing kernels'
   overhead at 2e6 rows (`npscales_map`, position train and map) is the
   alternative; see RESULTS.md "S0.2: spatial baseline".
+- **Decision (2026-11-01):** dropped. The overhead of the existing build
+  kernels on the raster cases (`npscales_map`'s per-row hex strings,
+  R-side time in position training and mapping) moves to S4.1's
+  performance pass, because the north-star target is what makes it worth
+  cutting.
 
 ## S2 sf build
 
@@ -1382,11 +1387,17 @@ ones. sf is in Suggests: every sf test and corpus file uses
   one. `st_transform()`, `sf_project()` and `st_graticule()` are still
   called through sf. Add `gg_*` wrappers for the unexported helpers
   (`sf_transform_xy`, `calc_limits_bbox`, `sf_breaks`, ...).
+  **Same-CRS skip (decided 2026-11-01):** in the `CoordSf$setup_data`
+  mirror, skip `st_transform()` when the layer's crs equals the coord's
+  crs. S0.2 measured 100–200 ms for this no-op call at 1e6 vertices.
+  Test that the sfc's coordinates, bbox, crs, precision, `n_empty` and
+  sfg classes equal ggplot2's, and fall back to calling sf whenever
+  equality of the crs objects isn't certain.
 - **Done when:** `expect_build_equal()` passes on the sf corpus plots and
   on the targeted cases in SPATIAL.md's Verification section, and each
   mirrored method has a snapshot.
 
-### S2.2 sf build kernels (conditional)
+### S2.2 sf build kernels (conditional) — dropped
 - **Depends:** S2.1, S0.2
 - **Touches:** `R/kernels-sf.R` (new), `alot-core/src/sf/` (new),
   `alot-r/src/sf.rs` (new)
@@ -1396,6 +1407,7 @@ ones. sf is in Suggests: every sf test and corpus file uses
   SPATIAL.md lands here if S2.2 needs it, otherwise in S3.1. Any other
   candidate fails the 1.25× rule and is recorded in RESULTS.md.
 - **Done when:** the Phase 1 criteria hold for each kept kernel.
+- **Decision (2026-11-01):** dropped, per the S0.2 verdict below.
 - **S0.2 verdict:** drop. The per-feature steps are about 2% end to end at 1e4
   features. The build is dominated by `st_transform()` in
   `CoordSf$setup_data`, which stays in sf (see RESULTS.md, "S0.2: spatial
@@ -1427,6 +1439,14 @@ ones. sf is in Suggests: every sf test and corpus file uses
   accept `CoordSf` panels for these lazy grobs.
 - **Declines:** `default_crs` set, legend-only layers, linetypes or
   arrows the path drawer declines elsewhere.
+- **Also fix (found in S0.1):** with `coord_sf()` and `breaks = NULL` on
+  both axes, `ir_scales()` calls the CoordSf view scale's
+  `break_positions()`, which aborts with "Not implemented.". Then
+  `alot_render_coverage()` errors and `alot_png()` warns before falling
+  back. Affected corpus plots: test-coord_sf "graticule lines and axes can
+  be removed via scales" #1 and "coord_sf() can render with empty
+  graticules" #1. Widen `tools/render-corpus.R` to admit CoordSf and
+  GeomSf plots so the render corpus covers them.
 - **Done when:** the sf polygon corpus plots render through the hybrid
   tier and match ragg, and the 1e6-vertex outline and choropleth cases
   draw faster than ragg.
@@ -1450,7 +1470,9 @@ ones. sf is in Suggests: every sf test and corpus file uses
   `default_crs` is NULL) as a hybrid lazy grob, with raster and sf layers
   in the same panels and fixed-scale facets. Do a performance pass on the
   north star and its faceted variant: IR time, per-panel overhead,
-  threads, buffer reuse.
+  threads, buffer reuse. This pass also takes on the raster build
+  overhead that S1.2 left (see S1.2's decision). After S1.1, alot's build
+  is about 87% (≈480 ms) of raster_2000's end-to-end time.
 - **Done when:** both north-star cases render through the hybrid tier,
   match ragg, and meet SPATIAL.md's target (≥5× end to end, or the target
   revised in S0.2).
