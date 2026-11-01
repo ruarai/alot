@@ -106,12 +106,33 @@ fn prepare(p: &PathSpec) -> Prepared {
     Prepared { fill, stroke, bbox: b }
 }
 
+/// Prepares paths in parallel, in chunks of about equal vertex counts (at
+/// least 4096 vertices each, so small batches stay on one thread and a few
+/// long paths still spread over threads).
+fn prepare_all(specs: &[PathSpec]) -> Vec<Prepared> {
+    let verts = |s: &PathSpec| s.rings.iter().map(Vec::len).sum::<usize>();
+    let total: usize = specs.iter().map(verts).sum();
+    let target = total.div_ceil(raster::default_threads()).max(4096);
+    let mut chunks = Vec::new();
+    let (mut start, mut acc) = (0, 0);
+    for (i, s) in specs.iter().enumerate() {
+        acc += verts(s);
+        if acc >= target {
+            chunks.push(&specs[start..=i]);
+            (start, acc) = (i + 1, 0);
+        }
+    }
+    if start < specs.len() {
+        chunks.push(&specs[start..]);
+    }
+    raster::par_map(chunks, |c| c.iter().map(prepare).collect::<Vec<_>>()).into_iter().flatten().collect()
+}
+
 impl PathBatch {
     /// Prepares the paths' outlines in parallel. Rings with a non-finite
     /// vertex are dropped (callers split polylines at NA, as grid does).
     pub fn new(specs: &[PathSpec]) -> Self {
-        let chunk = specs.len().div_ceil(raster::default_threads()).max(64);
-        let paths: Vec<Prepared> = raster::par_map(specs.chunks(chunk), |c| c.iter().map(prepare).collect::<Vec<_>>()).into_iter().flatten().collect();
+        let paths = prepare_all(specs);
         let rows = paths.iter().filter_map(Self::span).fold((i64::MAX, i64::MIN), |(lo, hi), (a, b)| (lo.min(a), hi.max(b)));
         let rows = if rows.0 > rows.1 { (0, 0) } else { rows };
         PathBatch { paths, rows }

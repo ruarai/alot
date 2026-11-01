@@ -1,10 +1,10 @@
 ---
 id: TASK-72
 title: S3.2 `geom_sf()` polygons
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-01T02:56:00Z'
-updated_date: '2026-11-01T02:56:00Z'
+updated_date: '2026-11-01T04:35:00Z'
 labels:
   - sf-render
 milestone: m-2
@@ -41,5 +41,11 @@ ordinal: 600
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 the sf polygon corpus plots render through the hybrid tier and match ragg, and the 1e6-vertex outline and choropleth cases draw faster than ragg.
+- [x] #1 the sf polygon corpus plots render through the hybrid tier and match ragg, and the 1e6-vertex outline and choropleth cases draw faster than ragg.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+geom_sf() POLYGON/MULTIPOLYGON layers under coord_sf() draw in Rust in the hybrid tier. R/render-sf.R mirrors Layer$draw_geom, Geom$draw_layer and GeomSf$draw_panel's gpar. alot-core render/sf.rs draws st_as_grob()'s even-odd paths, one per polygon part, fill then stroke, in data order. It uses S3.1's reader and rescale01(). Declines: default_crs, clip off, non-sfc (legend-only) geometry, AsIs x/y, non-polygon or unreadable features, arrows, pattern fills, unsupported line styles. Fixed ir_scales() for coord_sf() with an empty graticule. The render corpus now admits GeomSf/CoordSf (44 plots added). Draw is 5.5-8.4x faster than ragg at 1e6 vertices. Bbox batching was measured with no gain and dropped (RESULTS.md).
+<!-- SECTION:FINAL_SUMMARY:END -->

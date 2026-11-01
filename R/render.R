@@ -267,6 +267,12 @@ hybrid_gtable <- function(data) {
 }
 
 hybrid_layer <- function(layer) {
+  # geom_sf() under coord_sf() (S3.2, R/render-sf.R).
+  if (!is.null(sf_kind(layer$geom))) {
+    return(ggplot2::ggproto(NULL, layer,
+      draw_geom = function(self, data, layout) draw_sf_layer(data, layout, layer)
+    ))
+  }
   draw <- switch(hybrid_kind(layer) %||% "",
     points = draw_points_layer,
     rects = draw_rects_layer,
@@ -307,6 +313,10 @@ hybrid_marks_kind <- function(layer) {
 # `reason` ggplot2 draws it. hybrid_layer() picks the drawer the same way,
 # and each drawer makes the same check, so coverage and drawing agree.
 hybrid_choice <- function(layer, data, layout) {
+  if (!is.null(sf_kind(layer$geom))) {
+    reason <- sf_decline(layer, data, layout)
+    return(if (is.null(reason)) list(drawer = "sf") else list(reason = reason))
+  }
   kind <- hybrid_kind(layer)
   if (!is.null(kind) && hybrid_cartesian(layout$coord)) {
     reason <- hybrid_decline(layer, data, layout, kind)
@@ -405,6 +415,10 @@ full_kind <- function(layer) {
 # values first (ggplot2 R/layer.R), and GeomPoint$draw_panel() translates
 # shape names (R/geom-point.R).
 hybrid_data <- function(layer, data) {
+  # GeomSf$handle_na(), as draw_sf_layer() calls it.
+  if (!is.null(sf_kind(layer$geom)) && !gg_empty(data)) {
+    return(layer$geom$handle_na(data, layer$computed_geom_params))
+  }
   kind <- full_kind(layer)
   if (is.null(kind) || gg_empty(data)) {
     return(data)
@@ -1015,7 +1029,7 @@ drawDetails.alot_hybrid_layer <- function(x, recording) {
   tr <- grid::current.transform()
   x_range <- linear_range(x$panel_params$x)
   y_range <- linear_range(x$panel_params$y)
-  linear <- identical(x$kind, "marks") || (!is.null(x_range) && !is.null(y_range))
+  linear <- x$kind %in% c("marks", "sf") || (!is.null(x_range) && !is.null(y_range))
   if (is.null(res) || tr[1, 2] != 0 || tr[2, 1] != 0 || !linear) {
     return(grid::grid.draw(hybrid_fallback_grob(x)))
   }
@@ -1058,7 +1072,8 @@ drawDetails.alot_hybrid_layer <- function(x, recording) {
     marks = {
       specs <- marks_specs(s, res)
       if (!is.null(specs)) rs_render_panel_layers(specs, s$n_panels, x$panel, rect, dims, render_threads())
-    }
+    },
+    sf = render_sf_panel(x, rect, dims, res)
   )
   if (is.null(img)) {
     return(grid::grid.draw(hybrid_fallback_grob(x)))
@@ -1100,7 +1115,8 @@ hybrid_fallback_grob <- function(x) {
       linemitre = s$params$linemitre %||% 10
     ),
     # Geom$draw_layer()'s call for the panel (ggplot2 R/geom-.R).
-    marks = {
+    marks = ,
+    sf = {
       params <- s$params[intersect(names(s$params), s$geom$parameters())]
       rlang::inject(s$geom$draw_panel(data, x$panel_params, s$coord, !!!params))
     }

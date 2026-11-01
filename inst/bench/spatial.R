@@ -10,10 +10,12 @@
 #   ggplot2  ggplot_build(); then on ragg::agg_png(): ggplot_gtable(), grid
 #            drawing, and dev.off(), which writes the PNG (encode).
 #   hybrid   alot_build(), then the hybrid tier (run_hybrid()), for cases
-#            where it draws a layer in Rust (S1.1: the rasters).
+#            where it draws a layer in Rust (S1.1: the rasters; S3.2: sf
+#            polygons).
 #   alot     what alot_png() does: alot_build(), then the tier it picks
-#            (run_alot()): the full tier for the rasters since S1.1; the
-#            ggplot2 tier, after the full tier's attempt, for the rest.
+#            (run_alot()): the full tier for the rasters since S1.1, the
+#            hybrid tier for sf polygons since S3.2; the ggplot2 tier,
+#            after the full tier's attempt, for the rest.
 # The device is opened before the gtable is built, as print.ggplot() does.
 #
 # Each case also gets, unless ALOT_BENCH_PROFILE=false:
@@ -107,8 +109,12 @@ raster_plot <- function(n) {
   }
 }
 
-sf_plot <- function(n, crs) {
+sf_plot <- function(n, crs, outline = FALSE) {
   function() {
+    if (outline) {
+      # The north star's sf layer alone (S3.2).
+      return(ggplot(sf_regions(n, crs = crs)) + geom_sf(fill = NA, colour = "grey20"))
+    }
     ggplot(sf_regions(n, crs = crs)) +
       geom_sf(aes(fill = value), colour = "grey20")
   }
@@ -141,6 +147,7 @@ spatial_cases <- list(
   sf_1e2_4326 = list(plot = sf_plot(1e2, 4326), reps = 3L),
   sf_1e3_4326 = list(plot = sf_plot(1e3, 4326), reps = 3L),
   sf_1e4_4326 = list(plot = sf_plot(1e4, 4326), reps = 3L),
+  sf_1e3_3577_outline = list(plot = sf_plot(1e3, 3577, outline = TRUE), reps = 3L),
   # 1e3 features in EPSG:4326 drawn in EPSG:3577: CoordSf$setup_data
   # reprojects all 1e6 vertices in the build.
   sf_1e3_reproject = list(

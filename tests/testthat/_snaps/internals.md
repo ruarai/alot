@@ -7273,3 +7273,449 @@
           lst
       }
 
+# upstream sf drawing matches what the sf polygon drawer mirrors
+
+    Code
+      print(body_of(ggplot2::GeomSf, "draw_panel"))
+    Output
+      {
+          if (!inherits(coord, "CoordSf")) {
+              cli::cli_abort("{.fn {snake_class(self)}} can only be used with {.fn coord_sf}.")
+          }
+          data$shape <- translate_shape_string(data$shape)
+          data <- coord$transform(data, panel_params)
+          type <- sf_types[sf::st_geometry_type(data$geometry)]
+          is_point <- type == "point"
+          is_line <- type == "line"
+          is_collection <- type == "collection"
+          fill <- fill_alpha(data$fill %||% rep(NA, nrow(data)), data$alpha)
+          fill[is_line] <- arrow.fill %||% fill[is_line]
+          colour <- data$colour
+          colour[is_point | is_line] <- alpha(colour[is_point | is_line], 
+              data$alpha[is_point | is_line])
+          point_size <- data$size
+          point_size[!(is_point | is_collection)] <- data$linewidth[!(is_point | 
+              is_collection)]
+          stroke <- (data$stroke %||% rep(0.5, nrow(data))) * .stroke/2
+          font_size <- point_size * .pt + stroke
+          linewidth <- data$linewidth * .pt
+          linewidth[is_point] <- stroke[is_point]
+          gp <- gpar(col = colour, fill = fill, fontsize = font_size, 
+              lwd = linewidth, lty = data$linetype, lineend = lineend, 
+              linejoin = linejoin, linemitre = linemitre)
+          sf::st_as_grob(data$geometry, pch = data$shape, gp = gp, 
+              arrow = arrow)
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::GeomSf, "handle_na"))
+    Output
+      {
+          remove <- rep(FALSE, nrow(data))
+          types <- sf_types[sf::st_geometry_type(data$geometry)]
+          types <- split(seq_along(remove), types)
+          get_missing <- function(geom) {
+              detect_missing(data, c(geom$required_aes, geom$non_missing_aes))
+          }
+          remove[types$point] <- get_missing(GeomPoint)[types$point]
+          remove[types$line] <- get_missing(GeomPath)[types$line]
+          remove[types$other] <- get_missing(GeomPolygon)[types$other]
+          remove <- remove | get_missing(self)
+          if (any(remove)) {
+              data <- vec_slice(data, !remove)
+              if (!isTRUE(params$na.rm)) {
+                  cli::cli_warn("Removed {sum(remove)} row{?s} containing missing values or values \\\n          outside the scale range ({.fn {snake_class(self)}}).")
+              }
+          }
+          data
+      }
+
+---
+
+    Code
+      print(body_of(ggplot2::CoordSf, "transform"))
+    Output
+      {
+          if (is_transform_immune(data, snake_class(self))) {
+              return(data)
+          }
+          source_crs <- panel_params$default_crs
+          target_crs <- panel_params$crs
+          reverse <- panel_params$reverse %||% "none"
+          x_range <- switch(reverse, xy = , x = rev, identity)(panel_params$x_range)
+          y_range <- switch(reverse, xy = , y = rev, identity)(panel_params$y_range)
+          data[[geom_column(data)]] <- sf_rescale01(data[[geom_column(data)]], 
+              x_range, y_range)
+          data <- transform_position(sf_transform_xy(data, target_crs, 
+              source_crs), function(x) rescale(x, from = x_range), 
+              function(x) rescale(x, from = y_range))
+          transform_position(data, squish_infinite, squish_infinite)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("sf_rescale01", "ggplot2")))
+    Output
+      {
+          if (is.null(x)) {
+              return(x)
+          }
+          mult <- cbind(1, 1)
+          if (isTRUE(x_range[1] > x_range[2])) {
+              x_range <- sort(x_range)
+              mult[1] <- -1
+          }
+          if (isTRUE(y_range[1] > y_range[2])) {
+              y_range <- sort(y_range)
+              mult[2] <- -1
+          }
+          x <- sf::st_normalize(x, c(x_range[1], y_range[1], x_range[2], 
+              y_range[2]))
+          if (all(mult == 1)) {
+              return(x)
+          }
+          x * mult + pmax(-mult, 0)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("fill_alpha", "ggplot2")))
+    Output
+      {
+          if (!is.list(fill)) {
+              return(alpha(fill, alpha))
+          }
+          if (is_pattern(fill) || any(vapply(fill, is_pattern, logical(1)))) {
+              check_device("patterns", action = "warn")
+              fill <- pattern_alpha(fill, alpha)
+              return(fill)
+          }
+          else {
+              msg <- paste0("{.field fill} must be a vector of colours or list of ", 
+                  "{.cls GridPattern} objects.")
+              fill <- try_fetch(Map(alpha, colour = fill, alpha = alpha), 
+                  error = function(cnd) {
+                      cli::cli_abort(msg, call = expr(fill_alpha()))
+                  })
+              if (!all(lengths(fill) == 1)) {
+                  cli::cli_abort(msg)
+              }
+              return(unlist(fill))
+          }
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace("view_scales_from_graticule", "ggplot2")))
+    Output
+      {
+          if (empty(graticule)) {
+              return(ggproto(NULL, ViewScale))
+          }
+          position <- switch(arg_match0(aesthetic, c("x", "x.sec", 
+              "y", "y.sec")), x = "bottom", x.sec = "top", y = "left", 
+              y.sec = "right")
+          axis <- gsub("\\.sec$", "", aesthetic)
+          if (axis == "x") {
+              orth <- "y"
+              thres <- bbox[c(2, 4)]
+              limits <- bbox[c(1, 3)]
+          }
+          else {
+              orth <- "x"
+              thres <- bbox[c(1, 3)]
+              limits <- bbox[c(2, 4)]
+          }
+          axis_start <- paste0(axis, "_start")
+          axis_end <- paste0(axis, "_end")
+          orth_start <- paste0(orth, "_start")
+          orth_end <- paste0(orth, "_end")
+          if (position %in% c("top", "right")) {
+              thres <- thres[1] + 0.999 * diff(thres)
+              accept_start <- graticule[[orth_start]] > thres
+              accept_end <- graticule[[orth_end]] > thres
+          }
+          else {
+              thres <- thres[1] + 0.001 * diff(thres)
+              accept_start <- graticule[[orth_start]] < thres
+              accept_end <- graticule[[orth_end]] < thres
+          }
+          if (!any(accept_start | accept_end)) {
+              eps <- sqrt(.Machine$double.xmin)
+              subtract <- switch(position, top = , bottom = 90, 0)
+              straight <- abs(graticule$angle_start - subtract) < eps & 
+                  abs(graticule$angle_end - subtract) < eps
+              accept_start <- straight
+          }
+          type <- graticule$type
+          idx_start <- idx_end <- integer(0)
+          idx_start <- c(idx_start, which(type == label & accept_start))
+          idx_end <- c(idx_end, which(type == label & accept_end))
+          if ("S" %in% label_graticule) {
+              idx_start <- c(idx_start, which(type == "E" & accept_start))
+          }
+          if ("N" %in% label_graticule) {
+              idx_end <- c(idx_end, which(type == "E" & accept_end))
+          }
+          if ("W" %in% label_graticule) {
+              idx_start <- c(idx_start, which(type == "N" & accept_start))
+          }
+          if ("E" %in% label_graticule) {
+              idx_end <- c(idx_end, which(type == "N" & accept_end))
+          }
+          tick_start <- vec_slice(graticule, unique0(idx_start))
+          tick_end <- vec_slice(graticule, unique0(idx_end))
+          positions <- c(field(tick_start, axis_start), field(tick_end, 
+              axis_end))
+          labels <- c(tick_start$degree_label, tick_end$degree_label)
+          ord <- order(positions)
+          positions <- positions[ord]
+          labels <- labels[ord]
+          if (scale$position != position) {
+              guide <- scale$secondary.axis$guide %||% waiver()
+              if (is_derived(guide)) {
+                  guide <- scale$guide
+              }
+          }
+          else {
+              guide <- scale$guide
+          }
+          if (length(positions) > 0) {
+              guide <- guide %|W|% "axis"
+          }
+          else {
+              guide <- guide %|W|% "none"
+          }
+          ggproto(NULL, ViewScale, scale = scale, guide = guide, position = position, 
+              aesthetics = scale$aesthetics, name = scale$name, scale_is_discrete = scale$is_discrete(), 
+              limits = limits, continuous_range = limits, breaks = positions, 
+              minor_breaks = NULL, labels = labels, get_labels = function(self, 
+                  breaks = self$get_breaks()) {
+                  self$labels
+              })
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          old_length <- length(x)
+          x <- st_cast_sfc_default(x)
+          ids <- attr(x, "ids")
+          if (!is.null(ids)) {
+              if (length(pch) > 1) {
+                  pch <- rep(rep_len(pch, old_length), ids)
+              }
+              if (length(size) > 1) {
+                  size <- rep(rep_len(size, old_length), ids)
+              }
+              if (length(arrow) > 1) {
+                  arrow <- rep(rep_len(arrow, old_length), ids)
+              }
+              for (par in names(gp)) {
+                  if (length(gp[[par]]) > 1) {
+                      gp[[par]] <- rep(rep_len(gp[[par]], old_length), 
+                        ids)
+                  }
+              }
+          }
+          if (class(x)[1] %in% c("sfc_MULTIPOINT", "sfc_MULTILINESTRING", 
+              "sfc_MULTIPOLYGON")) 
+              st_as_grob(x, pch = pch, size = size, arrow = arrow, 
+                  gp = gp, ...)
+          else scalar_grobs(x, pch, size, arrow, gp, ...)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (utils::packageVersion("grid") < "3.6") {
+              return(scalar_grobs(x, rule = rule, default.units = default.units, 
+                  name = name, gp = gp, vp = vp, ...))
+          }
+          if (any(is_e <- st_is_empty(x))) {
+              gp = gp[!is_e]
+              x = x[!is_e]
+          }
+          if (length(x)) {
+              x <- unclass(x)
+              n_poly <- vapply(x, length, integer(1))
+              x <- unlist(x, recursive = FALSE)
+              n_points <- vapply(x, nrow, integer(1))
+              n_paths <- tapply(n_points, rep(seq_along(n_poly), n_poly), 
+                  sum)
+              x <- do.call(rbind, x)
+              pathGrob(x[, 1], x[, 2], id.lengths = n_points, pathId.lengths = n_paths, 
+                  rule = rule, default.units = default.units, name = name, 
+                  gp = gp, vp = vp)
+          }
+          else nullGrob()
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (utils::packageVersion("grid") < "3.6") {
+              return(scalar_grobs(x, rule = rule, default.units = default.units, 
+                  name = name, gp = gp, vp = vp, ...))
+          }
+          if (any(is_e <- st_is_empty(x))) {
+              gp = gp[!is_e]
+              x = x[!is_e]
+          }
+          if (length(x)) {
+              x <- unclass(x)
+              n_poly <- vapply(x, length, integer(1))
+              gp <- expand_gp(gp, n_poly)
+              x <- unlist(x, recursive = FALSE)
+              n_poly <- vapply(x, length, integer(1))
+              x <- unlist(x, recursive = FALSE)
+              n_points <- vapply(x, nrow, integer(1))
+              n_paths <- tapply(n_points, rep(seq_along(n_poly), n_poly), 
+                  sum)
+              x <- do.call(rbind, x)
+              pathGrob(x[, 1], x[, 2], id.lengths = n_points, pathId.lengths = n_paths, 
+                  rule = rule, default.units = default.units, name = name, 
+                  gp = gp, vp = vp)
+          }
+          else nullGrob()
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (length(x) == 0) 
+              nullGrob()
+          else {
+              get_x = function(x) unlist(sapply(x, function(y) y[, 
+                  1]))
+              get_y = function(x) unlist(sapply(x, function(y) y[, 
+                  2]))
+              pathGrob(get_x(x), get_y(x), id.lengths = vapply(x, nrow, 
+                  0L), default.units = default.units, rule = rule, 
+                  name = name, gp = gp, vp = vp)
+          }
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (length(x) == 0) 
+              nullGrob()
+          else {
+              get_x = function(x) unlist(sapply(x, function(y) sapply(y, 
+                  function(z) z[, 1])))
+              get_y = function(x) unlist(sapply(x, function(y) sapply(y, 
+                  function(z) z[, 2])))
+              get_l = function(x) unlist(sapply(x, function(y) vapply(y, 
+                  nrow, 0L)))
+              pathGrob(get_x(x), get_y(x), id.lengths = get_l(x), default.units = default.units, 
+                  rule = rule, name = name, gp = gp, vp = vp)
+          }
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (length(x) == 0) 
+              return(x)
+          if (!identical(unique(vapply(x, function(w) class(w)[3L], 
+              "")), "sfg")) 
+              stop("list item(s) not of class sfg")
+          a <- attributes(x)
+          ids = NULL
+          cls = unique(vapply(x, function(x) class(x)[2L], ""))
+          if (length(cls) > 1) {
+              if (all(cls %in% c("POINT", "MULTIPOINT"))) {
+                  x <- lapply(x, function(x) if (inherits(x, "POINT")) 
+                      POINT2MULTIPOINT(x)
+                  else x)
+                  class(x) <- c("sfc_MULTIPOINT", "sfc")
+              }
+              else if (all(cls %in% c("LINESTRING", "MULTILINESTRING"))) {
+                  x <- lapply(x, function(x) if (inherits(x, "LINESTRING")) 
+                      LINESTRING2MULTILINESTRING(x)
+                  else x)
+                  class(x) <- c("sfc_MULTILINESTRING", "sfc")
+              }
+              else if (all(cls %in% c("POLYGON", "MULTIPOLYGON"))) {
+                  x <- lapply(x, function(x) if (inherits(x, "POLYGON")) 
+                      POLYGON2MULTIPOLYGON(x)
+                  else x)
+                  class(x) <- c("sfc_MULTIPOLYGON", "sfc")
+              }
+          }
+          else if (cls == "GEOMETRYCOLLECTION" && all(lengths(x))) {
+              ids = get_lengths(x)
+              x <- do.call(st_sfc, unlist(x, recursive = FALSE))
+          }
+          attributes(x) <- a
+          structure(st_sfc(x), ids = ids)
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          gp <- split_gp(gp, length(x))
+          pch <- rep(pch, length.out = length(x))
+          size <- rep(size, length.out = length(x))
+          if (!is.null(arrow)) 
+              arrow <- rep(arrow, length.out = length(x))
+          do.call(gList, lapply(seq_along(x), function(i) {
+              st_as_grob(x[[i]], pch = pch[i], size = size[i], arrow = arrow[i], 
+                  gp = gp[[i]], ...)
+          }))
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          if (length(gp) == 0) 
+              return(gp)
+          gp <- unclass(gp)
+          n_gp <- vapply(gp, length, integer(1))
+          gp[n_gp > 1] <- lapply(gp[n_gp > 1], rep, n)
+          `class<-`(gp, "gpar")
+      }
+
+---
+
+    Code
+      print(body(utils::getFromNamespace(f, "sf")))
+    Output
+      {
+          gp <- unclass(gp)
+          gp <- lapply(gp, rep_len, n)
+          lapply(seq_len(n), function(i) {
+              `class<-`(lapply(gp, `[`, i), "gpar")
+          })
+      }
+

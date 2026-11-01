@@ -15,6 +15,7 @@ pub mod paths;
 pub mod png;
 pub mod points;
 pub mod raster;
+pub mod sf;
 pub mod rects;
 pub mod text;
 pub mod title;

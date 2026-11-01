@@ -3,6 +3,7 @@ pub mod grouped;
 pub mod layout;
 pub mod page;
 pub mod render;
+pub mod render_sf;
 pub mod sf;
 pub mod text;
 
@@ -774,6 +775,7 @@ extendr_module! {
     use layout;
     use page;
     use render;
+    use render_sf;
     use sf;
     use text;
     fn build_profile;

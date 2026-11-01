@@ -300,6 +300,22 @@ rs_render_rects <- function(xmin, xmax, ymin, ymax, rows, x_range, y_range, rect
 #' @noRd
 rs_render_paths <- function(x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads) .Call(wrap__render_paths, x, y, rows, path, ring, colour, fill, lwd, lty, style, mitre, x_range, y_range, rect, dims, res, threads)
 
+#' Renders one panel of a `geom_sf()` layer of POLYGON and MULTIPOLYGON
+#' features to a nativeRaster of `dims` (width, height) pixels, as
+#' `GeomSf$draw_panel` draws them on ragg. `geometry` holds the panel's
+#' features in data order (an sfc, or the list of its sfgs); `colour`,
+#' `fill` (from `rs_point_colours()`), `lwd` (grid's lwd, converted at
+#' `res` pixels per inch) and `lty` (R's packed line type, 0 solid) have
+#' one entry per feature. `style` is (lineend, linejoin): lineend 0 round,
+#' 1 butt, 2 square; linejoin 0 round, 1 mitre, 2 bevel. The geometry is
+#' rescaled as `sf_rescale01()` rescales it from `x_range` / `y_range`
+#' (CoordSf$transform's ranges after its `reverse` handling) and placed in
+#' `rect`, the panel's (left, top, width, height) in canvas pixels, and
+#' each path is clipped to it. `NULL` (decline) unless every feature is a
+#' polygon the sfc reader reads, or for other unsupported inputs.
+#' @noRd
+rs_render_sf_polygons <- function(geometry, x_range, y_range, rect, dims, colour, fill, lwd, lty, style, mitre, res, threads) .Call(wrap__render_sf_polygons, geometry, x_range, y_range, rect, dims, colour, fill, lwd, lty, style, mitre, res, threads)
+
 #' Walks the features of an sfc. Returns `list(bbox = c(xmin, ymin, xmax,
 #' ymax), types = <1-based code per feature into Kind::ALL>)`, or NULL unless
 #' every feature is a non-empty XY POINT, MULTIPOINT, LINESTRING,

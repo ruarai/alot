@@ -1781,3 +1781,47 @@ What is left of `layout_setup` is `rs_sfc_plain_xy()` (the walk that
 proves the skip exact, about 2 ms at 1e6 vertices) and sf's `[<-.sf`,
 which the mirror keeps as upstream has it. Layers in another CRS still
 call `st_transform()`, so `sf_1e3_reproject` is unchanged.
+
+## S3.2: geom_sf() polygons in the hybrid tier (2026-11-01)
+
+`inst/bench/spatial.R` (`ALOT_BENCH_CASES=sf_1e2_3577,sf_1e3_3577,sf_1e4_3577,sf_1e2_4326,sf_1e3_4326,sf_1e4_4326,sf_1e3_3577_outline
+ALOT_BENCH_PROFILE=false`), release build, same machine and page (7 × 7 in
+at 300 dpi) as S0.2, 3 interleaved reps, medians in ms. The sf cases now
+go to the **hybrid tier**: ggplot2's gtable, with the polygon layer as a
+lazy Rust grob (S3.1's sfc reader and `rescale01()`, then the path
+drawer). The new `sf_1e3_3577_outline` case is the north star's sf layer
+alone (`fill = NA, colour = "grey20"`, 1e3 features, 1e6 vertices).
+
+| case | ragg draw | alot draw | draw speedup | gg render | alot render | gg total | alot total | speedup |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| sf_1e2_3577 | 827 | 118 | 7.0× | 1,017 | 187 | 1,227 | 269 | 4.56× |
+| sf_1e3_3577 | 717 | 106 | 6.8× | 956 | 180 | 1,148 | 272 | 4.22× |
+| sf_1e4_3577 | 771 | 121 | 6.4× | 1,214 | 222 | 1,565 | 388 | 4.03× |
+| sf_1e2_4326 | 845 | 101 | 8.4× | 1,050 | 164 | 1,212 | 233 | 5.20× |
+| sf_1e3_4326 | 736 | 106 | 6.9× | 997 | 183 | 1,186 | 270 | 4.39× |
+| sf_1e4_4326 | 771 | 141 | 5.5× | 1,266 | 247 | 1,605 | 444 | 3.61× |
+| sf_1e3_3577_outline | 689 | 95 | 7.3× | 935 | 156 | 1,125 | 240 | 4.69× |
+
+**Target met:** the 1e6-vertex choropleth and outline cases draw 5.5–8.4×
+faster than ragg. The draw stage is grid drawing the whole gtable,
+including graticule lines, axes and the legend, which ggplot2 still draws.
+The Rust polygon drawer itself (timed in a standalone release build on a
+2000² page, 8 threads, 1e6 vertices, fill and 0.5 mm stroke) takes 45–70 ms:
+about half stroking the outlines and half rasterising in bands.
+
+**Path preparation split by vertices.** `PathBatch::new()` used to prepare
+paths in chunks of at least 64 specs, so 100 features of 10,000 vertices
+each were stroked on 2 threads. It now splits by vertex count (at least
+4,096 per chunk). For 1e2 features this took the drawer from 163 to 70 ms;
+1e3 and 1e4 features were unchanged.
+
+**Bbox batching: dropped (1.25× rule).** SPATIAL.md allows merging
+consecutive features whose bounding boxes don't overlap into one path. The
+version tried was exact: same colours, disjoint pixel boxes, and a group's
+box at most twice its members' area. A unit test showed it pixel-identical
+to unbatched drawing. It made no measurable difference: ±3 ms on the
+45–57 ms drawer at 1e2–1e4 features, even with one fill colour for every
+feature. With per-feature fills, as in a choropleth, it would rarely merge
+at all. The cost is in stroking and in per-pixel work, which batching
+doesn't reduce, and row bands already run in parallel. So the code was
+removed.

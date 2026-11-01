@@ -9,6 +9,10 @@
 # in-scope geoms, coords, facets, guides and theme elements, no plotmath
 # labels, and plots that ggplot2 builds and lays out without error. Writes
 # their file and plot id to tests/testthat/render-corpus.tsv.
+#
+# geom_sf() and coord_sf() are admitted too (SPATIAL.md, S3.2): the hybrid
+# tier draws their sf layers in Rust and keeps ggplot2's gtable, so
+# coord_sf()'s degree labels (plotmath) don't exclude a plot.
 
 suppressPackageStartupMessages({
   library(ggplot2)
@@ -27,9 +31,11 @@ scope_geoms <- c(
   "GeomDensity", "GeomBoxplot", "GeomViolin", "GeomErrorbar", "GeomLinerange",
   "GeomPointrange", "GeomCrossbar", "GeomSegment", "GeomCurve", "GeomAbline",
   "GeomHline", "GeomVline", "GeomSmooth", "GeomText", "GeomLabel", "GeomRug",
-  "GeomBlank"
+  "GeomBlank",
+  # SPATIAL.md.
+  "GeomSf"
 )
-scope_coords <- c("CoordCartesian", "CoordFlip", "CoordFixed", "CoordTransform")
+scope_coords <- c("CoordCartesian", "CoordFlip", "CoordFixed", "CoordTransform", "CoordSf")
 scope_facets <- c("FacetNull", "FacetWrap", "FacetGrid")
 scope_guides <- c(
   "GuideAxis", "GuideNone", "GuideLegend", "GuideColourbar", "GuideColoursteps",
@@ -63,7 +69,9 @@ out_of_scope <- function(b) {
   if (length(bad)) return(paste("guide", bad[1]))
   labels <- c(plot@labels, lapply(plot@scales$scales, function(s) s$name))
   if (any(vapply(labels, is_plotmath, logical(1)))) return("plotmath label")
-  breaks_labels <- unlist(lapply(b@layout$panel_params, function(pp) {
+  # coord_sf()'s axis labels are its graticule's degree labels, drawn by
+  # ggplot2 in the hybrid tier.
+  breaks_labels <- if (coord != "CoordSf") unlist(lapply(b@layout$panel_params, function(pp) {
     lapply(c("x", "y"), function(a) pp[[a]]$get_labels())
   }), recursive = FALSE)
   if (any(vapply(breaks_labels, is_plotmath, logical(1)))) return("plotmath axis label")

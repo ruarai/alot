@@ -429,6 +429,11 @@ man-gg-add.R	gg-add.Rd #4
 man-ggplot.R	ggplot.Rd #1
 man-ggplot.R	ggplot.Rd #2
 man-ggplot.R	ggplot.Rd #3
+man-ggsf.R	ggsf.Rd #1
+man-ggsf.R	ggsf.Rd #2
+man-ggsf.R	ggsf.Rd #3
+man-ggsf.R	ggsf.Rd #4
+man-ggsf.R	ggsf.Rd #5
 man-ggtheme.R	ggtheme.Rd #1
 man-ggtheme.R	ggtheme.Rd #2
 man-ggtheme.R	ggtheme.Rd #3
@@ -905,6 +910,32 @@ test-build.R	test-build.R: position aesthetics are coerced to correct type #2
 test-build.R	test-build.R: non-position aesthetics are mapped #1
 test-build.R	test-build.R: non-position aesthetics are mapped #2
 test-build.R	test-build.R: strings are not converted to factors #1
+test-coord_sf.R	test-coord_sf.R: basic plot builds without error #1
+test-coord_sf.R	test-coord_sf.R: graticule lines can be removed via theme #1
+test-coord_sf.R	test-coord_sf.R: graticule lines and axes can be removed via scales #1
+test-coord_sf.R	test-coord_sf.R: axis labels are correct for manual breaks #1
+test-coord_sf.R	test-coord_sf.R: axis labels are correct for manual breaks #2
+test-coord_sf.R	test-coord_sf.R: axis labels can be set manually #1
+test-coord_sf.R	test-coord_sf.R: axis labels can be set manually #2
+test-coord_sf.R	test-coord_sf.R: factors are treated like character labels and are not parsed #1
+test-coord_sf.R	test-coord_sf.R: factors are treated like character labels and are not parsed #2
+test-coord_sf.R	test-coord_sf.R: expressions can be mixed with character labels #1
+test-coord_sf.R	test-coord_sf.R: expressions can be mixed with character labels #2
+test-coord_sf.R	test-coord_sf.R: expressions can be mixed with character labels #3
+test-coord_sf.R	test-coord_sf.R: degree labels are automatically parsed #1
+test-coord_sf.R	test-coord_sf.R: degree labels are automatically parsed #2
+test-coord_sf.R	test-coord_sf.R: Inf is squished to range #1
+test-coord_sf.R	test-coord_sf.R: default crs works #1
+test-coord_sf.R	test-coord_sf.R: default crs works #3
+test-coord_sf.R	test-coord_sf.R: default crs works #4
+test-coord_sf.R	test-coord_sf.R: default crs works #5
+test-coord_sf.R	test-coord_sf.R: default crs works #6
+test-coord_sf.R	test-coord_sf.R: when both x and y are AsIs, they are not transformed #1
+test-coord_sf.R	test-coord_sf.R: coord_sf() can use function breaks and n.breaks #1
+test-coord_sf.R	test-coord_sf.R: coord_sf() uses the guide system #1
+test-coord_sf.R	test-coord_sf.R: sf coords can be reversed #1
+test-coord_sf.R	test-coord_sf.R: coord_sf() can render with empty graticules #1
+test-coord_sf.R	test-coord_sf.R: coord_sf() can calculate breaks when expansion is on #1
 test-coord-.R	test-coord-.R: clipping is on by default #1
 test-coord-.R	test-coord-.R: message when replacing non-default coordinate system #1
 test-coord-.R	test-coord-.R: guide names are not removed by `train_panel_guides()` #1
@@ -1135,9 +1166,21 @@ test-geom-rule.R	test-geom-rule.R: setting aesthetics generates one row for each
 test-geom-rule.R	test-geom-rule.R: setting aesthetics generates one row for each input row #3
 test-geom-rule.R	test-geom-rule.R: setting aesthetics generates one row for each input row #4
 test-geom-rule.R	test-geom-rule.R: setting aesthetics generates one row for each input row #5
+test-geom-sf.R	test-geom-sf.R: geom_sf() determines the legend type from mapped geometry column #1
+test-geom-sf.R	test-geom-sf.R: geom_sf() determines the legend type from mapped geometry column #2
 test-geom-sf.R	test-geom-sf.R: geom_sf() removes rows containing missing aes #1
+test-geom-sf.R	test-geom-sf.R: geom_sf() handles alpha properly #1
+test-geom-sf.R	test-geom-sf.R: geom_sf draws correctly #1
+test-geom-sf.R	test-geom-sf.R: geom_sf draws correctly #2
+test-geom-sf.R	test-geom-sf.R: geom_sf draws correctly #3
+test-geom-sf.R	test-geom-sf.R: geom_sf data type renders appropriate legends #2
+test-geom-sf.R	test-geom-sf.R: geom_sf data type renders appropriate legends #3
+test-geom-sf.R	test-geom-sf.R: geom_sf data type renders appropriate legends #4
+test-geom-sf.R	test-geom-sf.R: geom_sf uses combinations of geometry correctly #1
 test-geom-sf.R	test-geom-sf.R: geom_sf_text() and geom_sf_label() draws correctly #1
 test-geom-sf.R	test-geom-sf.R: geom_sf_text() and geom_sf_label() draws correctly #2
+test-geom-sf.R	test-geom-sf.R: geom_sf draws arrows correctly #1
+test-geom-sf.R	test-geom-sf.R: geom_sf draws arrows correctly #2
 test-geom-smooth.R	test-geom-smooth.R: data is ordered by x #1
 test-geom-smooth.R	test-geom-smooth.R: geom_smooth works in both directions #1
 test-geom-smooth.R	test-geom-smooth.R: geom_smooth works in both directions #2
@@ -1230,6 +1273,7 @@ test-guides.R	test-guides.R: guide specifications are properly checked #1
 test-guides.R	test-guides.R: get_guide_data retrieves keys appropriately #1
 test-guides.R	test-guides.R: get_guide_data retrieves keys from exotic coords #1
 test-guides.R	test-guides.R: get_guide_data retrieves keys from exotic coords #2
+test-guides.R	test-guides.R: get_guide_data retrieves keys from exotic coords #3
 test-guides.R	test-guides.R: empty guides are dropped #1
 test-guides.R	test-guides.R: guides are positioned correctly #1
 test-guides.R	test-guides.R: guides are positioned correctly #2

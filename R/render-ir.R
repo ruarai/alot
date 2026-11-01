@@ -384,6 +384,11 @@ ir_scales <- function(layout, support) {
     }
     view <- function(v) {
       if (is.null(v)) return(NULL)
+      # coord_sf()'s view scale for an empty graticule (no breaks) is a bare
+      # ggproto(NULL, ViewScale) whose `scale` is the base Scale, so its
+      # break_positions() aborts "Not implemented."
+      # (view_scales_from_graticule(), ggplot2 R/coord-sf.R).
+      if (identical(class(v$scale)[1], "Scale")) return(list(major = NULL, minor = NULL))
       list(major = v$break_positions(), minor = v$break_positions_minor())
     }
     list(x.range = pp$x.range, y.range = pp$y.range, x = view(pp$x), y = view(pp$y), axes = axes)

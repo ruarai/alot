@@ -449,3 +449,25 @@ test_that("upstream sf layer, stat and coord steps match the versions alot mirro
   expect_snapshot(print(body(utils::getFromNamespace("st_transform.sfc", "sf"))))
   expect_snapshot(print(body(sf::st_sfc)))
 })
+
+test_that("upstream sf drawing matches what the sf polygon drawer mirrors", {
+  # R/render-sf.R and alot-core/src/render/sf.rs mirror GeomSf$draw_panel()
+  # and handle_na(), CoordSf$transform() -> sf_rescale01() and what
+  # sf::st_as_grob() gives for POLYGON and MULTIPOLYGON features (one
+  # even-odd path per polygon, gpar repeated per polygon). render_ir()
+  # relies on view_scales_from_graticule()'s bare ViewScale for an empty
+  # graticule. If these fail, update the mirrors to match, then update the
+  # snapshots.
+  skip_if_not_installed("sf")
+  body_of <- function(obj, name) body(environment(obj[[name]])$f)
+  expect_snapshot(print(body_of(ggplot2::GeomSf, "draw_panel")))
+  expect_snapshot(print(body_of(ggplot2::GeomSf, "handle_na")))
+  expect_snapshot(print(body_of(ggplot2::CoordSf, "transform")))
+  expect_snapshot(print(body(utils::getFromNamespace("sf_rescale01", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("fill_alpha", "ggplot2"))))
+  expect_snapshot(print(body(utils::getFromNamespace("view_scales_from_graticule", "ggplot2"))))
+  for (f in c("st_as_grob.sfc", "st_as_grob.sfc_POLYGON", "st_as_grob.sfc_MULTIPOLYGON", "st_as_grob.POLYGON",
+    "st_as_grob.MULTIPOLYGON", "st_cast_sfc_default", "scalar_grobs", "expand_gp", "split_gp")) {
+    expect_snapshot(print(body(utils::getFromNamespace(f, "sf"))))
+  }
+})
