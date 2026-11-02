@@ -2,6 +2,8 @@
 
 A Rust backend for building and rendering ggplot2 plots.
 
+Note this is an AI vibe-coded proof-of-concept and not recommended for actual use.
+
 ```r
 library(ggplot2)
 p <- ggplot(mtcars, aes(wt, mpg)) + geom_point()
